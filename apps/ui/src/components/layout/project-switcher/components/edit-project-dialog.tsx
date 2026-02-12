@@ -9,12 +9,25 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Upload, X, ImageIcon } from 'lucide-react';
+import { Upload, X, ImageIcon, Check } from 'lucide-react';
 import { useAppStore } from '@/store/app-store';
 import { getAuthenticatedImageUrl } from '@/lib/api-fetch';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import type { Project } from '@/lib/electron';
 import { IconPicker } from './icon-picker';
+import { cn } from '@/lib/utils';
+
+/** Predefined badge colors for quick selection */
+const BADGE_COLORS = [
+  { value: '#ef4444', label: 'Red' },
+  { value: '#f97316', label: 'Orange' },
+  { value: '#eab308', label: 'Yellow' },
+  { value: '#22c55e', label: 'Green' },
+  { value: '#06b6d4', label: 'Cyan' },
+  { value: '#3b82f6', label: 'Blue' },
+  { value: '#8b5cf6', label: 'Purple' },
+  { value: '#ec4899', label: 'Pink' },
+];
 
 interface EditProjectDialogProps {
   project: Project;
@@ -23,12 +36,14 @@ interface EditProjectDialogProps {
 }
 
 export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDialogProps) {
-  const { setProjectName, setProjectIcon, setProjectCustomIcon } = useAppStore();
+  const { setProjectName, setProjectIcon, setProjectCustomIcon, setProjectBadgeColor } =
+    useAppStore();
   const [name, setName] = useState(project.name);
   const [icon, setIcon] = useState<string | null>((project as any).icon || null);
   const [customIconPath, setCustomIconPath] = useState<string | null>(
     (project as any).customIconPath || null
   );
+  const [badgeColor, setBadgeColor] = useState<string | null>((project as any).badgeColor || null);
   const [isUploadingIcon, setIsUploadingIcon] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -41,6 +56,9 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
     }
     if (customIconPath !== (project as any).customIconPath) {
       setProjectCustomIcon(project.id, customIconPath);
+    }
+    if (badgeColor !== (project as any).badgeColor) {
+      setProjectBadgeColor(project.id, badgeColor);
     }
     onOpenChange(false);
   };
@@ -170,6 +188,63 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
 
             {/* Preset Icon Picker - only show if no custom icon */}
             {!customIconPath && <IconPicker selectedIcon={icon} onSelectIcon={setIcon} />}
+          </div>
+
+          {/* Badge Color Picker */}
+          <div className="space-y-2">
+            <Label>Badge Border Color</Label>
+            <p className="text-xs text-muted-foreground mb-2">
+              Add a colored border to distinguish this project
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {/* No color option */}
+              <button
+                type="button"
+                onClick={() => setBadgeColor(null)}
+                className={cn(
+                  'w-7 h-7 rounded-md border-2 flex items-center justify-center transition-all',
+                  badgeColor === null
+                    ? 'border-primary ring-2 ring-primary/30'
+                    : 'border-border hover:border-muted-foreground'
+                )}
+                title="No border"
+              >
+                <X className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+              {/* Predefined colors */}
+              {BADGE_COLORS.map((color) => (
+                <button
+                  key={color.value}
+                  type="button"
+                  onClick={() => setBadgeColor(color.value)}
+                  className={cn(
+                    'w-7 h-7 rounded-md border-2 flex items-center justify-center transition-all',
+                    badgeColor === color.value ? 'ring-2 ring-primary/30' : 'hover:scale-110'
+                  )}
+                  style={{
+                    backgroundColor: color.value,
+                    borderColor: badgeColor === color.value ? 'hsl(var(--primary))' : color.value,
+                  }}
+                  title={color.label}
+                >
+                  {badgeColor === color.value && (
+                    <Check className="w-3.5 h-3.5 text-white drop-shadow-sm" />
+                  )}
+                </button>
+              ))}
+            </div>
+            {/* Preview */}
+            {badgeColor && (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Preview:</span>
+                <span
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded"
+                  style={{ borderWidth: '1px', borderStyle: 'solid', borderColor: badgeColor }}
+                >
+                  {name || project.name}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

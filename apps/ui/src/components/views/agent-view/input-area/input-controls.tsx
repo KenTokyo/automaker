@@ -1,10 +1,14 @@
-import { useRef, useCallback, useEffect } from 'react';
-import { Send, Paperclip, Square, ListOrdered } from 'lucide-react';
+import { useRef, useCallback, useEffect, useState } from 'react';
+import { Send, Paperclip, Square, ListOrdered, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { AgentModelSelector } from '../shared/agent-model-selector';
+import { AgentPromptsSelector } from './agent-prompts-selector';
+import { TimeLimiterSettings } from './time-limiter-settings';
+import { generateChatSummary, copyToClipboard } from '@/lib/copy-all-chat';
 import type { PhaseModelEntry } from '@automaker/types';
+import type { Message } from '@/types/electron';
 
 interface InputControlsProps {
   input: string;
@@ -22,6 +26,12 @@ interface InputControlsProps {
   hasFiles: boolean;
   isDragOver: boolean;
   showImageDropZone: boolean;
+  /** Current project path for agent prompts */
+  projectPath: string | null;
+  /** Chat messages for Copy-All feature */
+  messages?: Message[];
+  /** Elapsed seconds for time limiter display */
+  elapsedSeconds?: number;
   // Drag handlers
   onDragEnter: (e: React.DragEvent) => void;
   onDragLeave: (e: React.DragEvent) => void;
@@ -45,6 +55,9 @@ export function InputControls({
   hasFiles,
   isDragOver,
   showImageDropZone,
+  projectPath,
+  messages = [],
+  elapsedSeconds = 0,
   onDragEnter,
   onDragLeave,
   onDragOver,
@@ -53,24 +66,52 @@ export function InputControls({
 }: InputControlsProps) {
   const internalInputRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = externalInputRef || internalInputRef;
+  const [copySuccess, setCopySuccess] = useState(false);
+
+  // Handle Copy-All button click
+  const handleCopyAll = useCallback(async () => {
+    if (messages.length === 0) return;
+
+    const summary = generateChatSummary(messages);
+    const success = await copyToClipboard(summary.formattedChat);
+
+    if (success) {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    }
+  }, [messages]);
+
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      onInputChange(e.target.value);
+    },
+    [onInputChange]
+  );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       onSend();
+      // Reset height after sending (will be handled by useEffect when input clears)
     }
   };
 
-  const adjustTextareaHeight = useCallback(() => {
+  // Adjust height when input changes (including when cleared after send)
+  useEffect(() => {
     const textarea = inputRef.current;
     if (!textarea) return;
-    textarea.style.height = 'auto';
-    textarea.style.height = `${textarea.scrollHeight}px`;
-  }, [inputRef]);
 
-  useEffect(() => {
-    adjustTextareaHeight();
-  }, [input, adjustTextareaHeight]);
+    const minHeight = 44;
+    const maxHeight = 320;
+
+    textarea.style.height = 'auto';
+    const scrollHeight = textarea.scrollHeight;
+    const newHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight));
+
+    textarea.style.height = `${newHeight}px`;
+    textarea.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [input]); // inputRef is a ref and doesn't need to be in dependencies
 
   const canSend = (input.trim() || hasFiles) && isConnected;
 
@@ -99,15 +140,16 @@ export function InputControls({
                   : 'Describe what you want to build...'
             }
             value={input}
-            onChange={(e) => onInputChange(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             onPaste={onPaste}
             disabled={!isConnected}
             data-testid="agent-input"
             rows={1}
             className={cn(
-              'min-h-11 w-full bg-background border-border rounded-xl pl-4 pr-4 sm:pr-20 text-sm transition-all resize-none max-h-36 overflow-y-auto py-2.5',
+              'w-full bg-background border-border rounded-xl pl-4 pr-4 sm:pr-20 text-sm resize-none py-2.5',
               'focus:ring-2 focus:ring-primary/20 focus:border-primary/50',
+              'min-h-[44px]',
               hasFiles && 'border-primary/30',
               isDragOver && 'border-primary bg-primary/5'
             )}
@@ -148,6 +190,27 @@ export function InputControls({
             title="Attach files (images, .txt, .md)"
           >
             <Paperclip className="w-4 h-4" />
+          </Button>
+
+          {/* Agent Prompts Selector */}
+          <AgentPromptsSelector projectPath={projectPath} disabled={!isConnected} />
+
+          {/* Time Limiter Settings */}
+          <TimeLimiterSettings disabled={!isConnected} elapsedSeconds={elapsedSeconds} />
+
+          {/* Copy-All Button */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleCopyAll}
+            disabled={!isConnected || messages.length === 0}
+            className={cn(
+              'h-11 w-11 rounded-xl border-border shrink-0',
+              copySuccess && 'border-green-500/50 text-green-600'
+            )}
+            title="Copy entire chat history"
+          >
+            {copySuccess ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
           </Button>
 
           {/* Spacer to push action buttons to the right */}

@@ -1,16 +1,18 @@
 import { createRootRoute, Outlet, useLocation, useNavigate } from '@tanstack/react-router';
-import { useEffect, useState, useCallback, useDeferredValue, useRef } from 'react';
+import { useEffect, useState, useCallback, useDeferredValue, useRef, useMemo } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createLogger } from '@automaker/utils/logger';
 import { Sidebar } from '@/components/layout/sidebar';
 import { ProjectSwitcher } from '@/components/layout/project-switcher';
+import { ProjectCommandBox } from '@/components/layout/project-command-box';
 import {
   FileBrowserProvider,
   useFileBrowser,
   setGlobalFileBrowser,
 } from '@/contexts/file-browser-context';
 import { useAppStore, getStoredTheme, type ThemeMode } from '@/store/app-store';
+import { useKeyboardShortcuts, useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
 import { useSetupStore } from '@/store/setup-store';
 import { useAuthStore } from '@/store/auth-store';
 import { getElectronAPI, isElectron } from '@/lib/electron';
@@ -178,10 +180,26 @@ function RootLayoutContent() {
   const navigate = useNavigate();
   const [isMounted, setIsMounted] = useState(false);
   const [streamerPanelOpen, setStreamerPanelOpen] = useState(false);
+  const [projectCommandBoxOpen, setProjectCommandBoxOpen] = useState(false);
   const authChecked = useAuthStore((s) => s.authChecked);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const settingsLoaded = useAuthStore((s) => s.settingsLoaded);
   const { openFileBrowser } = useFileBrowser();
+  const shortcuts = useKeyboardShortcutsConfig();
+
+  // Register projectPicker shortcut to open Command Box
+  useKeyboardShortcuts(
+    useMemo(
+      () => [
+        {
+          key: shortcuts.projectPicker,
+          action: () => setProjectCommandBoxOpen((prev) => !prev),
+          description: 'Toggle project picker command box',
+        },
+      ],
+      [shortcuts.projectPicker]
+    )
+  );
 
   // Load project settings when switching projects
   useProjectSettingsLoader();
@@ -890,6 +908,7 @@ function RootLayoutContent() {
         onConfirm={handleSandboxConfirm}
         onDeny={handleSandboxDeny}
       />
+      <ProjectCommandBox open={projectCommandBoxOpen} onOpenChange={setProjectCommandBoxOpen} />
     </>
   );
 }

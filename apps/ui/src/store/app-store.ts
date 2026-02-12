@@ -1021,6 +1021,7 @@ export interface AppActions {
   setProjectIcon: (projectId: string, icon: string | null) => void; // Set project icon (null to clear)
   setProjectCustomIcon: (projectId: string, customIconPath: string | null) => void; // Set custom project icon image path (null to clear)
   setProjectName: (projectId: string, name: string) => void; // Update project name
+  setProjectBadgeColor: (projectId: string, badgeColor: string | null) => void; // Set project badge border color (null to clear)
 
   // View actions
   setCurrentView: (view: ViewMode) => void;
@@ -1876,6 +1877,23 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         currentProject: {
           ...currentProject,
           name,
+        },
+      });
+    }
+  },
+
+  setProjectBadgeColor: (projectId, badgeColor) => {
+    const { projects, currentProject } = get();
+    const updatedProjects = projects.map((p) =>
+      p.id === projectId ? { ...p, badgeColor: badgeColor === null ? undefined : badgeColor } : p
+    );
+    set({ projects: updatedProjects });
+    // Also update currentProject if it matches
+    if (currentProject?.id === projectId) {
+      set({
+        currentProject: {
+          ...currentProject,
+          badgeColor: badgeColor === null ? undefined : badgeColor,
         },
       });
     }

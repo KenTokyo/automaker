@@ -17,7 +17,10 @@ import {
   Check,
   X,
   ArchiveRestore,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import type { SessionListItem } from '@/types/electron';
@@ -27,6 +30,12 @@ import { useSessions } from '@/hooks/queries';
 import { queryKeys } from '@/lib/query-keys';
 import { DeleteSessionDialog } from '@/components/dialogs/delete-session-dialog';
 import { DeleteAllArchivedSessionsDialog } from '@/components/dialogs/delete-all-archived-sessions-dialog';
+import { ProjectBadge } from '@/components/project-badge';
+import { useProjectLookup } from '@/hooks/use-project-lookup';
+import { useSessionSearch } from '@/hooks/use-session-search';
+import { useSessionFilter } from '@/hooks/use-session-filter';
+import { SessionSearchInput } from '@/components/session-manager/session-search-input';
+import { ProjectFilterDropdown } from '@/components/session-manager/project-filter-dropdown';
 
 // Random session name generator
 const adjectives = [
@@ -105,6 +114,7 @@ export function SessionManager({
   onQuickCreateRef,
 }: SessionManagerProps) {
   const shortcuts = useKeyboardShortcutsConfig();
+  const { getProjectName, getBadgeColor } = useProjectLookup();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -116,8 +126,27 @@ export function SessionManager({
   const [sessionToDelete, setSessionToDelete] = useState<SessionListItem | null>(null);
   const [isDeleteAllArchivedDialogOpen, setIsDeleteAllArchivedDialogOpen] = useState(false);
 
+  // Multiselect state
+  const [isMultiselectMode, setIsMultiselectMode] = useState(false);
+  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
+
   // Use React Query for sessions list - always include archived, filter client-side
   const { data: sessions = [], refetch: refetchSessions } = useSessions(true);
+
+  // Search and filter hooks
+  const { searchTerm, debouncedSearchTerm, setSearchTerm, clearSearch } = useSessionSearch();
+  const {
+    filterProjectPath,
+    setFilterProjectPath,
+    resetFilter,
+    filteredSessions: filteredBySearchAndProject,
+    sessionCountByProject,
+  } = useSessionFilter({ sessions, searchTerm: debouncedSearchTerm });
+
+  // Reset project filter when the active project changes
+  useEffect(() => {
+    resetFilter();
+  }, [projectPath, resetFilter]);
 
   // Ref to track if we've done the initial running sessions check
   const hasCheckedInitialRef = useRef(false);
@@ -320,31 +349,118 @@ export function SessionManager({
 
   const activeSessions = sessions.filter((s) => !s.isArchived);
   const archivedSessions = sessions.filter((s) => s.isArchived);
-  const displayedSessions = activeTab === 'active' ? activeSessions : archivedSessions;
+
+  // Multiselect functions
+  const toggleSessionSelection = (sessionId: string) => {
+    setSelectedSessionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) {
+        next.delete(sessionId);
+      } else {
+        next.add(sessionId);
+      }
+      return next;
+    });
+  };
+
+  const selectAllInCurrentTab = () => {
+    const sessionsToSelect = activeTab === 'active' ? filteredActive : filteredArchived;
+    setSelectedSessionIds(new Set(sessionsToSelect.map((s) => s.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedSessionIds(new Set());
+  };
+
+  const exitMultiselectMode = () => {
+    setIsMultiselectMode(false);
+    setSelectedSessionIds(new Set());
+  };
+
+  // Bulk delete selected sessions
+  const handleBulkDelete = async () => {
+    const api = getElectronAPI();
+    if (!api?.sessions || selectedSessionIds.size === 0) return;
+
+    for (const sessionId of selectedSessionIds) {
+      await api.sessions.delete(sessionId);
+      // If the deleted session was currently selected, deselect it
+      if (currentSessionId === sessionId) {
+        onSelectSession(null);
+      }
+    }
+
+    await invalidateSessions();
+    exitMultiselectMode();
+  };
+
+  // Bulk archive selected sessions
+  const handleBulkArchive = async () => {
+    const api = getElectronAPI();
+    if (!api?.sessions || selectedSessionIds.size === 0) return;
+
+    for (const sessionId of selectedSessionIds) {
+      await api.sessions.archive(sessionId);
+      // If the archived session was currently selected, deselect it
+      if (currentSessionId === sessionId) {
+        onSelectSession(null);
+      }
+    }
+
+    await invalidateSessions();
+    exitMultiselectMode();
+  };
+
+  // Apply search + project filter on the tab-specific list
+  const filteredActive = filteredBySearchAndProject.filter((s) => !s.isArchived);
+  const filteredArchived = filteredBySearchAndProject.filter((s) => s.isArchived);
+  const displayedSessions = activeTab === 'active' ? filteredActive : filteredArchived;
+  const isFiltering = !!debouncedSearchTerm || !!filterProjectPath;
 
   return (
     <Card className="h-full flex flex-col rounded-none">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between mb-4">
           <CardTitle>Agent Sessions</CardTitle>
-          <HotkeyButton
-            variant="default"
-            size="sm"
-            onClick={() => {
-              // Switch to active tab if on archived tab
-              if (activeTab === 'archived') {
-                setActiveTab('active');
-              }
-              handleQuickCreateSession();
-            }}
-            hotkey={shortcuts.newSession}
-            hotkeyActive={false}
-            data-testid="new-session-button"
-            title={`New Session (${shortcuts.newSession})`}
-          >
-            <Plus className="w-4 h-4 mr-1" />
-            New
-          </HotkeyButton>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={isMultiselectMode ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => {
+                if (isMultiselectMode) {
+                  exitMultiselectMode();
+                } else {
+                  setIsMultiselectMode(true);
+                }
+              }}
+              title={isMultiselectMode ? 'Exit select mode' : 'Select multiple sessions'}
+              data-testid="multiselect-toggle"
+            >
+              {isMultiselectMode ? (
+                <CheckSquare className="w-4 h-4" />
+              ) : (
+                <Square className="w-4 h-4" />
+              )}
+            </Button>
+            <HotkeyButton
+              variant="default"
+              size="sm"
+              onClick={() => {
+                // Switch to active tab if on archived tab
+                if (activeTab === 'archived') {
+                  setActiveTab('active');
+                }
+                handleQuickCreateSession();
+              }}
+              hotkey={shortcuts.newSession}
+              hotkeyActive={false}
+              data-testid="new-session-button"
+              title={`New Session (${shortcuts.newSession})`}
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              New
+            </HotkeyButton>
+          </div>
         </div>
 
         <Tabs
@@ -355,17 +471,80 @@ export function SessionManager({
           <TabsList className="w-full">
             <TabsTrigger value="active" className="flex-1">
               <MessageSquare className="w-4 h-4 mr-2" />
-              Active ({activeSessions.length})
+              Active (
+              {isFiltering
+                ? `${filteredActive.length}/${activeSessions.length}`
+                : activeSessions.length}
+              )
             </TabsTrigger>
             <TabsTrigger value="archived" className="flex-1">
               <Archive className="w-4 h-4 mr-2" />
-              Archived ({archivedSessions.length})
+              Archived (
+              {isFiltering
+                ? `${filteredArchived.length}/${archivedSessions.length}`
+                : archivedSessions.length}
+              )
             </TabsTrigger>
           </TabsList>
         </Tabs>
+
+        {/* Search & Filter Toolbar */}
+        <div className="flex items-center gap-2 mt-3">
+          <div className="flex-1 min-w-0">
+            <SessionSearchInput value={searchTerm} onChange={setSearchTerm} onClear={clearSearch} />
+          </div>
+          <ProjectFilterDropdown
+            selectedProjectPath={filterProjectPath}
+            onChange={setFilterProjectPath}
+            sessionCounts={sessionCountByProject}
+          />
+        </div>
       </CardHeader>
 
       <CardContent className="flex-1 overflow-y-auto space-y-2" data-testid="session-list">
+        {/* Multiselect toolbar */}
+        {isMultiselectMode && (
+          <div className="p-2 border rounded-lg bg-muted/50 flex items-center justify-between gap-2 sticky top-0 z-10">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                {selectedSessionIds.size} selected
+              </span>
+              <Button variant="ghost" size="sm" onClick={selectAllInCurrentTab} className="h-7">
+                Select All
+              </Button>
+              {selectedSessionIds.size > 0 && (
+                <Button variant="ghost" size="sm" onClick={clearSelection} className="h-7">
+                  Clear
+                </Button>
+              )}
+            </div>
+            {selectedSessionIds.size > 0 && (
+              <div className="flex items-center gap-1">
+                {activeTab === 'active' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleBulkArchive}
+                    className="h-7"
+                    title="Archive selected"
+                  >
+                    <Archive className="w-4 h-4" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleBulkDelete}
+                  className="h-7 text-destructive hover:text-destructive"
+                  title="Delete selected"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Create new session */}
         {isCreating && (
           <div className="p-3 border rounded-lg bg-muted/50">
@@ -423,12 +602,31 @@ export function SessionManager({
             className={cn(
               'p-3 border rounded-lg cursor-pointer transition-colors hover:bg-accent/50',
               currentSessionId === session.id && 'bg-primary/10 border-primary',
-              session.isArchived && 'opacity-60'
+              session.isArchived && 'opacity-60',
+              isMultiselectMode &&
+                selectedSessionIds.has(session.id) &&
+                'bg-primary/20 border-primary'
             )}
-            onClick={() => !session.isArchived && onSelectSession(session.id)}
+            onClick={() => {
+              if (isMultiselectMode) {
+                toggleSessionSelection(session.id);
+              } else if (!session.isArchived) {
+                onSelectSession(session.id);
+              }
+            }}
             data-testid={`session-item-${session.id}`}
           >
             <div className="flex items-start justify-between gap-2">
+              {/* Checkbox for multiselect mode */}
+              {isMultiselectMode && (
+                <div className="flex items-center pt-0.5" onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    checked={selectedSessionIds.has(session.id)}
+                    onCheckedChange={() => toggleSessionSelection(session.id)}
+                    data-testid={`session-checkbox-${session.id}`}
+                  />
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 {editingSessionId === session.id ? (
                   <div className="flex gap-2 mb-2">
@@ -490,7 +688,7 @@ export function SessionManager({
                     {session.preview && (
                       <p className="text-xs text-muted-foreground truncate">{session.preview}</p>
                     )}
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
                       <span className="text-xs text-muted-foreground">
                         {session.messageCount} messages
                       </span>
@@ -498,13 +696,23 @@ export function SessionManager({
                       <span className="text-xs text-muted-foreground">
                         {new Date(session.updatedAt).toLocaleDateString()}
                       </span>
+                      {session.projectPath && (
+                        <>
+                          <span className="text-xs text-muted-foreground">·</span>
+                          <ProjectBadge
+                            projectName={getProjectName(session.projectPath)}
+                            projectPath={session.projectPath}
+                            badgeColor={getBadgeColor(session.projectPath)}
+                          />
+                        </>
+                      )}
                     </div>
                   </>
                 )}
               </div>
 
-              {/* Actions */}
-              {!session.isArchived && (
+              {/* Actions - hidden in multiselect mode */}
+              {!isMultiselectMode && !session.isArchived && (
                 <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                   <Button
                     size="sm"
@@ -514,6 +722,7 @@ export function SessionManager({
                       setEditingName(session.name);
                     }}
                     className="h-7 w-7 p-0"
+                    title="Rename session"
                   >
                     <Edit2 className="w-3 h-3" />
                   </Button>
@@ -523,19 +732,31 @@ export function SessionManager({
                     onClick={() => handleArchiveSession(session.id)}
                     className="h-7 w-7 p-0"
                     data-testid={`archive-session-${session.id}`}
+                    title="Archive session"
                   >
                     <Archive className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleDeleteSession(session)}
+                    className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                    data-testid={`delete-session-${session.id}`}
+                    title="Delete session"
+                  >
+                    <Trash2 className="w-3 h-3" />
                   </Button>
                 </div>
               )}
 
-              {session.isArchived && (
+              {!isMultiselectMode && session.isArchived && (
                 <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => handleUnarchiveSession(session.id)}
                     className="h-7 w-7 p-0"
+                    title="Restore session"
                   >
                     <ArchiveRestore className="w-3 h-3" />
                   </Button>
@@ -543,8 +764,9 @@ export function SessionManager({
                     size="sm"
                     variant="ghost"
                     onClick={() => handleDeleteSession(session)}
-                    className="h-7 w-7 p-0 text-destructive"
-                    data-testid={`delete-session-${session.id}`}
+                    className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                    data-testid={`delete-archived-session-${session.id}`}
+                    title="Delete session"
                   >
                     <Trash2 className="w-3 h-3" />
                   </Button>
@@ -557,14 +779,23 @@ export function SessionManager({
         {displayedSessions.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
             <MessageSquare className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">
-              {activeTab === 'active' ? 'No active sessions' : 'No archived sessions'}
-            </p>
-            <p className="text-xs">
-              {activeTab === 'active'
-                ? 'Create your first session to get started'
-                : 'Archive sessions to see them here'}
-            </p>
+            {isFiltering ? (
+              <>
+                <p className="text-sm">No matching sessions</p>
+                <p className="text-xs">Try adjusting your search or filter</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm">
+                  {activeTab === 'active' ? 'No active sessions' : 'No archived sessions'}
+                </p>
+                <p className="text-xs">
+                  {activeTab === 'active'
+                    ? 'Create your first session to get started'
+                    : 'Archive sessions to see them here'}
+                </p>
+              </>
+            )}
           </div>
         )}
       </CardContent>

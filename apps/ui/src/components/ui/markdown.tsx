@@ -9,11 +9,39 @@ interface MarkdownProps {
 }
 
 /**
+ * Preprocess text to preserve single line breaks as <br> tags
+ * This ensures that newlines in the source text are rendered properly
+ */
+function preserveLineBreaks(text: string): string {
+  // Don't process empty strings
+  if (!text) return text;
+
+  // Split by code blocks to avoid processing them
+  const codeBlockRegex = /(```[\s\S]*?```|`[^`\n]+`)/g;
+  const parts = text.split(codeBlockRegex);
+
+  return parts
+    .map((part, index) => {
+      // Even indices are regular text, odd indices are code blocks
+      if (index % 2 === 0) {
+        // Replace single newlines with double newlines for markdown paragraphs
+        // But preserve double/multiple newlines as they are
+        return part.replace(/(?<!\n)\n(?!\n)/g, '\n\n');
+      }
+      return part;
+    })
+    .join('');
+}
+
+/**
  * Reusable Markdown component for rendering markdown content
  * Theme-aware styling that adapts to all predefined themes
  * Supports raw HTML elements including images
  */
 export function Markdown({ children, className }: MarkdownProps) {
+  // Preprocess to preserve line breaks
+  const processedContent = preserveLineBreaks(children);
+
   return (
     <div
       className={cn(
@@ -45,7 +73,7 @@ export function Markdown({ children, className }: MarkdownProps) {
         className
       )}
     >
-      <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeSanitize]}>{children}</ReactMarkdown>
+      <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeSanitize]}>{processedContent}</ReactMarkdown>
     </div>
   );
 }

@@ -80,6 +80,12 @@ export function useElectronAgent({
   const [serverQueue, setServerQueue] = useState<QueuedPrompt[]>([]);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const currentMessageRef = useRef<Message | null>(null);
+  const onToolUseRef = useRef(onToolUse);
+
+  // Keep onToolUse ref up to date
+  useEffect(() => {
+    onToolUseRef.current = onToolUse;
+  }, [onToolUse]);
 
   // Send message directly to the agent (bypassing queue)
   const sendMessageDirectly = useCallback(
@@ -306,7 +312,7 @@ export function useElectronAgent({
         case 'tool_use':
           // Tool being used
           logger.info('Tool use:', event.tool.name);
-          onToolUse?.(event.tool.name, event.tool.input);
+          onToolUseRef.current?.(event.tool.name, event.tool.input);
           break;
 
         case 'complete':
@@ -367,7 +373,8 @@ export function useElectronAgent({
         unsubscribeRef.current = null;
       }
     };
-  }, [sessionId, onToolUse]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]); // onToolUse is intentionally excluded - we use a ref pattern to avoid re-subscribing
 
   // Send a message to the agent
   const sendMessage = useCallback(

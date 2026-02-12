@@ -756,6 +756,8 @@ export interface ProjectRef {
   icon?: string;
   /** Custom icon image path for project switcher */
   customIconPath?: string;
+  /** Border color for project badge (hex color, e.g., "#ff0000") */
+  badgeColor?: string;
 }
 
 /**

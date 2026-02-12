@@ -1,9 +1,11 @@
 import { ImageDropZone } from '@/components/ui/image-drop-zone';
 import type { ImageAttachment, TextFileAttachment } from '@/store/app-store';
 import type { PhaseModelEntry } from '@automaker/types';
+import type { Message } from '@/types/electron';
 import { FilePreview } from './file-preview';
 import { QueueDisplay } from './queue-display';
 import { InputControls } from './input-controls';
+import { SelectedPromptsDisplay } from './selected-prompts-display';
 
 interface QueueItem {
   id: string;
@@ -22,6 +24,12 @@ interface AgentInputAreaProps {
   onModelSelect: (entry: PhaseModelEntry) => void;
   isProcessing: boolean;
   isConnected: boolean;
+  /** Current project path for agent prompts */
+  projectPath: string | null;
+  /** Chat messages for Copy-All feature */
+  messages?: Message[];
+  /** Elapsed seconds for time limiter display */
+  elapsedSeconds?: number;
   // File attachments
   selectedImages: ImageAttachment[];
   selectedTextFiles: TextFileAttachment[];
@@ -54,6 +62,9 @@ export function AgentInputArea({
   onModelSelect,
   isProcessing,
   isConnected,
+  projectPath,
+  messages = [],
+  elapsedSeconds = 0,
   selectedImages,
   selectedTextFiles,
   showImageDropZone,
@@ -76,7 +87,7 @@ export function AgentInputArea({
   const hasFiles = selectedImages.length > 0 || selectedTextFiles.length > 0;
 
   return (
-    <div className="border-t border-border p-4 bg-card/50 backdrop-blur-sm">
+    <div className="border-t border-border p-4 bg-card/50 backdrop-blur-sm flex-shrink-0 max-h-[50vh] overflow-y-auto">
       {/* Image Drop Zone (when visible) */}
       {showImageDropZone && (
         <ImageDropZone
@@ -107,6 +118,9 @@ export function AgentInputArea({
         />
       )}
 
+      {/* Selected Agent Prompts Display */}
+      <SelectedPromptsDisplay />
+
       {/* Input Controls */}
       <InputControls
         input={input}
@@ -122,6 +136,9 @@ export function AgentInputArea({
         hasFiles={hasFiles}
         isDragOver={isDragOver}
         showImageDropZone={showImageDropZone}
+        projectPath={projectPath}
+        messages={messages}
+        elapsedSeconds={elapsedSeconds}
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}
         onDragOver={onDragOver}
