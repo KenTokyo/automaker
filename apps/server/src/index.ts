@@ -338,7 +338,7 @@ app.use('/api/settings', createSettingsRoutes(settingsService));
 app.use('/api/claude', createClaudeRoutes(claudeUsageService));
 app.use('/api/codex', createCodexRoutes(codexUsageService, codexModelCacheService));
 app.use('/api/github', createGitHubRoutes(events, settingsService));
-app.use('/api/docs', createDocsRoutes());
+app.use('/api/docs', createDocsRoutes(settingsService));
 app.use('/api/context', createContextRoutes(settingsService));
 app.use('/api/backlog-plan', createBacklogPlanRoutes(events, settingsService));
 app.use('/api/mcp', createMCPRoutes(mcpTestService));

@@ -1,8 +1,27 @@
-import { memo } from 'react';
-import { Bot, User, ImageIcon, AlertCircle } from 'lucide-react';
+import { memo, useCallback, useState } from 'react';
+import {
+  Bot,
+  User,
+  ImageIcon,
+  AlertCircle,
+  FileText,
+  FilePlus,
+  FileInput,
+  ClipboardPaste,
+} from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Markdown } from '@/components/ui/markdown';
 import type { ImageAttachment } from '@/store/app-store';
+import { useAppStore } from '@/store/app-store';
+import { getHttpApiClient } from '@/lib/http-api-client';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Message {
   id: string;
@@ -19,11 +38,13 @@ interface MessageBubbleProps {
 
 export const MessageBubble = memo(function MessageBubble({ message }: MessageBubbleProps) {
   const isError = message.isError && message.role === 'assistant';
+  const showInsertDocs =
+    message.role === 'assistant' && !isError && message.content.trim().length > 0;
 
   return (
     <div
       className={cn(
-        'flex gap-4 max-w-4xl',
+        'group/msg flex gap-4 max-w-4xl',
         message.role === 'user' ? 'flex-row-reverse ml-auto' : ''
       )}
     >
@@ -109,22 +130,133 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
           </div>
         )}
 
-        <p
-          className={cn(
-            'text-[11px] mt-2 font-medium',
-            isError
-              ? 'text-red-500/70'
-              : message.role === 'user'
-                ? 'text-primary-foreground/70'
-                : 'text-muted-foreground'
-          )}
-        >
-          {new Date(message.timestamp).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </p>
+        {/* Footer: timestamp + Insert into Docs */}
+        <div className="flex items-center justify-between mt-2">
+          <p
+            className={cn(
+              'text-[11px] font-medium',
+              isError
+                ? 'text-red-500/70'
+                : message.role === 'user'
+                  ? 'text-primary-foreground/70'
+                  : 'text-muted-foreground'
+            )}
+          >
+            {new Date(message.timestamp).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </p>
+
+          {showInsertDocs && <InsertIntoDocsButton content={message.content} />}
+        </div>
       </div>
     </div>
   );
 });
+
+/** Button with dropdown to insert AI message content into docs */
+function InsertIntoDocsButton({ content }: { content: string }) {
+  const [isCreating, setIsCreating] = useState(false);
+  const projectPath = useAppStore((s) => s.currentProject?.path);
+  const currentDocPath = useAppStore((s) => s.currentDocPath);
+  const setDocsOpen = useAppStore((s) => s.setDocsOpen);
+  const setCurrentDocPath = useAppStore((s) => s.setCurrentDocPath);
+
+  const handleNewDoc = useCallback(async () => {
+    if (!projectPath || isCreating) return;
+    setIsCreating(true);
+    try {
+      const api = getHttpApiClient();
+      // Generate a name from the first line of content
+      const firstLine = content
+        .split('\n')[0]
+        .replace(/^#+\s*/, '')
+        .trim();
+      const name = (firstLine.slice(0, 40) || 'AI Response') + '.md';
+      const newDoc = await api.docs.create({ projectPath, name, content });
+      toast.success('Document created');
+      // Open the new doc
+      setDocsOpen(true);
+      setCurrentDocPath(newDoc.path);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to create document';
+      toast.error(msg);
+    } finally {
+      setIsCreating(false);
+    }
+  }, [content, projectPath, isCreating, setDocsOpen, setCurrentDocPath]);
+
+  const handleAppendToCurrent = useCallback(async () => {
+    if (!projectPath || !currentDocPath || isCreating) return;
+    setIsCreating(true);
+    try {
+      const api = getHttpApiClient();
+      // Read current content first
+      const docContent = await api.docs.read(projectPath, currentDocPath);
+      const existing = docContent.content || '';
+      const separator = existing.trim().length > 0 ? '\n\n---\n\n' : '';
+      await api.docs.update({
+        projectPath,
+        filePath: currentDocPath,
+        content: existing + separator + content,
+      });
+      toast.success('Content appended to document');
+      // Switch to docs view
+      setDocsOpen(true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to append to document';
+      toast.error(msg);
+    } finally {
+      setIsCreating(false);
+    }
+  }, [content, projectPath, currentDocPath, isCreating, setDocsOpen]);
+
+  const handleCopyAsMarkdown = useCallback(() => {
+    navigator.clipboard.writeText(content).then(
+      () => toast.success('Copied to clipboard'),
+      () => toast.error('Failed to copy')
+    );
+  }, [content]);
+
+  if (!projectPath) return null;
+
+  return (
+    <DropdownMenu>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="opacity-0 group-hover/msg:opacity-100 focus:opacity-100 transition-opacity inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+              >
+                <FileText className="w-3 h-3" />
+                Docs
+              </button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">
+            Insert into Docs
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem onClick={handleNewDoc} disabled={isCreating}>
+          <FilePlus className="w-3.5 h-3.5 mr-2" />
+          New Document
+        </DropdownMenuItem>
+        {currentDocPath && (
+          <DropdownMenuItem onClick={handleAppendToCurrent} disabled={isCreating}>
+            <FileInput className="w-3.5 h-3.5 mr-2" />
+            Append to Current
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={handleCopyAsMarkdown}>
+          <ClipboardPaste className="w-3.5 h-3.5 mr-2" />
+          Copy as Markdown
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

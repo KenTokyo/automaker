@@ -34,6 +34,9 @@ import type {
   EventHook,
   ClaudeApiProfile,
   ClaudeCompatibleProvider,
+  EditorThemeSettings,
+  HeadingStyle,
+  TableThemeStyles,
 } from '@automaker/types';
 import {
   getAllCursorModelIds,
@@ -42,6 +45,7 @@ import {
   DEFAULT_PHASE_MODELS,
   DEFAULT_OPENCODE_MODEL,
   DEFAULT_MAX_CONCURRENCY,
+  DEFAULT_EDITOR_THEME,
 } from '@automaker/types';
 
 const logger = createLogger('AppStore');
@@ -873,6 +877,13 @@ export interface AppState {
   currentDocPath: string | null; // Currently opened file (relative path within docs/)
   docsViewMode: 'rendered' | 'raw'; // Markdown view mode
   recentDocs: { path: string; name: string; absolutePath: string }[]; // Recently opened docs (max 10)
+
+  // Docs Editor Theme
+  editorTheme: EditorThemeSettings;
+
+  // Docs Auto-Save
+  docsAutoSave: boolean;
+  docsAutoSaveDelay: number; // ms
 }
 
 // Claude Usage interface matching the server response
@@ -1437,6 +1448,16 @@ export interface AppActions {
   setDocsViewMode: (mode: 'rendered' | 'raw') => void;
   addRecentDoc: (doc: { path: string; name: string; absolutePath: string }) => void;
 
+  // Docs Editor Theme actions
+  setEditorTheme: (partial: Partial<EditorThemeSettings>) => void;
+  setHeadingStyle: (level: 'h1' | 'h2' | 'h3' | 'h4', style: Partial<HeadingStyle>) => void;
+  setTableStyles: (styles: Partial<TableThemeStyles>) => void;
+  resetEditorTheme: () => void;
+
+  // Docs Auto-Save actions
+  setDocsAutoSave: (enabled: boolean) => void;
+  setDocsAutoSaveDelay: (ms: number) => void;
+
   // Reset
   reset: () => void;
 }
@@ -1573,6 +1594,11 @@ const initialState: AppState = {
   currentDocPath: null,
   docsViewMode: (getItem('automaker:docsViewMode') as 'rendered' | 'raw') || 'rendered',
   recentDocs: JSON.parse(getItem('automaker:recentDocs') || '[]'),
+  // Docs Editor Theme
+  editorTheme: JSON.parse(getItem('automaker:editorTheme') || 'null') || DEFAULT_EDITOR_THEME,
+  // Docs Auto-Save
+  docsAutoSave: getItem('automaker:docsAutoSave') !== 'false', // default true
+  docsAutoSaveDelay: parseInt(getItem('automaker:docsAutoSaveDelay') || '3000', 10),
 };
 
 export const useAppStore = create<AppState & AppActions>()((set, get) => ({
@@ -4291,6 +4317,49 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     const updated = [doc, ...filtered].slice(0, 10);
     set({ recentDocs: updated });
     setItem('automaker:recentDocs', JSON.stringify(updated));
+  },
+
+  // Docs Editor Theme actions
+  setEditorTheme: (partial) => {
+    const current = get().editorTheme;
+    const updated = { ...current, ...partial };
+    set({ editorTheme: updated });
+    setItem('automaker:editorTheme', JSON.stringify(updated));
+  },
+  setHeadingStyle: (level, style) => {
+    const current = get().editorTheme;
+    const updated = {
+      ...current,
+      headingStyles: {
+        ...current.headingStyles,
+        [level]: { ...current.headingStyles[level], ...style },
+      },
+    };
+    set({ editorTheme: updated });
+    setItem('automaker:editorTheme', JSON.stringify(updated));
+  },
+  setTableStyles: (styles) => {
+    const current = get().editorTheme;
+    const updated = {
+      ...current,
+      tableStyles: { ...current.tableStyles, ...styles },
+    };
+    set({ editorTheme: updated });
+    setItem('automaker:editorTheme', JSON.stringify(updated));
+  },
+  resetEditorTheme: () => {
+    set({ editorTheme: DEFAULT_EDITOR_THEME });
+    setItem('automaker:editorTheme', JSON.stringify(DEFAULT_EDITOR_THEME));
+  },
+
+  // Docs Auto-Save actions
+  setDocsAutoSave: (enabled) => {
+    set({ docsAutoSave: enabled });
+    setItem('automaker:docsAutoSave', String(enabled));
+  },
+  setDocsAutoSaveDelay: (ms) => {
+    set({ docsAutoSaveDelay: ms });
+    setItem('automaker:docsAutoSaveDelay', String(ms));
   },
 
   // Reset

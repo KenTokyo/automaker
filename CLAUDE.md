@@ -174,3 +174,5 @@ Use `resolveModelString()` from `@automaker/model-resolver` to convert model ali
 - `AUTOMAKER_MOCK_AGENT=true` - Enable mock agent mode for CI testing
 - `AUTOMAKER_AUTO_LOGIN=true` - Skip login prompt in development (disabled when NODE_ENV=production)
 - `VITE_HOSTNAME` - Hostname for frontend API URLs (default: localhost)
+
+bitte kein build durchlaufen lassen, sondern nur nach typescript fehlern suchen, statt kompletten build oder dev server zu starten!

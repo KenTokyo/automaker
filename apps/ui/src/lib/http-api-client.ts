@@ -2699,15 +2699,27 @@ export class HttpApiClient implements ElectronAPI {
     read: (projectPath: string, filePath: string): Promise<DocContent> =>
       this.post('/api/docs/read', { projectPath, filePath }),
 
-    create: (params: CreateDocParams): Promise<DocFile> => this.post('/api/docs/create', params),
+    create: async (params: CreateDocParams): Promise<DocFile> => {
+      const res = await this.post<{ success: boolean; file: DocFile }>('/api/docs/create', params);
+      return res.file;
+    },
 
-    update: (params: UpdateDocParams): Promise<DocFile> => this.post('/api/docs/update', params),
+    update: async (params: UpdateDocParams): Promise<DocFile> => {
+      const res = await this.post<{ success: boolean; file: DocFile }>('/api/docs/update', params);
+      return res.file;
+    },
 
     delete: (params: DeleteDocParams): Promise<{ success: boolean }> =>
       this.post('/api/docs/delete', params),
 
-    mkdir: (projectPath: string, name: string, subfolder?: string): Promise<DocFile> =>
-      this.post('/api/docs/mkdir', { projectPath, name, subfolder }),
+    mkdir: async (projectPath: string, name: string, subfolder?: string): Promise<DocFile> => {
+      const res = await this.post<{ success: boolean; file: DocFile }>('/api/docs/mkdir', {
+        projectPath,
+        name,
+        subfolder,
+      });
+      return res.file;
+    },
 
     rename: (
       projectPath: string,
@@ -2715,6 +2727,17 @@ export class HttpApiClient implements ElectronAPI {
       newName: string
     ): Promise<{ success: boolean }> =>
       this.post('/api/docs/rename', { projectPath, filePath, newName }),
+
+    aiTransform: (params: {
+      text: string;
+      command: string;
+      customPrompt?: string;
+      context?: string;
+      language?: string;
+      model?: string;
+      projectPath?: string;
+    }): Promise<{ success: boolean; transformedText: string }> =>
+      this.post('/api/docs/ai-transform', params),
   };
 }
 

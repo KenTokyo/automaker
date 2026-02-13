@@ -339,5 +339,13 @@ export type {
   DeleteDocParams,
   ListDocsParams,
   ListDocsResponse,
+  HeadingStyle,
+  TableThemeStyles,
+  EditorThemeSettings,
 } from './docs.js';
-export { SUPPORTED_DOC_EXTENSIONS } from './docs.js';
+export {
+  SUPPORTED_DOC_EXTENSIONS,
+  DEFAULT_HEADING_STYLES,
+  DEFAULT_TABLE_STYLES,
+  DEFAULT_EDITOR_THEME,
+} from './docs.js';

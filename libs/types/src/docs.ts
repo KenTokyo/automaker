@@ -97,3 +97,110 @@ export interface ListDocsResponse {
   /** Total count */
   totalCount: number;
 }
+
+// ─── Editor Theme Settings ──────────────────────────────────────────
+
+/**
+ * Style settings for a single heading level (H1-H4)
+ */
+export interface HeadingStyle {
+  color: string;
+  gradientEnabled: boolean;
+  gradientFrom: string;
+  gradientTo: string;
+  gradientDirection: 'to-right' | 'to-bottom-right' | 'to-bottom';
+  fontSize: number;
+  fontWeight: number;
+}
+
+/**
+ * Style settings for tables in the editor
+ */
+export interface TableThemeStyles {
+  headerBackground: string;
+  stripedRows: boolean;
+  stripedColor: string;
+  borderColor: string;
+  cellPadding: 'compact' | 'normal' | 'spacious';
+}
+
+/**
+ * Complete editor theme settings
+ */
+export interface EditorThemeSettings {
+  fontScale: number;
+  bodyFontSize: number;
+  codeFontSize: number;
+  lineHeight: number;
+  headingStyles: Record<'h1' | 'h2' | 'h3' | 'h4', HeadingStyle>;
+  tableStyles: TableThemeStyles;
+  editorWidth: 'narrow' | 'medium' | 'wide' | 'full';
+  fontFamily: 'system' | 'serif' | 'mono' | 'inter';
+}
+
+/**
+ * Default heading styles
+ */
+export const DEFAULT_HEADING_STYLES: Record<'h1' | 'h2' | 'h3' | 'h4', HeadingStyle> = {
+  h1: {
+    color: '',
+    gradientEnabled: false,
+    gradientFrom: '#3b82f6',
+    gradientTo: '#8b5cf6',
+    gradientDirection: 'to-right',
+    fontSize: 30,
+    fontWeight: 700,
+  },
+  h2: {
+    color: '',
+    gradientEnabled: false,
+    gradientFrom: '#06b6d4',
+    gradientTo: '#3b82f6',
+    gradientDirection: 'to-right',
+    fontSize: 24,
+    fontWeight: 600,
+  },
+  h3: {
+    color: '',
+    gradientEnabled: false,
+    gradientFrom: '#10b981',
+    gradientTo: '#06b6d4',
+    gradientDirection: 'to-right',
+    fontSize: 20,
+    fontWeight: 600,
+  },
+  h4: {
+    color: '',
+    gradientEnabled: false,
+    gradientFrom: '#f59e0b',
+    gradientTo: '#ef4444',
+    gradientDirection: 'to-right',
+    fontSize: 16,
+    fontWeight: 600,
+  },
+};
+
+/**
+ * Default table theme styles
+ */
+export const DEFAULT_TABLE_STYLES: TableThemeStyles = {
+  headerBackground: '',
+  stripedRows: true,
+  stripedColor: '',
+  borderColor: '',
+  cellPadding: 'normal',
+};
+
+/**
+ * Default editor theme settings
+ */
+export const DEFAULT_EDITOR_THEME: EditorThemeSettings = {
+  fontScale: 100,
+  bodyFontSize: 16,
+  codeFontSize: 14,
+  lineHeight: 1.7,
+  headingStyles: DEFAULT_HEADING_STYLES,
+  tableStyles: DEFAULT_TABLE_STYLES,
+  editorWidth: 'medium',
+  fontFamily: 'system',
+};

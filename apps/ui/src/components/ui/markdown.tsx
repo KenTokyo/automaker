@@ -1,7 +1,12 @@
+import { memo, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
+import { common, createLowlight } from 'lowlight';
+import { toHtml } from 'hast-util-to-html';
 import { cn } from '@/lib/utils';
+
+const lowlight = createLowlight(common);
 
 interface MarkdownProps {
   children: string;
@@ -13,7 +18,6 @@ interface MarkdownProps {
  * This ensures that newlines in the source text are rendered properly
  */
 function preserveLineBreaks(text: string): string {
-  // Don't process empty strings
   if (!text) return text;
 
   // Split by code blocks to avoid processing them
@@ -34,13 +38,73 @@ function preserveLineBreaks(text: string): string {
 }
 
 /**
+ * Syntax-highlight a code string using lowlight.
+ * Returns an HTML string with hljs classes.
+ */
+function highlightCode(code: string, language?: string): string {
+  if (!language || language === 'plaintext' || language === 'text') {
+    return escapeHtml(code);
+  }
+  try {
+    const tree = lowlight.highlight(language, code);
+    return toHtml(tree);
+  } catch {
+    // Language not registered — fallback to auto-detect
+    try {
+      const tree = lowlight.highlightAuto(code);
+      return toHtml(tree);
+    } catch {
+      return escapeHtml(code);
+    }
+  }
+}
+
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
+ * Custom code component for react-markdown that adds syntax highlighting.
+ */
+const CodeBlock = memo(function CodeBlock({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<'code'> & { node?: unknown }) {
+  const match = className?.match(/language-(\S+)/);
+  const language = match ? match[1] : undefined;
+  const code = String(children).replace(/\n$/, '');
+
+  // Inline code (no language class and no newlines)
+  const isInline = !className && !String(children).includes('\n');
+  if (isInline) {
+    return (
+      <code className={className} {...props}>
+        {children}
+      </code>
+    );
+  }
+
+  // Code block with syntax highlighting
+  const highlighted = highlightCode(code, language);
+
+  return (
+    <code
+      className={cn(className, 'hljs')}
+      dangerouslySetInnerHTML={{ __html: highlighted }}
+      {...props}
+    />
+  );
+});
+
+/**
  * Reusable Markdown component for rendering markdown content
  * Theme-aware styling that adapts to all predefined themes
  * Supports raw HTML elements including images
+ * Includes syntax highlighting for code blocks via lowlight
  */
-export function Markdown({ children, className }: MarkdownProps) {
-  // Preprocess to preserve line breaks
-  const processedContent = preserveLineBreaks(children);
+export const Markdown = memo(function Markdown({ children, className }: MarkdownProps) {
+  const processedContent = useMemo(() => preserveLineBreaks(children), [children]);
 
   return (
     <div
@@ -70,10 +134,49 @@ export function Markdown({ children, className }: MarkdownProps) {
         '[&_hr]:border-border [&_hr]:my-4',
         // Images
         '[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-2 [&_img]:border [&_img]:border-border',
+        // Tables
+        '[&_table]:w-full [&_table]:border-collapse [&_table]:my-3',
+        '[&_th]:border [&_th]:border-border [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:text-sm [&_th]:font-semibold [&_th]:text-foreground [&_th]:bg-muted/50',
+        '[&_td]:border [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_td]:text-sm [&_td]:text-foreground-secondary',
+        '[&_tr:nth-child(even)_td]:bg-muted/25',
         className
       )}
     >
-      <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeSanitize]}>{processedContent}</ReactMarkdown>
+      <ReactMarkdown
+        rehypePlugins={[rehypeRaw, rehypeSanitize]}
+        components={{
+          code: CodeBlock as React.ComponentType<React.ComponentProps<'code'>>,
+        }}
+      >
+        {processedContent}
+      </ReactMarkdown>
+
+      <style>{syntaxStyles}</style>
     </div>
   );
-}
+});
+
+/**
+ * Syntax highlighting styles for lowlight/hljs classes.
+ * Uses CSS variables so they adapt to all app themes.
+ */
+const syntaxStyles = `
+  .prose .hljs-keyword { color: var(--chart-4, oklch(0.7 0.15 280)); }
+  .prose .hljs-string { color: var(--chart-1, oklch(0.646 0.222 41.116)); }
+  .prose .hljs-number { color: var(--chart-3, oklch(0.7 0.15 150)); }
+  .prose .hljs-comment { color: var(--muted-foreground); font-style: italic; }
+  .prose .hljs-function,
+  .prose .hljs-title { color: var(--chart-2, oklch(0.6 0.118 184.704)); }
+  .prose .hljs-params { color: var(--foreground); }
+  .prose .hljs-built_in,
+  .prose .hljs-type { color: var(--chart-5, oklch(0.769 0.188 70.08)); }
+  .prose .hljs-attr { color: var(--chart-2, oklch(0.6 0.118 184.704)); }
+  .prose .hljs-variable { color: var(--foreground); }
+  .prose .hljs-literal { color: var(--chart-4, oklch(0.7 0.15 280)); }
+  .prose .hljs-meta { color: var(--muted-foreground); }
+  .prose .hljs-selector-tag,
+  .prose .hljs-tag,
+  .prose .hljs-name { color: var(--chart-1, oklch(0.646 0.222 41.116)); }
+  .prose .hljs-selector-class,
+  .prose .hljs-attribute { color: var(--chart-2, oklch(0.6 0.118 184.704)); }
+`;

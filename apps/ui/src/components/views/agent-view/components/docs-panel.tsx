@@ -28,6 +28,7 @@ export const DocsPanel = memo(function DocsPanel({ projectPath }: DocsPanelProps
     navigateToFolder,
     currentSubfolder,
     createDoc,
+    updateDoc,
     createFolder,
     retryLoadDoc,
     renameDoc,
@@ -113,6 +114,7 @@ export const DocsPanel = memo(function DocsPanel({ projectPath }: DocsPanelProps
           onClose={closeDoc}
           onDelete={handleDeleteFromViewer}
           onRetry={retryLoadDoc}
+          onSave={updateDoc}
         />
         <DocsDeleteDialog
           open={deleteDialogOpen}

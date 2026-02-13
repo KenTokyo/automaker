@@ -92,6 +92,18 @@ export default defineConfig(({ command }) => {
           'events',
           'readline',
         ],
+        output: {
+          manualChunks(id) {
+            // TipTap core + extensions in a separate chunk
+            if (id.includes('@tiptap/')) {
+              return 'tiptap';
+            }
+            // Lowlight / highlight.js for syntax highlighting
+            if (id.includes('lowlight') || id.includes('highlight.js')) {
+              return 'lowlight';
+            }
+          },
+        },
       },
     },
     optimizeDeps: {
