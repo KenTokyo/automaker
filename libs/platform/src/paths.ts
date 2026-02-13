@@ -214,6 +214,37 @@ export async function ensureAutomakerDir(projectPath: string): Promise<string> {
 }
 
 // ============================================================================
+// Docs Paths
+// ============================================================================
+
+/**
+ * Get the docs directory for a project
+ *
+ * Contains user-created documentation files (.md, .txt).
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Absolute path to {projectPath}/.automaker/docs
+ */
+export function getDocsDir(projectPath: string): string {
+  return path.join(getAutomakerDir(projectPath), 'docs');
+}
+
+/**
+ * Create the docs directory for a project if it doesn't exist
+ *
+ * Creates {projectPath}/.automaker/docs recursively.
+ * Safe to call multiple times - uses recursive: true.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Promise resolving to the created docs directory path
+ */
+export async function ensureDocsDir(projectPath: string): Promise<string> {
+  const docsDir = getDocsDir(projectPath);
+  await secureFs.mkdir(docsDir, { recursive: true });
+  return docsDir;
+}
+
+// ============================================================================
 // Ideation Paths
 // ============================================================================
 

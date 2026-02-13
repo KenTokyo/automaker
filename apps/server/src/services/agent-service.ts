@@ -17,6 +17,7 @@ import {
   classifyError,
   getUserFriendlyErrorMessage,
 } from '@automaker/utils';
+import { isFirstMessage, prependTitleInstruction, parseSessionInfo } from '../lib/session-title.js';
 import { ProviderFactory } from '../providers/provider-factory.js';
 import { createChatOptions, validateWorkingDirectory } from '../lib/sdk-options.js';
 import { PathNotAllowedError } from '@automaker/platform';
@@ -69,6 +70,7 @@ interface Session {
 interface SessionMetadata {
   id: string;
   name: string;
+  description?: string;
   projectPath?: string;
   workingDirectory: string;
   createdAt: string;
@@ -413,6 +415,10 @@ export class AgentService {
         claudeCompatibleProvider, // Pass provider for alternative endpoint configuration (GLM, MiniMax, etc.)
       };
 
+      // Check if this is the first message in the session (for auto title generation)
+      // We check conversationHistory length since it was built BEFORE adding the current message
+      const isFirstMsg = isFirstMessage(conversationHistory.length);
+
       // Build prompt content with images
       const { content: promptContent } = await buildPromptWithImages(
         message,
@@ -421,14 +427,20 @@ export class AgentService {
         true // include image paths in text
       );
 
+      // For the first message, prepend title generation instruction
+      const finalPrompt = isFirstMsg
+        ? prependTitleInstruction(typeof promptContent === 'string' ? promptContent : message)
+        : promptContent;
+
       // Set the prompt in options
-      options.prompt = promptContent;
+      options.prompt = finalPrompt;
 
       // Execute via provider
       const stream = provider.executeQuery(options);
 
       let currentAssistantMessage: Message | null = null;
       let responseText = '';
+      let sessionInfoParsed = false; // Track if we've already extracted session info
       const toolUses: Array<{ name: string; input: unknown }> = [];
 
       for await (const msg of stream) {
@@ -445,22 +457,54 @@ export class AgentService {
               if (block.type === 'text') {
                 responseText += block.text;
 
+                // For first messages, strip SESSION_INFO block from displayed content during streaming
+                let displayText = responseText;
+                if (isFirstMsg && !sessionInfoParsed) {
+                  // Try to parse and strip SESSION_INFO block as it streams in
+                  const parsed = parseSessionInfo(responseText);
+                  if (parsed.title || parsed.description) {
+                    displayText = parsed.cleanedContent;
+                    sessionInfoParsed = true;
+
+                    // Update session metadata with extracted title and description
+                    const metadataUpdates: Partial<SessionMetadata> = {};
+                    if (parsed.title) {
+                      metadataUpdates.name = parsed.title;
+                    }
+                    if (parsed.description) {
+                      metadataUpdates.description = parsed.description;
+                    }
+                    await this.updateSession(sessionId, metadataUpdates);
+
+                    // Emit session metadata update event so frontend can refresh
+                    this.emitAgentEvent(sessionId, {
+                      type: 'session_metadata_updated',
+                      name: parsed.title,
+                      description: parsed.description,
+                    });
+                  } else if (responseText.includes('[SESSION_INFO]')) {
+                    // Block is still being written - hide it from display
+                    const infoStart = responseText.indexOf('[SESSION_INFO]');
+                    displayText = responseText.substring(0, infoStart).trim();
+                  }
+                }
+
                 if (!currentAssistantMessage) {
                   currentAssistantMessage = {
                     id: this.generateId(),
                     role: 'assistant',
-                    content: responseText,
+                    content: displayText,
                     timestamp: new Date().toISOString(),
                   };
                   session.messages.push(currentAssistantMessage);
                 } else {
-                  currentAssistantMessage.content = responseText;
+                  currentAssistantMessage.content = displayText;
                 }
 
                 this.emitAgentEvent(sessionId, {
                   type: 'stream',
                   messageId: currentAssistantMessage.id,
-                  content: responseText,
+                  content: displayText,
                   isComplete: false,
                 });
               } else if (block.type === 'tool_use') {
@@ -479,9 +523,32 @@ export class AgentService {
           }
         } else if (msg.type === 'result') {
           if (msg.subtype === 'success' && msg.result) {
+            // For first messages, clean the result content of any SESSION_INFO blocks
+            let resultContent = msg.result;
+            if (isFirstMsg && !sessionInfoParsed) {
+              const parsed = parseSessionInfo(resultContent);
+              if (parsed.title || parsed.description) {
+                resultContent = parsed.cleanedContent;
+                // Update session metadata if not already done during streaming
+                const metadataUpdates: Partial<SessionMetadata> = {};
+                if (parsed.title) metadataUpdates.name = parsed.title;
+                if (parsed.description) metadataUpdates.description = parsed.description;
+                await this.updateSession(sessionId, metadataUpdates);
+                this.emitAgentEvent(sessionId, {
+                  type: 'session_metadata_updated',
+                  name: parsed.title,
+                  description: parsed.description,
+                });
+              }
+            } else if (isFirstMsg && sessionInfoParsed) {
+              // Already parsed during streaming - just clean the content
+              const parsed = parseSessionInfo(resultContent);
+              resultContent = parsed.cleanedContent;
+            }
+
             if (currentAssistantMessage) {
-              currentAssistantMessage.content = msg.result;
-              responseText = msg.result;
+              currentAssistantMessage.content = resultContent;
+              responseText = resultContent;
             }
           }
 

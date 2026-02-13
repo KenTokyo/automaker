@@ -361,6 +361,12 @@ export function useElectronAgent({
           logger.error('Queue error:', event.error);
           setError(event.error);
           break;
+
+        case 'session_metadata_updated':
+          // Session title/description updated from first Claude response
+          // Query invalidation hook handles the sessions list refresh
+          logger.info('Session metadata updated:', event.name);
+          break;
       }
     };
 

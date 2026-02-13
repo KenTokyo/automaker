@@ -30,6 +30,9 @@ export {
   getCredentialsPath,
   getProjectSettingsPath,
   ensureDataDir,
+  // Docs paths
+  getDocsDir,
+  ensureDocsDir,
   // Ideation paths
   getIdeationDir,
   getIdeasDir,

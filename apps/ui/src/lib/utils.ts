@@ -73,6 +73,8 @@ export function getModelDisplayName(model: ModelAlias | string): string {
     sonnet: 'Claude Sonnet',
     opus: 'Claude Opus',
     // Codex models
+    'codex-gpt-5.3-codex': 'GPT-5.3 Codex',
+    'codex-gpt-5.2-codex': 'GPT-5.2 Codex',
     'codex-gpt-5.2': 'GPT-5.2',
     'codex-gpt-5.1-codex-max': 'GPT-5.1 Codex Max',
     'codex-gpt-5.1-codex': 'GPT-5.1 Codex',

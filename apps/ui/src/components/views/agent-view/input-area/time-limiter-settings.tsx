@@ -5,7 +5,7 @@
  * When the time limit is exceeded, the chat is copied and a new session is started.
  */
 
-import { useState, useEffect } from 'react';
+import { memo, useState, useEffect } from 'react';
 import { Timer, Settings, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +24,10 @@ interface TimeLimiterSettingsProps {
   elapsedSeconds?: number;
 }
 
-export function TimeLimiterSettings({ disabled, elapsedSeconds = 0 }: TimeLimiterSettingsProps) {
+export const TimeLimiterSettings = memo(function TimeLimiterSettings({
+  disabled,
+  elapsedSeconds = 0,
+}: TimeLimiterSettingsProps) {
   const { timeLimitSeconds, isEnabled, setTimeLimit, setEnabled } = useTimeLimiterStore();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -197,4 +200,4 @@ export function TimeLimiterSettings({ disabled, elapsedSeconds = 0 }: TimeLimite
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
+});

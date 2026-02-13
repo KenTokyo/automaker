@@ -193,7 +193,7 @@ export function useSessionQueryInvalidation(sessionId: string | undefined) {
       }
 
       // Invalidate sessions list when any session changes
-      if (event.type === 'complete') {
+      if (event.type === 'complete' || event.type === 'session_metadata_updated') {
         queryClient.invalidateQueries({
           queryKey: queryKeys.sessions.all(),
         });

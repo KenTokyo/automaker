@@ -798,6 +798,9 @@ export interface AppState {
   defaultRequirePlanApproval: boolean;
   defaultFeatureModel: PhaseModelEntry;
 
+  // Agent Chat Model Selection (persisted)
+  selectedAgentModel: PhaseModelEntry;
+
   // Plan Approval State
   // When a plan requires user approval, this holds the pending approval details
   pendingPlanApproval: {
@@ -864,6 +867,12 @@ export interface AppState {
 
   // Init Script State (keyed by "projectPath::branch" to support concurrent scripts)
   initScriptState: Record<string, InitScriptState>;
+
+  // Docs Panel State
+  docsOpen: boolean; // Whether the Docs tab is active (vs. Sessions tab)
+  currentDocPath: string | null; // Currently opened file (relative path within docs/)
+  docsViewMode: 'rendered' | 'raw'; // Markdown view mode
+  recentDocs: { path: string; name: string; absolutePath: string }[]; // Recently opened docs (max 10)
 }
 
 // Claude Usage interface matching the server response
@@ -1173,6 +1182,7 @@ export interface AppActions {
   setPhaseModels: (models: Partial<PhaseModelConfig>) => Promise<void>;
   resetPhaseModels: () => Promise<void>;
   toggleFavoriteModel: (modelId: string) => void;
+  setSelectedAgentModel: (entry: PhaseModelEntry) => void;
 
   // Cursor CLI Settings actions
   setEnabledCursorModels: (models: CursorModelId[]) => void;
@@ -1421,6 +1431,12 @@ export interface AppActions {
     projectPath: string
   ) => Array<{ key: string; state: InitScriptState }>;
 
+  // Docs Panel actions
+  setDocsOpen: (open: boolean) => void;
+  setCurrentDocPath: (path: string | null) => void;
+  setDocsViewMode: (mode: 'rendered' | 'raw') => void;
+  addRecentDoc: (doc: { path: string; name: string; absolutePath: string }) => void;
+
   // Reset
   reset: () => void;
 }
@@ -1473,7 +1489,7 @@ const initialState: AppState = {
   enabledCursorModels: getAllCursorModelIds(), // All Cursor models enabled by default
   cursorDefaultModel: 'cursor-auto', // Default to auto selection
   enabledCodexModels: getAllCodexModelIds(), // All Codex models enabled by default
-  codexDefaultModel: 'codex-gpt-5.2-codex', // Default to GPT-5.2-Codex
+  codexDefaultModel: 'codex-gpt-5.3-codex', // Default to GPT-5.3-Codex
   codexAutoLoadAgents: false, // Default to disabled (user must opt-in)
   codexSandboxMode: 'workspace-write', // Default to workspace-write for safety
   codexApprovalPolicy: 'on-request', // Default to on-request for balanced safety
@@ -1528,7 +1544,8 @@ const initialState: AppState = {
   specCreatingForProject: null,
   defaultPlanningMode: 'skip' as PlanningMode,
   defaultRequirePlanApproval: false,
-  defaultFeatureModel: { model: 'opus' } as PhaseModelEntry,
+  defaultFeatureModel: { model: 'claude-opus' } as PhaseModelEntry,
+  selectedAgentModel: { model: 'claude-opus', thinkingLevel: 'high' } as PhaseModelEntry,
   pendingPlanApproval: null,
   claudeRefreshInterval: 60,
   claudeUsage: null,
@@ -1551,6 +1568,11 @@ const initialState: AppState = {
   lastProjectDir: '',
   recentFolders: [],
   initScriptState: {},
+  // Docs Panel State
+  docsOpen: false,
+  currentDocPath: null,
+  docsViewMode: (getItem('automaker:docsViewMode') as 'rendered' | 'raw') || 'rendered',
+  recentDocs: JSON.parse(getItem('automaker:recentDocs') || '[]'),
 };
 
 export const useAppStore = create<AppState & AppActions>()((set, get) => ({
@@ -2603,6 +2625,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     }
   },
 
+  setSelectedAgentModel: (entry) => set({ selectedAgentModel: entry }),
   // Cursor CLI Settings actions
   setEnabledCursorModels: (models) => set({ enabledCursorModels: models }),
   setCursorDefaultModel: (model) => set({ cursorDefaultModel: model }),
@@ -4253,6 +4276,21 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     return Object.entries(states)
       .filter(([key]) => key.startsWith(prefix))
       .map(([key, state]) => ({ key, state }));
+  },
+
+  // Docs Panel actions
+  setDocsOpen: (open) => set({ docsOpen: open }),
+  setCurrentDocPath: (path) => set({ currentDocPath: path }),
+  setDocsViewMode: (mode) => {
+    set({ docsViewMode: mode });
+    setItem('automaker:docsViewMode', mode);
+  },
+  addRecentDoc: (doc) => {
+    const { recentDocs } = get();
+    const filtered = recentDocs.filter((d) => d.path !== doc.path);
+    const updated = [doc, ...filtered].slice(0, 10);
+    set({ recentDocs: updated });
+    setItem('automaker:recentDocs', JSON.stringify(updated));
   },
 
   // Reset

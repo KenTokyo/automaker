@@ -40,6 +40,14 @@ import type { Message, SessionListItem } from '@/types/electron';
 import type { Feature, ClaudeUsageResponse, CodexUsageResponse } from '@/store/app-store';
 import type { WorktreeAPI, GitAPI, ModelDefinition, ProviderStatus } from '@/types/electron';
 import type { ModelId, ThinkingLevel, ReasoningEffort } from '@automaker/types';
+import type {
+  DocFile,
+  DocContent,
+  CreateDocParams,
+  UpdateDocParams,
+  DeleteDocParams,
+  ListDocsResponse,
+} from '@automaker/types';
 import { getGlobalFileBrowser } from '@/contexts/file-browser-context';
 
 const logger = createLogger('HttpClient');
@@ -2681,6 +2689,32 @@ export class HttpApiClient implements ElectronAPI {
       stepIds: string[]
     ): Promise<{ success: boolean; error?: string }> =>
       this.post('/api/pipeline/steps/reorder', { projectPath, stepIds }),
+  };
+
+  // Docs API
+  docs = {
+    list: (projectPath: string, subfolder?: string): Promise<ListDocsResponse> =>
+      this.post('/api/docs/list', { projectPath, subfolder }),
+
+    read: (projectPath: string, filePath: string): Promise<DocContent> =>
+      this.post('/api/docs/read', { projectPath, filePath }),
+
+    create: (params: CreateDocParams): Promise<DocFile> => this.post('/api/docs/create', params),
+
+    update: (params: UpdateDocParams): Promise<DocFile> => this.post('/api/docs/update', params),
+
+    delete: (params: DeleteDocParams): Promise<{ success: boolean }> =>
+      this.post('/api/docs/delete', params),
+
+    mkdir: (projectPath: string, name: string, subfolder?: string): Promise<DocFile> =>
+      this.post('/api/docs/mkdir', { projectPath, name, subfolder }),
+
+    rename: (
+      projectPath: string,
+      filePath: string,
+      newName: string
+    ): Promise<{ success: boolean }> =>
+      this.post('/api/docs/rename', { projectPath, filePath, newName }),
   };
 }
 

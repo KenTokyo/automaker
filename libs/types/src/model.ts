@@ -49,7 +49,9 @@ export const LEGACY_CLAUDE_ALIAS_MAP: Record<string, ClaudeCanonicalId> = {
  */
 export const CODEX_MODEL_MAP = {
   // Recommended Codex-specific models
-  /** Most advanced agentic coding model for complex software engineering (default for ChatGPT users) */
+  /** Latest advanced agentic coding model for complex software engineering */
+  gpt53Codex: 'codex-gpt-5.3-codex',
+  /** Advanced agentic coding model for complex software engineering */
   gpt52Codex: 'codex-gpt-5.2-codex',
   /** Optimized for long-horizon, agentic coding tasks in Codex */
   gpt51CodexMax: 'codex-gpt-5.1-codex-max',
@@ -70,6 +72,7 @@ export const CODEX_MODEL_IDS = Object.values(CODEX_MODEL_MAP);
  * These models can use reasoning.effort parameter
  */
 export const REASONING_CAPABLE_MODELS = new Set([
+  CODEX_MODEL_MAP.gpt53Codex,
   CODEX_MODEL_MAP.gpt52Codex,
   CODEX_MODEL_MAP.gpt51CodexMax,
   CODEX_MODEL_MAP.gpt52,
@@ -97,7 +100,7 @@ export function getAllCodexModelIds(): CodexModelId[] {
 export const DEFAULT_MODELS = {
   claude: 'claude-opus-4-5-20251101',
   cursor: 'cursor-auto', // Cursor's recommended default (with prefix)
-  codex: CODEX_MODEL_MAP.gpt52Codex, // GPT-5.2-Codex is the most advanced agentic coding model
+  codex: CODEX_MODEL_MAP.gpt53Codex, // GPT-5.3-Codex is the most advanced agentic coding model
 } as const;
 
 export type ModelAlias = keyof typeof CLAUDE_MODEL_MAP;

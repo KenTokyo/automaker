@@ -10,6 +10,8 @@ import type {
 } from '@automaker/types';
 
 const logger = createLogger('CodexAppServer');
+const CODEX_CONFIG_FLAG = '--config';
+const CODEX_COMPAT_MODEL_REASONING_EFFORT = 'model_reasoning_effort=high';
 
 /**
  * CodexAppServerService
@@ -90,15 +92,19 @@ export class CodexAppServerService {
       // On Windows, .cmd files must be run through shell
       const needsShell = process.platform === 'win32' && cliPath.toLowerCase().endsWith('.cmd');
 
-      childProcess = spawn(cliPath, ['app-server'], {
-        cwd: process.cwd(),
-        env: {
-          ...process.env,
-          TERM: 'dumb',
-        },
-        stdio: ['pipe', 'pipe', 'pipe'],
-        shell: needsShell,
-      });
+      childProcess = spawn(
+        cliPath,
+        [CODEX_CONFIG_FLAG, CODEX_COMPAT_MODEL_REASONING_EFFORT, 'app-server'],
+        {
+          cwd: process.cwd(),
+          env: {
+            ...process.env,
+            TERM: 'dumb',
+          },
+          stdio: ['pipe', 'pipe', 'pipe'],
+          shell: needsShell,
+        }
+      );
 
       if (!childProcess.stdin || !childProcess.stdout) {
         throw new Error('Failed to create stdio pipes');

@@ -12,6 +12,8 @@ import { createLogger } from '@automaker/utils';
 const logger = createLogger('CodexAuth');
 
 const CODEX_COMMAND = 'codex';
+const CODEX_CONFIG_FLAG = '--config';
+const CODEX_COMPAT_MODEL_REASONING_EFFORT = 'model_reasoning_effort=high';
 const OPENAI_API_KEY_ENV = 'OPENAI_API_KEY';
 
 export interface CodexAuthCheckResult {
@@ -40,7 +42,7 @@ export async function checkCodexAuthentication(
   try {
     const result = await spawnProcess({
       command: resolvedCliPath || CODEX_COMMAND,
-      args: ['login', 'status'],
+      args: [CODEX_CONFIG_FLAG, CODEX_COMPAT_MODEL_REASONING_EFFORT, 'login', 'status'],
       cwd: process.cwd(),
       env: {
         ...process.env,

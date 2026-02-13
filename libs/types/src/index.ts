@@ -329,3 +329,15 @@ export { PR_STATES, validatePRState } from './worktree.js';
 
 // Terminal types
 export type { TerminalInfo } from './terminal.js';
+
+// Docs types
+export type {
+  DocFile,
+  DocContent,
+  CreateDocParams,
+  UpdateDocParams,
+  DeleteDocParams,
+  ListDocsParams,
+  ListDocsResponse,
+} from './docs.js';
+export { SUPPORTED_DOC_EXTENSIONS } from './docs.js';

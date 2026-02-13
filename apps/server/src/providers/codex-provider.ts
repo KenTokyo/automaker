@@ -61,6 +61,7 @@ const CODEX_APPROVAL_FLAG = '--ask-for-approval';
 const CODEX_SEARCH_FLAG = '--search';
 const CODEX_OUTPUT_SCHEMA_FLAG = '--output-schema';
 const CODEX_CONFIG_FLAG = '--config';
+const CODEX_COMPAT_MODEL_REASONING_EFFORT = 'model_reasoning_effort=high';
 const CODEX_IMAGE_FLAG = '--image';
 const CODEX_ADD_DIR_FLAG = '--add-dir';
 const CODEX_SKIP_GIT_REPO_CHECK_FLAG = '--skip-git-repo-check';
@@ -808,6 +809,8 @@ export class CodexProvider extends BaseProvider {
 
       // Model is already bare (no prefix) - validated by executeQuery
       const args = [
+        CODEX_CONFIG_FLAG,
+        CODEX_COMPAT_MODEL_REASONING_EFFORT,
         CODEX_EXEC_SUBCOMMAND,
         CODEX_YOLO_FLAG,
         CODEX_SKIP_GIT_REPO_CHECK_FLAG,
@@ -1081,7 +1084,7 @@ export class CodexProvider extends BaseProvider {
         // Try 'codex login status' first (same as checkCodexAuthentication)
         const result = await spawnProcess({
           command: cliPath || CODEX_COMMAND,
-          args: ['login', 'status'],
+          args: [CODEX_CONFIG_FLAG, CODEX_COMPAT_MODEL_REASONING_EFFORT, 'login', 'status'],
           cwd: process.cwd(),
           env: {
             ...process.env,

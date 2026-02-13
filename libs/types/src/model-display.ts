@@ -72,9 +72,17 @@ export const CLAUDE_MODELS: ModelOption[] = [
  */
 export const CODEX_MODELS: (ModelOption & { hasReasoning?: boolean })[] = [
   {
+    id: CODEX_MODEL_MAP.gpt53Codex,
+    label: 'GPT-5.3-Codex',
+    description: 'Latest advanced agentic coding model for complex software engineering.',
+    badge: 'Premium',
+    provider: 'codex',
+    hasReasoning: true,
+  },
+  {
     id: CODEX_MODEL_MAP.gpt52Codex,
     label: 'GPT-5.2-Codex',
-    description: 'Most advanced agentic coding model for complex software engineering.',
+    description: 'Advanced agentic coding model for complex software engineering.',
     badge: 'Premium',
     provider: 'codex',
     hasReasoning: true,
@@ -194,6 +202,7 @@ export function getModelDisplayName(model: ModelAlias | string): string {
     haiku: 'Claude Haiku',
     sonnet: 'Claude Sonnet',
     opus: 'Claude Opus',
+    [CODEX_MODEL_MAP.gpt53Codex]: 'GPT-5.3-Codex',
     [CODEX_MODEL_MAP.gpt52Codex]: 'GPT-5.2-Codex',
     [CODEX_MODEL_MAP.gpt51CodexMax]: 'GPT-5.1-Codex-Max',
     [CODEX_MODEL_MAP.gpt51CodexMini]: 'GPT-5.1-Codex-Mini',

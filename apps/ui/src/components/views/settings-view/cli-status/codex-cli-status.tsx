@@ -87,9 +87,17 @@ export function CodexCliStatus({ status, authStatus, isChecking, onRefresh }: Cl
       const result = await api.setup.authCodex();
 
       if (result.success) {
-        toast.success('Signed In', {
-          description: 'Successfully authenticated Codex CLI',
-        });
+        if (result.requiresManualAuth) {
+          toast.info('Codex Linked', {
+            description:
+              result.message ||
+              'Codex CLI linked. Run `codex login` in your terminal to finish authentication.',
+          });
+        } else {
+          toast.success('Codex Linked', {
+            description: result.message || 'Codex CLI linked with the app.',
+          });
+        }
         onRefresh();
       } else if (result.error) {
         toast.error('Authentication Failed', {

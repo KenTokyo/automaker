@@ -1,19 +1,33 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
-import { Send, Paperclip, Square, ListOrdered, Copy, Check } from 'lucide-react';
+import {
+  Send,
+  Paperclip,
+  Square,
+  ListOrdered,
+  Copy,
+  Check,
+  Mic,
+  MicOff,
+  FileText,
+  Plus,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { AgentModelSelector } from '../shared/agent-model-selector';
 import { AgentPromptsSelector } from './agent-prompts-selector';
 import { TimeLimiterSettings } from './time-limiter-settings';
 import { generateChatSummary, copyToClipboard } from '@/lib/copy-all-chat';
+import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
+import { useAppStore } from '@/store/app-store';
 import type { PhaseModelEntry } from '@automaker/types';
 import type { Message } from '@/types/electron';
 
 interface InputControlsProps {
   input: string;
   onInputChange: (value: string) => void;
-  onSend: () => void;
+  onSend: (messageOverride?: string) => void;
   onStop: () => void;
   onToggleImageDropZone: () => void;
   onPaste: (e: React.ClipboardEvent) => Promise<void>;
@@ -41,6 +55,10 @@ interface InputControlsProps {
   inputRef?: React.RefObject<HTMLTextAreaElement | null>;
 }
 
+const TEXTAREA_MIN_HEIGHT = 44;
+const TEXTAREA_MAX_HEIGHT = 320;
+const INPUT_SYNC_DEBOUNCE_MS = 180;
+
 export function InputControls({
   input,
   onInputChange,
@@ -66,7 +84,159 @@ export function InputControls({
 }: InputControlsProps) {
   const internalInputRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = externalInputRef || internalInputRef;
+  const onSendRef = useRef(onSend);
+  const inputSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resizeFrameRef = useRef<number | null>(null);
+  const [draftInput, setDraftInput] = useState(input);
+  const draftInputRef = useRef(input);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
+  onSendRef.current = onSend;
+
+  const resizeTextarea = useCallback((textarea: HTMLTextAreaElement | null) => {
+    if (!textarea) return;
+
+    textarea.style.height = 'auto';
+    const scrollHeight = textarea.scrollHeight;
+    const newHeight = Math.max(TEXTAREA_MIN_HEIGHT, Math.min(scrollHeight, TEXTAREA_MAX_HEIGHT));
+
+    textarea.style.height = `${newHeight}px`;
+    textarea.style.overflowY = scrollHeight > TEXTAREA_MAX_HEIGHT ? 'auto' : 'hidden';
+  }, []);
+
+  const clearPendingInputSync = useCallback(() => {
+    if (inputSyncTimeoutRef.current !== null) {
+      clearTimeout(inputSyncTimeoutRef.current);
+      inputSyncTimeoutRef.current = null;
+    }
+  }, []);
+
+  const clearPendingResize = useCallback(() => {
+    if (resizeFrameRef.current !== null) {
+      window.cancelAnimationFrame(resizeFrameRef.current);
+      resizeFrameRef.current = null;
+    }
+  }, []);
+
+  const scheduleTextareaResize = useCallback(
+    (textarea: HTMLTextAreaElement | null) => {
+      if (!textarea) return;
+
+      clearPendingResize();
+      resizeFrameRef.current = window.requestAnimationFrame(() => {
+        resizeFrameRef.current = null;
+        resizeTextarea(textarea);
+      });
+    },
+    [clearPendingResize, resizeTextarea]
+  );
+
+  const syncInputToParent = useCallback(
+    (nextValue: string, immediate = false) => {
+      clearPendingInputSync();
+
+      if (immediate) {
+        onInputChange(nextValue);
+        return;
+      }
+
+      inputSyncTimeoutRef.current = setTimeout(() => {
+        inputSyncTimeoutRef.current = null;
+        onInputChange(nextValue);
+      }, INPUT_SYNC_DEBOUNCE_MS);
+    },
+    [clearPendingInputSync, onInputChange]
+  );
+
+  const canSend = (draftInput.trim().length > 0 || hasFiles) && isConnected;
+
+  useEffect(() => {
+    draftInputRef.current = draftInput;
+  }, [draftInput]);
+
+  useEffect(() => {
+    return () => {
+      clearPendingInputSync();
+      clearPendingResize();
+    };
+  }, [clearPendingInputSync, clearPendingResize]);
+
+  useEffect(() => {
+    if (input === draftInputRef.current) return;
+    setDraftInput(input);
+    setInterimTranscript('');
+    scheduleTextareaResize(inputRef.current);
+  }, [input, inputRef, scheduleTextareaResize]);
+
+  // Speech recognition
+  const {
+    isListening,
+    isSupported: isSpeechSupported,
+    toggleListening,
+  } = useSpeechRecognition({
+    lang: 'de-DE',
+    continuous: true,
+    interimResults: true,
+    onTranscript: useCallback(
+      (transcript: string, isFinal: boolean) => {
+        if (isFinal) {
+          // Append final transcript to local draft first to keep typing responsive.
+          setDraftInput((previous) => {
+            const nextValue = previous + (previous ? ' ' : '') + transcript;
+            syncInputToParent(nextValue);
+            return nextValue;
+          });
+          setInterimTranscript('');
+          scheduleTextareaResize(inputRef.current);
+        } else {
+          // Show interim results
+          setInterimTranscript(transcript);
+        }
+      },
+      [inputRef, scheduleTextareaResize, syncInputToParent]
+    ),
+    onError: useCallback((error: string) => {
+      console.error('Speech recognition error:', error);
+      setInterimTranscript('');
+    }, []),
+  });
+
+  // Listen for docs:insert-path events
+  useEffect(() => {
+    const handleInsertPath = (e: Event) => {
+      const path = (e as CustomEvent<string>).detail;
+      if (!path) return;
+      setDraftInput((previous) => {
+        const nextValue = previous ? previous + '\n' + path : path;
+        syncInputToParent(nextValue, true);
+        return nextValue;
+      });
+      scheduleTextareaResize(inputRef.current);
+      inputRef.current?.focus();
+    };
+
+    window.addEventListener('docs:insert-path', handleInsertPath);
+    return () => window.removeEventListener('docs:insert-path', handleInsertPath);
+  }, [inputRef, scheduleTextareaResize, syncInputToParent]);
+
+  // Recent docs from store
+  const recentDocs = useAppStore((s) => s.recentDocs);
+  const setDocsOpen = useAppStore((s) => s.setDocsOpen);
+  const [docsPopoverOpen, setDocsPopoverOpen] = useState(false);
+
+  const handleInsertRecentDoc = useCallback(
+    (absolutePath: string) => {
+      setDraftInput((previous) => {
+        const nextValue = previous ? previous + '\n' + absolutePath : absolutePath;
+        syncInputToParent(nextValue, true);
+        return nextValue;
+      });
+      scheduleTextareaResize(inputRef.current);
+      inputRef.current?.focus();
+      setDocsPopoverOpen(false);
+    },
+    [inputRef, scheduleTextareaResize, syncInputToParent]
+  );
 
   // Handle Copy-All button click
   const handleCopyAll = useCallback(async () => {
@@ -83,37 +253,31 @@ export function InputControls({
 
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      onInputChange(e.target.value);
+      const nextValue = e.currentTarget.value;
+      setDraftInput(nextValue);
+      syncInputToParent(nextValue);
+      scheduleTextareaResize(e.currentTarget);
     },
-    [onInputChange]
+    [scheduleTextareaResize, syncInputToParent]
   );
 
+  const triggerSend = useCallback(() => {
+    if (!canSend) return;
+
+    onSendRef.current(draftInput);
+    setDraftInput('');
+    setInterimTranscript('');
+    syncInputToParent('', true);
+    scheduleTextareaResize(inputRef.current);
+  }, [canSend, draftInput, inputRef, scheduleTextareaResize, syncInputToParent]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.nativeEvent.isComposing) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      onSend();
-      // Reset height after sending (will be handled by useEffect when input clears)
+      triggerSend();
     }
   };
-
-  // Adjust height when input changes (including when cleared after send)
-  useEffect(() => {
-    const textarea = inputRef.current;
-    if (!textarea) return;
-
-    const minHeight = 44;
-    const maxHeight = 320;
-
-    textarea.style.height = 'auto';
-    const scrollHeight = textarea.scrollHeight;
-    const newHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight));
-
-    textarea.style.height = `${newHeight}px`;
-    textarea.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input]); // inputRef is a ref and doesn't need to be in dependencies
-
-  const canSend = (input.trim() || hasFiles) && isConnected;
 
   return (
     <>
@@ -139,9 +303,12 @@ export function InputControls({
                   ? 'Type to queue another prompt...'
                   : 'Describe what you want to build...'
             }
-            value={input}
+            value={
+              draftInput + (interimTranscript ? (draftInput ? ' ' : '') + interimTranscript : '')
+            }
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            onBlur={() => syncInputToParent(draftInput, true)}
             onPaste={onPaste}
             disabled={!isConnected}
             data-testid="agent-input"
@@ -151,7 +318,8 @@ export function InputControls({
               'focus:ring-2 focus:ring-primary/20 focus:border-primary/50',
               'min-h-[44px]',
               hasFiles && 'border-primary/30',
-              isDragOver && 'border-primary bg-primary/5'
+              isDragOver && 'border-primary bg-primary/5',
+              isListening && 'border-red-500/50 ring-2 ring-red-500/20'
             )}
           />
           {hasFiles && !isDragOver && (
@@ -176,6 +344,23 @@ export function InputControls({
             disabled={!isConnected}
           />
 
+          {/* Microphone Button */}
+          {isSpeechSupported && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={toggleListening}
+              disabled={!isConnected}
+              className={cn(
+                'h-11 w-11 rounded-xl border-border shrink-0',
+                isListening && 'bg-red-500/10 text-red-600 border-red-500/30 animate-pulse'
+              )}
+              title={isListening ? 'Stop recording' : 'Start voice input'}
+            >
+              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </Button>
+          )}
+
           {/* File Attachment Button */}
           <Button
             variant="outline"
@@ -194,6 +379,56 @@ export function InputControls({
 
           {/* Agent Prompts Selector */}
           <AgentPromptsSelector projectPath={projectPath} disabled={!isConnected} />
+
+          {/* Docs Quick Access */}
+          <Popover open={docsPopoverOpen} onOpenChange={setDocsPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={!isConnected}
+                className="h-11 w-11 rounded-xl border-border shrink-0"
+                title="Insert doc path"
+              >
+                <FileText className="w-4 h-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-0" align="start">
+              <div className="p-2 border-b">
+                <p className="text-xs font-medium text-muted-foreground">Recent Docs</p>
+              </div>
+              {recentDocs.length === 0 ? (
+                <div className="p-3 text-xs text-muted-foreground text-center">No recent docs</div>
+              ) : (
+                <div className="max-h-48 overflow-y-auto">
+                  {recentDocs.slice(0, 5).map((doc) => (
+                    <button
+                      key={doc.path}
+                      className="flex items-center justify-between w-full px-3 py-2 text-sm hover:bg-accent/50 transition-colors"
+                      onClick={() => handleInsertRecentDoc(doc.absolutePath)}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span className="truncate">{doc.name}</span>
+                      </div>
+                      <Plus className="w-3 h-3 text-muted-foreground shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="p-2 border-t">
+                <button
+                  className="w-full text-xs text-center text-primary hover:underline"
+                  onClick={() => {
+                    setDocsOpen(true);
+                    setDocsPopoverOpen(false);
+                  }}
+                >
+                  Browse All Docs
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
 
           {/* Time Limiter Settings */}
           <TimeLimiterSettings disabled={!isConnected} elapsedSeconds={elapsedSeconds} />
@@ -232,7 +467,7 @@ export function InputControls({
 
           {/* Send / Queue Button */}
           <Button
-            onClick={onSend}
+            onClick={triggerSend}
             disabled={!canSend}
             className="h-11 px-4 rounded-xl shrink-0"
             variant={isProcessing ? 'outline' : 'default'}

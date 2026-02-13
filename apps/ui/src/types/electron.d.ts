@@ -56,11 +56,18 @@ export type StreamEvent =
       sessionId: string;
       error: string;
       message?: Message;
+    }
+  | {
+      type: 'session_metadata_updated';
+      sessionId: string;
+      name?: string;
+      description?: string;
     };
 
 export interface SessionListItem {
   id: string;
   name: string;
+  description?: string;
   projectPath: string;
   createdAt: string;
   updatedAt: string;
@@ -688,6 +695,36 @@ export interface ElectronAPI {
 
   // Spec Regeneration APIs
   specRegeneration: SpecRegenerationAPI;
+
+  // Docs APIs
+  docs: DocsAPI;
+}
+
+export interface DocsAPI {
+  list: (
+    projectPath: string,
+    subfolder?: string
+  ) => Promise<import('@automaker/types').ListDocsResponse>;
+
+  read: (projectPath: string, filePath: string) => Promise<import('@automaker/types').DocContent>;
+
+  create: (
+    params: import('@automaker/types').CreateDocParams
+  ) => Promise<import('@automaker/types').DocFile>;
+
+  update: (
+    params: import('@automaker/types').UpdateDocParams
+  ) => Promise<import('@automaker/types').DocFile>;
+
+  delete: (params: import('@automaker/types').DeleteDocParams) => Promise<{ success: boolean }>;
+
+  mkdir: (
+    projectPath: string,
+    name: string,
+    subfolder?: string
+  ) => Promise<import('@automaker/types').DocFile>;
+
+  rename: (projectPath: string, filePath: string, newName: string) => Promise<{ success: boolean }>;
 }
 
 export interface WorktreeInfo {

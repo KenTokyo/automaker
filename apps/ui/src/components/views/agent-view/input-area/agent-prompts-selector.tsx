@@ -5,7 +5,7 @@
  * custom agent prompts that are prepended to messages.
  */
 
-import { useState, useEffect } from 'react';
+import { memo, useState, useEffect } from 'react';
 import { Bot, Plus, Pencil, Trash2, FolderOpen, X, ChevronDown, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -36,7 +36,10 @@ interface AgentPromptsSelectorProps {
   disabled?: boolean;
 }
 
-export function AgentPromptsSelector({ projectPath, disabled }: AgentPromptsSelectorProps) {
+export const AgentPromptsSelector = memo(function AgentPromptsSelector({
+  projectPath,
+  disabled,
+}: AgentPromptsSelectorProps) {
   const {
     prompts,
     selectedPromptIds,
@@ -389,4 +392,4 @@ export function AgentPromptsSelector({ projectPath, disabled }: AgentPromptsSele
       </Dialog>
     </>
   );
-}
+});

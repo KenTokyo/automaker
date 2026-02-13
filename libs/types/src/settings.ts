@@ -869,6 +869,12 @@ export interface GlobalSettings {
   /** Enable AI-generated commit messages when opening commit dialog (default: true) */
   enableAiCommitMessages: boolean;
 
+  // Model Selection Persistence
+  /** User's favorite models in the model selector */
+  favoriteModels?: string[];
+  /** Last selected model and thinking level in agent chat view */
+  selectedAgentModel?: PhaseModelEntry;
+
   // AI Model Selection (per-phase configuration)
   /** Phase-specific AI model configuration */
   phaseModels: PhaseModelConfig;

@@ -5,6 +5,7 @@
 export interface AgentSession {
   id: string;
   name: string;
+  description?: string;
   projectPath: string;
   createdAt: string;
   updatedAt: string;

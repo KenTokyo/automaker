@@ -3,6 +3,7 @@
  * This ensures we have a single source of truth for model selection logic.
  */
 
+import { memo } from 'react';
 import { PhaseModelSelector } from '@/components/views/settings-view/model-defaults/phase-model-selector';
 import type { PhaseModelEntry } from '@automaker/types';
 
@@ -18,8 +19,12 @@ interface AgentModelSelectorProps {
   disabled?: boolean;
 }
 
-export function AgentModelSelector({ value, onChange, disabled }: AgentModelSelectorProps) {
+export const AgentModelSelector = memo(function AgentModelSelector({
+  value,
+  onChange,
+  disabled,
+}: AgentModelSelectorProps) {
   return (
     <PhaseModelSelector value={value} onChange={onChange} disabled={disabled} compact align="end" />
   );
-}
+});

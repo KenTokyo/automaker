@@ -89,7 +89,7 @@ export function ModelSelector({
     } else if (provider === 'codex' && selectedProvider !== 'codex') {
       // Switch to Codex's default model (use isDefault flag from dynamic models)
       const defaultModel = codexModels.find((m) => m.isDefault);
-      const defaultModelId = defaultModel?.id || codexModels[0]?.id || 'codex-gpt-5.2-codex';
+      const defaultModelId = defaultModel?.id || codexModels[0]?.id || 'codex-gpt-5.3-codex';
       onModelSelect(defaultModelId);
     } else if (provider === 'claude' && selectedProvider !== 'claude') {
       // Switch to Claude's default model (canonical format)

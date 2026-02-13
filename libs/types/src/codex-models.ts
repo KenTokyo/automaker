@@ -6,6 +6,7 @@
  * IMPORTANT: All Codex models use 'codex-' prefix to distinguish from Cursor CLI models
  */
 export type CodexModelId =
+  | 'codex-gpt-5.3-codex'
   | 'codex-gpt-5.2-codex'
   | 'codex-gpt-5.1-codex-max'
   | 'codex-gpt-5.1-codex-mini'
@@ -29,10 +30,17 @@ export interface CodexModelConfig {
  * All keys use 'codex-' prefix to distinguish from Cursor CLI models
  */
 export const CODEX_MODEL_CONFIG_MAP: Record<CodexModelId, CodexModelConfig> = {
+  'codex-gpt-5.3-codex': {
+    id: 'codex-gpt-5.3-codex',
+    label: 'GPT-5.3-Codex',
+    description: 'Latest advanced agentic coding model for complex software engineering',
+    hasThinking: true,
+    supportsVision: true,
+  },
   'codex-gpt-5.2-codex': {
     id: 'codex-gpt-5.2-codex',
     label: 'GPT-5.2-Codex',
-    description: 'Most advanced agentic coding model for complex software engineering',
+    description: 'Advanced agentic coding model for complex software engineering',
     hasThinking: true,
     supportsVision: true,
   },

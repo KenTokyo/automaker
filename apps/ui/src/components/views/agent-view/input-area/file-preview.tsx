@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { X, FileText } from 'lucide-react';
 import type { ImageAttachment, TextFileAttachment } from '@/store/app-store';
 import { formatFileSize } from '@/lib/image-utils';
@@ -11,7 +12,7 @@ interface FilePreviewProps {
   onClearAll: () => void;
 }
 
-export function FilePreview({
+export const FilePreview = memo(function FilePreview({
   selectedImages,
   selectedTextFiles,
   isProcessing,
@@ -100,4 +101,4 @@ export function FilePreview({
       </div>
     </div>
   );
-}
+});

@@ -2,7 +2,6 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { useAgentPromptsStore } from '@/store/agent-prompts-store';
 import { useTimeLimiterStore } from '@/store/time-limiter-store';
-import type { PhaseModelEntry } from '@automaker/types';
 import { useElectronAgent } from '@/hooks/use-electron-agent';
 import { SessionManager } from '@/components/session-manager';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
@@ -24,29 +23,39 @@ import { AgentInputArea } from './agent-view/input-area';
 const LG_BREAKPOINT = 1024;
 
 export function AgentView() {
-  const { currentProject, projects, setCurrentProject } = useAppStore();
+  const { currentProject, projects, setCurrentProject, selectedAgentModel, setSelectedAgentModel } =
+    useAppStore();
   const [input, setInput] = useState('');
   const [currentTool, setCurrentTool] = useState<string | null>(null);
+  const [isDesktop, setIsDesktop] = useState(true);
   // Initialize session manager state - starts as true to match SSR
   // Then updates on mount based on actual screen size to prevent hydration mismatch
   const [showSessionManager, setShowSessionManager] = useState(true);
 
   // Update session manager visibility based on screen size after mount and on resize
   useEffect(() => {
-    const updateVisibility = () => {
-      const isDesktop = window.innerWidth >= LG_BREAKPOINT;
-      setShowSessionManager(isDesktop);
+    const updateViewportState = () => {
+      const desktop = window.innerWidth >= LG_BREAKPOINT;
+      setIsDesktop(desktop);
+      setShowSessionManager(desktop);
     };
 
     // Set initial value
-    updateVisibility();
+    updateViewportState();
 
     // Listen for resize events
-    window.addEventListener('resize', updateVisibility);
-    return () => window.removeEventListener('resize', updateVisibility);
+    window.addEventListener('resize', updateViewportState);
+    return () => window.removeEventListener('resize', updateViewportState);
   }, []);
 
-  const [modelSelection, setModelSelection] = useState<PhaseModelEntry>({ model: 'claude-sonnet' });
+  // Model selection now persisted via app-store
+  const modelSelection = selectedAgentModel;
+  const setModelSelection = setSelectedAgentModel;
+
+  const handleToolUse = useCallback((toolName: string) => {
+    setCurrentTool(toolName);
+    setTimeout(() => setCurrentTool(null), 2000);
+  }, []);
 
   // Input ref for auto-focus
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -67,7 +76,6 @@ export function AgentView() {
     sendMessage,
     clearHistory,
     stopExecution,
-    error: agentError,
     serverQueue,
     addToServerQueue,
     removeFromServerQueue,
@@ -77,10 +85,7 @@ export function AgentView() {
     workingDirectory: currentProject?.path,
     model: modelSelection.model,
     thinkingLevel: modelSelection.thinkingLevel,
-    onToolUse: (toolName) => {
-      setCurrentTool(toolName);
-      setTimeout(() => setCurrentTool(null), 2000);
-    },
+    onToolUse: handleToolUse,
   });
 
   // File attachments hook
@@ -107,7 +112,6 @@ export function AgentView() {
   // Time limiter store
   const {
     isEnabled: timeLimiterEnabled,
-    timeLimitSeconds,
     startSession,
     getElapsedSeconds,
     isTimeExceeded,
@@ -179,44 +183,62 @@ export function AgentView() {
   ]);
 
   // Handle send message
-  const handleSend = useCallback(async () => {
-    const {
-      selectedImages,
-      selectedTextFiles,
-      setSelectedImages,
-      setSelectedTextFiles,
-      setShowImageDropZone,
-    } = fileAttachments;
+  const handleSend = useCallback(
+    async (messageOverride?: string) => {
+      const {
+        selectedImages,
+        selectedTextFiles,
+        setSelectedImages,
+        setSelectedTextFiles,
+        setShowImageDropZone,
+      } = fileAttachments;
 
-    if (!input.trim() && selectedImages.length === 0 && selectedTextFiles.length === 0) return;
+      const messageInput = messageOverride ?? input;
+      if (!messageInput.trim() && selectedImages.length === 0 && selectedTextFiles.length === 0) {
+        return;
+      }
 
-    // Get selected agent prompts and prepend to message
-    const agentPromptsText = getSelectedPromptsText();
-    let messageContent = input;
-    if (agentPromptsText) {
-      messageContent = agentPromptsText + '\n\n---\n\n' + input;
-    }
+      // Get selected agent prompts and prepend to message
+      const agentPromptsText = getSelectedPromptsText();
+      let messageContent = messageInput;
+      if (agentPromptsText) {
+        messageContent = agentPromptsText + '\n\n---\n\n' + messageInput;
+      }
 
-    const messageImages = selectedImages;
-    const messageTextFiles = selectedTextFiles;
+      const messageImages = selectedImages;
+      const messageTextFiles = selectedTextFiles;
 
-    setInput('');
-    setSelectedImages([]);
-    setSelectedTextFiles([]);
-    setShowImageDropZone(false);
+      setInput('');
+      setSelectedImages([]);
+      setSelectedTextFiles([]);
+      setShowImageDropZone(false);
 
-    // If already processing, add to server queue instead
-    if (isProcessing) {
-      await addToServerQueue(messageContent, messageImages, messageTextFiles);
-    } else {
-      await sendMessage(messageContent, messageImages, messageTextFiles);
-    }
-  }, [input, fileAttachments, isProcessing, sendMessage, addToServerQueue, getSelectedPromptsText]);
+      // If already processing, add to server queue instead
+      if (isProcessing) {
+        await addToServerQueue(messageContent, messageImages, messageTextFiles);
+      } else {
+        await sendMessage(messageContent, messageImages, messageTextFiles);
+      }
+    },
+    [input, fileAttachments, isProcessing, sendMessage, addToServerQueue, getSelectedPromptsText]
+  );
 
   const handleClearChat = async () => {
     if (!confirm('Are you sure you want to clear this conversation?')) return;
     await clearHistory();
   };
+
+  const handleShowSessionManager = useCallback(() => {
+    setShowSessionManager(true);
+  }, []);
+
+  const handleHideSessionManager = useCallback(() => {
+    setShowSessionManager(false);
+  }, []);
+
+  const handleToggleSessionManager = useCallback(() => {
+    setShowSessionManager((previous) => !previous);
+  }, []);
 
   // Auto-focus input when session is selected/changed
   useEffect(() => {
@@ -255,17 +277,17 @@ export function AgentView() {
   return (
     <div className="flex-1 flex overflow-hidden bg-background" data-testid="agent-view">
       {/* Mobile backdrop overlay for Session Manager */}
-      {showSessionManager && currentProject && (
+      {!isDesktop && showSessionManager && currentProject && (
         <div
-          className="fixed inset-0 bg-black/50 z-20 lg:hidden"
-          onClick={() => setShowSessionManager(false)}
+          className="fixed inset-0 bg-black/50 z-20"
+          onClick={handleHideSessionManager}
           data-testid="session-manager-backdrop"
         />
       )}
 
       {/* Mobile Session Manager - fixed overlay */}
-      {showSessionManager && currentProject && (
-        <div className="fixed inset-y-0 left-0 w-72 z-30 lg:hidden border-r border-border shrink-0 bg-card">
+      {!isDesktop && showSessionManager && currentProject && (
+        <div className="fixed inset-y-0 left-0 w-72 z-30 border-r border-border shrink-0 bg-card">
           <SessionManager
             currentSessionId={currentSessionId}
             onSelectSession={handleSelectSession}
@@ -276,163 +298,163 @@ export function AgentView() {
         </div>
       )}
 
-      {/* Desktop layout with resizable panels */}
-      <ResizablePanelGroup
-        direction="horizontal"
-        className="hidden lg:flex"
-        autoSaveId="agent-view-sidebar"
-      >
-        {/* Session Manager Sidebar - Desktop (resizable) */}
-        {showSessionManager && currentProject && (
-          <>
-            <ResizablePanel
-              defaultSize={25}
-              minSize={15}
-              maxSize={40}
-              className="bg-card border-r border-border"
-            >
-              <SessionManager
+      {isDesktop ? (
+        <ResizablePanelGroup
+          direction="horizontal"
+          className="flex"
+          autoSaveId="agent-view-sidebar"
+        >
+          {/* Session Manager Sidebar - Desktop (resizable) */}
+          {showSessionManager && currentProject && (
+            <>
+              <ResizablePanel
+                defaultSize={25}
+                minSize={15}
+                maxSize={40}
+                className="bg-card border-r border-border"
+              >
+                <SessionManager
+                  currentSessionId={currentSessionId}
+                  onSelectSession={handleSelectSession}
+                  projectPath={currentProject.path}
+                  isCurrentSessionThinking={isProcessing}
+                  onQuickCreateRef={quickCreateSessionRef}
+                />
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+            </>
+          )}
+
+          {/* Chat Area - Desktop */}
+          <ResizablePanel defaultSize={showSessionManager && currentProject ? 75 : 100}>
+            <div className="flex-1 flex flex-col overflow-hidden h-full">
+              {/* Header */}
+              <AgentHeader
+                currentProject={currentProject}
+                projects={projects}
+                onProjectSelect={setCurrentProject}
                 currentSessionId={currentSessionId}
-                onSelectSession={handleSelectSession}
-                projectPath={currentProject.path}
-                isCurrentSessionThinking={isProcessing}
-                onQuickCreateRef={quickCreateSessionRef}
-              />
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-          </>
-        )}
-
-        {/* Chat Area - Desktop */}
-        <ResizablePanel defaultSize={showSessionManager && currentProject ? 75 : 100}>
-          <div className="flex-1 flex flex-col overflow-hidden h-full">
-            {/* Header */}
-            <AgentHeader
-              currentProject={currentProject}
-              projects={projects}
-              onProjectSelect={setCurrentProject}
-              currentSessionId={currentSessionId}
-              isConnected={isConnected}
-              isProcessing={isProcessing}
-              currentTool={currentTool}
-              messagesCount={messages.length}
-              showSessionManager={showSessionManager}
-              onToggleSessionManager={() => setShowSessionManager(!showSessionManager)}
-              onClearChat={handleClearChat}
-            />
-
-            {/* Messages */}
-            <ChatArea
-              currentSessionId={currentSessionId}
-              messages={displayMessages}
-              isProcessing={isProcessing}
-              showSessionManager={showSessionManager}
-              messagesContainerRef={messagesContainerRef}
-              onScroll={handleScroll}
-              onShowSessionManager={() => setShowSessionManager(true)}
-            />
-
-            {/* Input Area */}
-            {currentSessionId && (
-              <AgentInputArea
-                input={input}
-                onInputChange={setInput}
-                onSend={handleSend}
-                onStop={stopExecution}
-                modelSelection={modelSelection}
-                onModelSelect={setModelSelection}
-                isProcessing={isProcessing}
                 isConnected={isConnected}
-                projectPath={currentProject?.path || null}
-                messages={messages}
-                elapsedSeconds={elapsedSeconds}
-                selectedImages={fileAttachments.selectedImages}
-                selectedTextFiles={fileAttachments.selectedTextFiles}
-                showImageDropZone={fileAttachments.showImageDropZone}
-                isDragOver={fileAttachments.isDragOver}
-                onImagesSelected={fileAttachments.handleImagesSelected}
-                onToggleImageDropZone={fileAttachments.toggleImageDropZone}
-                onRemoveImage={fileAttachments.removeImage}
-                onRemoveTextFile={fileAttachments.removeTextFile}
-                onClearAllFiles={fileAttachments.clearAllFiles}
-                onDragEnter={fileAttachments.handleDragEnter}
-                onDragLeave={fileAttachments.handleDragLeave}
-                onDragOver={fileAttachments.handleDragOver}
-                onDrop={fileAttachments.handleDrop}
-                onPaste={fileAttachments.handlePaste}
-                serverQueue={serverQueue}
-                onRemoveFromQueue={removeFromServerQueue}
-                onClearQueue={clearServerQueue}
-                inputRef={inputRef}
+                isProcessing={isProcessing}
+                currentTool={currentTool}
+                messagesCount={messages.length}
+                showSessionManager={showSessionManager}
+                onToggleSessionManager={handleToggleSessionManager}
+                onClearChat={handleClearChat}
               />
-            )}
-          </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
 
-      {/* Mobile Chat Area */}
-      <div className="flex-1 flex flex-col overflow-hidden lg:hidden">
-        {/* Header */}
-        <AgentHeader
-          currentProject={currentProject}
-          projects={projects}
-          onProjectSelect={setCurrentProject}
-          currentSessionId={currentSessionId}
-          isConnected={isConnected}
-          isProcessing={isProcessing}
-          currentTool={currentTool}
-          messagesCount={messages.length}
-          showSessionManager={showSessionManager}
-          onToggleSessionManager={() => setShowSessionManager(!showSessionManager)}
-          onClearChat={handleClearChat}
-        />
+              {/* Messages */}
+              <ChatArea
+                currentSessionId={currentSessionId}
+                messages={displayMessages}
+                isProcessing={isProcessing}
+                showSessionManager={showSessionManager}
+                messagesContainerRef={messagesContainerRef}
+                onScroll={handleScroll}
+                onShowSessionManager={handleShowSessionManager}
+              />
 
-        {/* Messages */}
-        <ChatArea
-          currentSessionId={currentSessionId}
-          messages={displayMessages}
-          isProcessing={isProcessing}
-          showSessionManager={showSessionManager}
-          messagesContainerRef={messagesContainerRef}
-          onScroll={handleScroll}
-          onShowSessionManager={() => setShowSessionManager(true)}
-        />
-
-        {/* Input Area */}
-        {currentSessionId && (
-          <AgentInputArea
-            input={input}
-            onInputChange={setInput}
-            onSend={handleSend}
-            onStop={stopExecution}
-            modelSelection={modelSelection}
-            onModelSelect={setModelSelection}
-            isProcessing={isProcessing}
+              {/* Input Area */}
+              {currentSessionId && (
+                <AgentInputArea
+                  input={input}
+                  onInputChange={setInput}
+                  onSend={handleSend}
+                  onStop={stopExecution}
+                  modelSelection={modelSelection}
+                  onModelSelect={setModelSelection}
+                  isProcessing={isProcessing}
+                  isConnected={isConnected}
+                  projectPath={currentProject?.path || null}
+                  messages={messages}
+                  elapsedSeconds={elapsedSeconds}
+                  selectedImages={fileAttachments.selectedImages}
+                  selectedTextFiles={fileAttachments.selectedTextFiles}
+                  showImageDropZone={fileAttachments.showImageDropZone}
+                  isDragOver={fileAttachments.isDragOver}
+                  onImagesSelected={fileAttachments.handleImagesSelected}
+                  onToggleImageDropZone={fileAttachments.toggleImageDropZone}
+                  onRemoveImage={fileAttachments.removeImage}
+                  onRemoveTextFile={fileAttachments.removeTextFile}
+                  onClearAllFiles={fileAttachments.clearAllFiles}
+                  onDragEnter={fileAttachments.handleDragEnter}
+                  onDragLeave={fileAttachments.handleDragLeave}
+                  onDragOver={fileAttachments.handleDragOver}
+                  onDrop={fileAttachments.handleDrop}
+                  onPaste={fileAttachments.handlePaste}
+                  serverQueue={serverQueue}
+                  onRemoveFromQueue={removeFromServerQueue}
+                  onClearQueue={clearServerQueue}
+                  inputRef={inputRef}
+                />
+              )}
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      ) : (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Header */}
+          <AgentHeader
+            currentProject={currentProject}
+            projects={projects}
+            onProjectSelect={setCurrentProject}
+            currentSessionId={currentSessionId}
             isConnected={isConnected}
-            projectPath={currentProject?.path || null}
-            messages={messages}
-            elapsedSeconds={elapsedSeconds}
-            selectedImages={fileAttachments.selectedImages}
-            selectedTextFiles={fileAttachments.selectedTextFiles}
-            showImageDropZone={fileAttachments.showImageDropZone}
-            isDragOver={fileAttachments.isDragOver}
-            onImagesSelected={fileAttachments.handleImagesSelected}
-            onToggleImageDropZone={fileAttachments.toggleImageDropZone}
-            onRemoveImage={fileAttachments.removeImage}
-            onRemoveTextFile={fileAttachments.removeTextFile}
-            onClearAllFiles={fileAttachments.clearAllFiles}
-            onDragEnter={fileAttachments.handleDragEnter}
-            onDragLeave={fileAttachments.handleDragLeave}
-            onDragOver={fileAttachments.handleDragOver}
-            onDrop={fileAttachments.handleDrop}
-            onPaste={fileAttachments.handlePaste}
-            serverQueue={serverQueue}
-            onRemoveFromQueue={removeFromServerQueue}
-            onClearQueue={clearServerQueue}
-            inputRef={inputRef}
+            isProcessing={isProcessing}
+            currentTool={currentTool}
+            messagesCount={messages.length}
+            showSessionManager={showSessionManager}
+            onToggleSessionManager={handleToggleSessionManager}
+            onClearChat={handleClearChat}
           />
-        )}
-      </div>
+
+          {/* Messages */}
+          <ChatArea
+            currentSessionId={currentSessionId}
+            messages={displayMessages}
+            isProcessing={isProcessing}
+            showSessionManager={showSessionManager}
+            messagesContainerRef={messagesContainerRef}
+            onScroll={handleScroll}
+            onShowSessionManager={handleShowSessionManager}
+          />
+
+          {/* Input Area */}
+          {currentSessionId && (
+            <AgentInputArea
+              input={input}
+              onInputChange={setInput}
+              onSend={handleSend}
+              onStop={stopExecution}
+              modelSelection={modelSelection}
+              onModelSelect={setModelSelection}
+              isProcessing={isProcessing}
+              isConnected={isConnected}
+              projectPath={currentProject?.path || null}
+              messages={messages}
+              elapsedSeconds={elapsedSeconds}
+              selectedImages={fileAttachments.selectedImages}
+              selectedTextFiles={fileAttachments.selectedTextFiles}
+              showImageDropZone={fileAttachments.showImageDropZone}
+              isDragOver={fileAttachments.isDragOver}
+              onImagesSelected={fileAttachments.handleImagesSelected}
+              onToggleImageDropZone={fileAttachments.toggleImageDropZone}
+              onRemoveImage={fileAttachments.removeImage}
+              onRemoveTextFile={fileAttachments.removeTextFile}
+              onClearAllFiles={fileAttachments.clearAllFiles}
+              onDragEnter={fileAttachments.handleDragEnter}
+              onDragLeave={fileAttachments.handleDragLeave}
+              onDragOver={fileAttachments.handleDragOver}
+              onDrop={fileAttachments.handleDrop}
+              onPaste={fileAttachments.handlePaste}
+              serverQueue={serverQueue}
+              onRemoveFromQueue={removeFromServerQueue}
+              onClearQueue={clearServerQueue}
+              inputRef={inputRef}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

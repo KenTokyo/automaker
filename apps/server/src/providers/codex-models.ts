@@ -19,18 +19,31 @@ const MAX_OUTPUT_16K = 16000;
 export const CODEX_MODELS: ModelDefinition[] = [
   // ========== Recommended Codex Models ==========
   {
-    id: CODEX_MODEL_MAP.gpt52Codex,
-    name: 'GPT-5.2-Codex',
-    modelString: CODEX_MODEL_MAP.gpt52Codex,
+    id: CODEX_MODEL_MAP.gpt53Codex,
+    name: 'GPT-5.3-Codex',
+    modelString: CODEX_MODEL_MAP.gpt53Codex,
     provider: 'openai',
     description:
-      'Most advanced agentic coding model for complex software engineering (default for ChatGPT users).',
+      'Latest advanced agentic coding model for complex software engineering (default for ChatGPT users).',
     contextWindow: CONTEXT_WINDOW_256K,
     maxOutputTokens: MAX_OUTPUT_32K,
     supportsVision: true,
     supportsTools: true,
     tier: 'premium' as const,
     default: true,
+    hasReasoning: true,
+  },
+  {
+    id: CODEX_MODEL_MAP.gpt52Codex,
+    name: 'GPT-5.2-Codex',
+    modelString: CODEX_MODEL_MAP.gpt52Codex,
+    provider: 'openai',
+    description: 'Advanced agentic coding model for complex software engineering.',
+    contextWindow: CONTEXT_WINDOW_256K,
+    maxOutputTokens: MAX_OUTPUT_32K,
+    supportsVision: true,
+    supportsTools: true,
+    tier: 'premium' as const,
     hasReasoning: true,
   },
   {

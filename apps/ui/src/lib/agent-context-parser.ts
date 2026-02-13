@@ -39,6 +39,7 @@ export function formatModelName(model: string): string {
   if (model.includes('haiku')) return 'Haiku 4.5';
 
   // Codex/GPT models - specific formatting
+  if (model === 'codex-gpt-5.3-codex') return 'GPT-5.3 Codex';
   if (model === 'codex-gpt-5.2-codex') return 'GPT-5.2 Codex';
   if (model === 'codex-gpt-5.2') return 'GPT-5.2';
   if (model === 'codex-gpt-5.1-codex-max') return 'GPT-5.1 Max';

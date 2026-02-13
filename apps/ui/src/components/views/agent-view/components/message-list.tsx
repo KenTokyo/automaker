@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { ImageAttachment } from '@/store/app-store';
 import { MessageBubble } from './message-bubble';
 import { ThinkingIndicator } from './thinking-indicator';
@@ -17,7 +18,7 @@ interface MessageListProps {
   onScroll: () => void;
 }
 
-export function MessageList({
+export const MessageList = memo(function MessageList({
   messages,
   isProcessing,
   messagesContainerRef,
@@ -38,4 +39,4 @@ export function MessageList({
       {isProcessing && <ThinkingIndicator />}
     </div>
   );
-}
+});

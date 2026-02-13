@@ -4,6 +4,7 @@ import {
   useKeyboardShortcutsConfig,
   type KeyboardShortcut,
 } from '@/hooks/use-keyboard-shortcuts';
+import { useAppStore } from '@/store/app-store';
 
 interface UseAgentShortcutsOptions {
   currentProject: { path: string; name: string } | null;
@@ -15,6 +16,8 @@ export function useAgentShortcuts({
   quickCreateSessionRef,
 }: UseAgentShortcutsOptions): void {
   const shortcuts = useKeyboardShortcutsConfig();
+  const docsOpen = useAppStore((s) => s.docsOpen);
+  const setDocsOpen = useAppStore((s) => s.setDocsOpen);
 
   // Keyboard shortcuts for agent view
   const agentShortcuts: KeyboardShortcut[] = useMemo(() => {
@@ -31,10 +34,19 @@ export function useAgentShortcuts({
         },
         description: 'Create new session',
       });
+
+      // Toggle docs panel
+      shortcutsList.push({
+        key: 'ctrl+shift+d',
+        action: () => {
+          setDocsOpen(!docsOpen);
+        },
+        description: 'Toggle docs panel',
+      });
     }
 
     return shortcutsList;
-  }, [currentProject, shortcuts, quickCreateSessionRef]);
+  }, [currentProject, shortcuts, quickCreateSessionRef, docsOpen, setDocsOpen]);
 
   // Register keyboard shortcuts
   useKeyboardShortcuts(agentShortcuts);

@@ -22,6 +22,7 @@ export function createIndexHandler(agentService: AgentService) {
           return {
             id: s.id,
             name: s.name,
+            description: s.description,
             projectPath: s.projectPath || s.workingDirectory,
             workingDirectory: s.workingDirectory,
             createdAt: s.createdAt,

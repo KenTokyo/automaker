@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { ImageAttachment } from '@/store/app-store';
 import { MessageList } from './message-list';
 import { NoSessionState } from './empty-states';
@@ -21,7 +22,7 @@ interface ChatAreaProps {
   onShowSessionManager: () => void;
 }
 
-export function ChatArea({
+export const ChatArea = memo(function ChatArea({
   currentSessionId,
   messages,
   isProcessing,
@@ -47,4 +48,4 @@ export function ChatArea({
       onScroll={onScroll}
     />
   );
-}
+});

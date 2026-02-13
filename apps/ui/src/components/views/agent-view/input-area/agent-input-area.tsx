@@ -16,7 +16,7 @@ interface QueueItem {
 interface AgentInputAreaProps {
   input: string;
   onInputChange: (value: string) => void;
-  onSend: () => void;
+  onSend: (messageOverride?: string) => void;
   onStop: () => void;
   /** Current model selection (model + optional thinking level) */
   modelSelection: PhaseModelEntry;

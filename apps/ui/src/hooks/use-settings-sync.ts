@@ -86,6 +86,9 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'worktreePanelCollapsed',
   'lastProjectDir',
   'recentFolders',
+  // Model Selection Persistence
+  'favoriteModels', // User's favorite models in the model selector
+  'selectedAgentModel', // Last selected model in agent chat view
 ] as const;
 
 // Fields from setup store to sync
@@ -682,6 +685,11 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       worktreePanelCollapsed: serverSettings.worktreePanelCollapsed ?? false,
       lastProjectDir: serverSettings.lastProjectDir ?? '',
       recentFolders: serverSettings.recentFolders ?? [],
+      // Model Selection Persistence
+      favoriteModels: serverSettings.favoriteModels ?? [],
+      selectedAgentModel: serverSettings.selectedAgentModel
+        ? migratePhaseModelEntry(serverSettings.selectedAgentModel)
+        : { model: 'claude-opus', thinkingLevel: 'high' },
       // Event hooks
       eventHooks: serverSettings.eventHooks ?? [],
       // Terminal settings (nested in terminalState)

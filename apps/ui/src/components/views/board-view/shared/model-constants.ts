@@ -65,9 +65,17 @@ export const CURSOR_MODELS: ModelOption[] = Object.entries(CURSOR_MODEL_MAP).map
  */
 export const CODEX_MODELS: ModelOption[] = [
   {
+    id: CODEX_MODEL_MAP.gpt53Codex,
+    label: 'GPT-5.3-Codex',
+    description: 'Latest advanced agentic coding model for complex software engineering.',
+    badge: 'Premium',
+    provider: 'codex',
+    hasThinking: true,
+  },
+  {
     id: CODEX_MODEL_MAP.gpt52Codex,
     label: 'GPT-5.2-Codex',
-    description: 'Most advanced agentic coding model for complex software engineering.',
+    description: 'Advanced agentic coding model for complex software engineering.',
     badge: 'Premium',
     provider: 'codex',
     hasThinking: true,

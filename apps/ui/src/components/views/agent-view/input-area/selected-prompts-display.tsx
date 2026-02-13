@@ -6,14 +6,14 @@
  */
 
 import { X, Copy, Check } from 'lucide-react';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useAgentPromptsStore } from '@/store/agent-prompts-store';
 
-export function SelectedPromptsDisplay() {
+export const SelectedPromptsDisplay = memo(function SelectedPromptsDisplay() {
   const { prompts, selectedPromptIds, deselectPrompt, getSelectedPromptsText } =
     useAgentPromptsStore();
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -123,4 +123,4 @@ export function SelectedPromptsDisplay() {
       </div>
     </TooltipProvider>
   );
-}
+});

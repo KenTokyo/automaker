@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { X } from 'lucide-react';
 
 interface QueueItem {
@@ -12,7 +13,11 @@ interface QueueDisplayProps {
   onClearQueue: () => void;
 }
 
-export function QueueDisplay({ serverQueue, onRemoveFromQueue, onClearQueue }: QueueDisplayProps) {
+export const QueueDisplay = memo(function QueueDisplay({
+  serverQueue,
+  onRemoveFromQueue,
+  onClearQueue,
+}: QueueDisplayProps) {
   if (serverQueue.length === 0) {
     return null;
   }
@@ -57,4 +62,4 @@ export function QueueDisplay({ serverQueue, onRemoveFromQueue, onClearQueue }: Q
       </div>
     </div>
   );
-}
+});
