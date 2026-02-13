@@ -90,6 +90,24 @@ export function useProjectCreation({ upsertAndSetCurrentProject }: UseProjectCre
         const api = getElectronAPI();
         const projectPath = `${parentDir}/${projectName}`;
 
+        // Check if the target directory already exists (e.g. user picked a parent dir
+        // that already contains a folder with the same name as the project)
+        const dirExists = await api.exists(projectPath);
+        if (dirExists) {
+          // If it already has a .git or .automaker dir, treat it as an existing project
+          const hasGit = await api.exists(`${projectPath}/.git`);
+          const hasAutomaker = await api.exists(`${projectPath}/.automaker`);
+
+          if (hasGit || hasAutomaker) {
+            // Open as existing project instead of creating nested directory
+            logger.info(
+              `Directory ${projectPath} already exists with code — opening as existing project`
+            );
+            await finalizeProjectCreation(projectPath, projectName);
+            return;
+          }
+        }
+
         // Create project directory
         await api.mkdir(projectPath);
 
