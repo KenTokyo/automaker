@@ -393,6 +393,17 @@ export const BrowserPanel = memo(function BrowserPanel({ projectPath }: BrowserP
     [tabs, activeTabId]
   );
 
+  // Heal legacy/incomplete persisted state: ensure projects with tabs always
+  // have a valid active tab ID.
+  useEffect(() => {
+    if (tabs.length === 0) return;
+    if (activeTabId && tabs.some((tab) => tab.id === activeTabId)) return;
+    const fallbackTabId = tabs[tabs.length - 1]?.id;
+    if (fallbackTabId) {
+      setActiveBrowserTab(projectPath, fallbackTabId);
+    }
+  }, [projectPath, tabs, activeTabId, setActiveBrowserTab]);
+
   /** Create a new tab with a given URL and make it active */
   const createTab = useCallback(
     (url: string) => {
@@ -542,14 +553,14 @@ export const BrowserPanel = memo(function BrowserPanel({ projectPath }: BrowserP
     setHasError(true);
   }, []);
 
-  // Sync iframeSrc when the active tab changes (mount, tab switch from outside)
-  // Only update if iframeSrc doesn't already match the active tab's URL
+  // Sync iframe source when selected tab or project changes.
+  // Intentionally not depending on activeTabUrl itself, so same-origin URL tracking
+  // updates do not force iframe reloads.
   const activeTabUrl = activeTab?.url ?? '';
   useEffect(() => {
-    if (activeTabUrl && !iframeSrc) {
-      setIframeSrc(activeTabUrl);
-    }
-  }, [activeTabId]); // eslint-disable-line react-hooks/exhaustive-deps
+    setIframeSrc(activeTabUrl);
+    setHasError(false);
+  }, [projectPath, activeTabId]);
 
   // Timeout: if iframe takes >10s, show error
   useEffect(() => {

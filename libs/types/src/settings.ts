@@ -758,6 +758,12 @@ export interface ProjectRef {
   customIconPath?: string;
   /** Border color for project badge (hex color, e.g., "#ff0000") */
   badgeColor?: string;
+  /** Background color for project items in sidebar (hex color) */
+  backgroundColor?: string;
+  /** Text/foreground color for project (hex color) */
+  textColor?: string;
+  /** Icon color for project (hex color) */
+  iconColor?: string;
 }
 
 /**

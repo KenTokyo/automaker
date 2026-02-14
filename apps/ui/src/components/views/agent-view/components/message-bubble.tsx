@@ -39,8 +39,9 @@ interface MessageBubbleProps {
 
 export const MessageBubble = memo(function MessageBubble({ message }: MessageBubbleProps) {
   const isError = message.isError && message.role === 'assistant';
-  const showInsertDocs =
-    message.role === 'assistant' && !isError && message.content.trim().length > 0;
+  const hasContent = message.content.trim().length > 0;
+  const showCopyButton = hasContent;
+  const showInsertDocs = message.role === 'assistant' && !isError && hasContent;
 
   return (
     <div
@@ -149,12 +150,12 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
             })}
           </p>
 
-          {showInsertDocs && (
-            <div className="flex items-center gap-1.5">
-              <CopyButton content={message.content} />
-              <InsertIntoDocsButton content={message.content} />
-            </div>
-          )}
+          <div className="flex items-center gap-1.5">
+            {showCopyButton && (
+              <CopyButton content={message.content} isUserMessage={message.role === 'user'} />
+            )}
+            {showInsertDocs && <InsertIntoDocsButton content={message.content} />}
+          </div>
         </div>
       </div>
     </div>
@@ -162,7 +163,7 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
 });
 
 /** Direct copy-to-clipboard button (single click) */
-function CopyButton({ content }: { content: string }) {
+function CopyButton({ content, isUserMessage }: { content: string; isUserMessage?: boolean }) {
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(content).then(
       () => toast.success('Copied to clipboard'),
@@ -177,7 +178,12 @@ function CopyButton({ content }: { content: string }) {
           <button
             type="button"
             onClick={handleCopy}
-            className="opacity-0 group-hover/msg:opacity-100 focus:opacity-100 transition-opacity inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+            className={cn(
+              'opacity-0 group-hover/msg:opacity-100 focus:opacity-100 transition-opacity inline-flex items-center gap-1 text-[10px]',
+              isUserMessage
+                ? 'text-primary-foreground/70 hover:text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
           >
             <Copy className="w-3 h-3" />
           </button>

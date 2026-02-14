@@ -4,7 +4,7 @@ import type { Project, TrashedProject } from '@/lib/electron';
 import { getElectronAPI } from '@/lib/electron';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { createLogger } from '@automaker/utils/logger';
-import { setItem, getItem } from '@/lib/storage';
+import { setItem, getItem, getJSON, setJSON, removeItem } from '@/lib/storage';
 import {
   UI_SANS_FONT_OPTIONS,
   UI_MONO_FONT_OPTIONS,
@@ -127,6 +127,8 @@ export type ThemeMode =
 export const THEME_STORAGE_KEY = 'automaker:theme';
 export const FONT_SANS_STORAGE_KEY = 'automaker:font-sans';
 export const FONT_MONO_STORAGE_KEY = 'automaker:font-mono';
+export const BROWSER_TABS_STORAGE_KEY = 'automaker:browser-tabs-by-project';
+export const ACTIVE_BROWSER_TAB_STORAGE_KEY = 'automaker:active-browser-tab-by-project';
 
 // Maximum number of output lines to keep in init script state (prevents unbounded memory growth)
 export const MAX_INIT_OUTPUT_LINES = 500;
@@ -602,6 +604,127 @@ export interface BrowserTab {
   port: number | null; // Configured port (e.g. 3000)
 }
 
+type BrowserTabsByProject = Record<string, BrowserTab[]>;
+type ActiveBrowserTabByProject = Record<string, string>;
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function normalizeStoredBrowserTab(tab: unknown): BrowserTab | null {
+  if (!isObjectRecord(tab)) return null;
+
+  const id = typeof tab.id === 'string' ? tab.id : '';
+  const url = typeof tab.url === 'string' ? tab.url : '';
+  const title =
+    typeof tab.title === 'string' && tab.title.length > 0 ? tab.title : url || 'New Tab';
+  const port =
+    typeof tab.port === 'number' && Number.isInteger(tab.port) && tab.port >= 0 ? tab.port : null;
+
+  if (!id) return null;
+  return { id, url, title, port };
+}
+
+function getStoredBrowserTabsByProject(): BrowserTabsByProject {
+  const stored = getJSON<unknown>(BROWSER_TABS_STORAGE_KEY);
+  if (!isObjectRecord(stored)) return {};
+
+  const parsed: BrowserTabsByProject = {};
+
+  for (const [projectPath, rawTabs] of Object.entries(stored)) {
+    if (!Array.isArray(rawTabs)) continue;
+
+    const tabs = rawTabs
+      .map((rawTab) => normalizeStoredBrowserTab(rawTab))
+      .filter((tab): tab is BrowserTab => tab !== null);
+
+    if (tabs.length > 0) {
+      parsed[projectPath] = tabs;
+    }
+  }
+
+  return parsed;
+}
+
+function getStoredActiveBrowserTabsByProject(): ActiveBrowserTabByProject {
+  const stored = getJSON<unknown>(ACTIVE_BROWSER_TAB_STORAGE_KEY);
+  if (!isObjectRecord(stored)) return {};
+
+  const parsed: ActiveBrowserTabByProject = {};
+  for (const [projectPath, activeTabId] of Object.entries(stored)) {
+    if (typeof activeTabId === 'string' && activeTabId.length > 0) {
+      parsed[projectPath] = activeTabId;
+    }
+  }
+
+  return parsed;
+}
+
+function sanitizeBrowserPanelState(
+  browserTabsByProject: BrowserTabsByProject,
+  activeBrowserTabByProject: ActiveBrowserTabByProject
+): {
+  tabsByProject: BrowserTabsByProject;
+  activeByProject: ActiveBrowserTabByProject;
+} {
+  const tabsByProject: BrowserTabsByProject = {};
+  const activeByProject: ActiveBrowserTabByProject = {};
+
+  for (const [projectPath, tabs] of Object.entries(browserTabsByProject)) {
+    if (!Array.isArray(tabs) || tabs.length === 0) continue;
+
+    const validTabs = tabs
+      .map((tab) => normalizeStoredBrowserTab(tab))
+      .filter((tab): tab is BrowserTab => tab !== null);
+
+    if (validTabs.length === 0) continue;
+
+    tabsByProject[projectPath] = validTabs;
+
+    const requestedActiveId = activeBrowserTabByProject[projectPath];
+    const hasRequestedActive =
+      typeof requestedActiveId === 'string' &&
+      validTabs.some((tab) => tab.id === requestedActiveId);
+    const fallbackActiveId = validTabs[validTabs.length - 1]?.id;
+    const resolvedActiveId = hasRequestedActive ? requestedActiveId : fallbackActiveId;
+
+    if (resolvedActiveId) {
+      activeByProject[projectPath] = resolvedActiveId;
+    }
+  }
+
+  return { tabsByProject, activeByProject };
+}
+
+function getStoredBrowserPanelState(): {
+  tabsByProject: BrowserTabsByProject;
+  activeByProject: ActiveBrowserTabByProject;
+} {
+  return sanitizeBrowserPanelState(
+    getStoredBrowserTabsByProject(),
+    getStoredActiveBrowserTabsByProject()
+  );
+}
+
+function persistBrowserPanelState(
+  browserTabsByProject: BrowserTabsByProject,
+  activeBrowserTabByProject: ActiveBrowserTabByProject
+): void {
+  const sanitized = sanitizeBrowserPanelState(browserTabsByProject, activeBrowserTabByProject);
+
+  if (Object.keys(sanitized.tabsByProject).length > 0) {
+    setJSON(BROWSER_TABS_STORAGE_KEY, sanitized.tabsByProject);
+  } else {
+    removeItem(BROWSER_TABS_STORAGE_KEY);
+  }
+
+  if (Object.keys(sanitized.activeByProject).length > 0) {
+    setJSON(ACTIVE_BROWSER_TAB_STORAGE_KEY, sanitized.activeByProject);
+  } else {
+    removeItem(ACTIVE_BROWSER_TAB_STORAGE_KEY);
+  }
+}
+
 export interface AppState {
   // Project state
   projects: Project[];
@@ -1056,6 +1179,9 @@ export interface AppActions {
   setProjectCustomIcon: (projectId: string, customIconPath: string | null) => void; // Set custom project icon image path (null to clear)
   setProjectName: (projectId: string, name: string) => void; // Update project name
   setProjectBadgeColor: (projectId: string, badgeColor: string | null) => void; // Set project badge border color (null to clear)
+  setProjectBackgroundColor: (projectId: string, backgroundColor: string | null) => void; // Set project background color (null to clear)
+  setProjectTextColor: (projectId: string, textColor: string | null) => void; // Set project text color (null to clear)
+  setProjectIconColor: (projectId: string, iconColor: string | null) => void; // Set project icon color (null to clear)
 
   // View actions
   setCurrentView: (view: ViewMode) => void;
@@ -1487,6 +1613,8 @@ export interface AppActions {
   reset: () => void;
 }
 
+const storedBrowserPanelState = getStoredBrowserPanelState();
+
 const initialState: AppState = {
   projects: [],
   currentProject: null,
@@ -1626,8 +1754,8 @@ const initialState: AppState = {
   docsAutoSaveDelay: parseInt(getItem('automaker:docsAutoSaveDelay') || '3000', 10),
   // Browser Panel State
   browserPanelOpen: false,
-  browserTabsByProject: {},
-  activeBrowserTabByProject: {},
+  browserTabsByProject: storedBrowserPanelState.tabsByProject,
+  activeBrowserTabByProject: storedBrowserPanelState.activeByProject,
   browserPanelSize: 35,
 };
 
@@ -1972,6 +2100,59 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         currentProject: {
           ...currentProject,
           badgeColor: badgeColor === null ? undefined : badgeColor,
+        },
+      });
+    }
+  },
+
+  setProjectBackgroundColor: (projectId, backgroundColor) => {
+    const { projects, currentProject } = get();
+    const updatedProjects = projects.map((p) =>
+      p.id === projectId
+        ? { ...p, backgroundColor: backgroundColor === null ? undefined : backgroundColor }
+        : p
+    );
+    set({ projects: updatedProjects });
+    // Also update currentProject if it matches
+    if (currentProject?.id === projectId) {
+      set({
+        currentProject: {
+          ...currentProject,
+          backgroundColor: backgroundColor === null ? undefined : backgroundColor,
+        },
+      });
+    }
+  },
+
+  setProjectTextColor: (projectId, textColor) => {
+    const { projects, currentProject } = get();
+    const updatedProjects = projects.map((p) =>
+      p.id === projectId ? { ...p, textColor: textColor === null ? undefined : textColor } : p
+    );
+    set({ projects: updatedProjects });
+    // Also update currentProject if it matches
+    if (currentProject?.id === projectId) {
+      set({
+        currentProject: {
+          ...currentProject,
+          textColor: textColor === null ? undefined : textColor,
+        },
+      });
+    }
+  },
+
+  setProjectIconColor: (projectId, iconColor) => {
+    const { projects, currentProject } = get();
+    const updatedProjects = projects.map((p) =>
+      p.id === projectId ? { ...p, iconColor: iconColor === null ? undefined : iconColor } : p
+    );
+    set({ projects: updatedProjects });
+    // Also update currentProject if it matches
+    if (currentProject?.id === projectId) {
+      set({
+        currentProject: {
+          ...currentProject,
+          iconColor: iconColor === null ? undefined : iconColor,
         },
       });
     }
@@ -4396,49 +4577,88 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   setBrowserPanelOpen: (open) => set({ browserPanelOpen: open }),
   toggleBrowserPanel: () => set({ browserPanelOpen: !get().browserPanelOpen }),
   addBrowserTab: (projectPath, tab) => {
-    const tabs = get().browserTabsByProject[projectPath] || [];
+    const state = get();
+    const tabs = state.browserTabsByProject[projectPath] || [];
+    const browserTabsByProject = {
+      ...state.browserTabsByProject,
+      [projectPath]: [...tabs, tab],
+    };
+    const activeBrowserTabByProject = {
+      ...state.activeBrowserTabByProject,
+      [projectPath]: tab.id,
+    };
+
+    persistBrowserPanelState(browserTabsByProject, activeBrowserTabByProject);
+
     set({
-      browserTabsByProject: {
-        ...get().browserTabsByProject,
-        [projectPath]: [...tabs, tab],
-      },
-      activeBrowserTabByProject: {
-        ...get().activeBrowserTabByProject,
-        [projectPath]: tab.id,
-      },
+      browserTabsByProject,
+      activeBrowserTabByProject,
     });
   },
   removeBrowserTab: (projectPath, tabId) => {
-    const tabs = get().browserTabsByProject[projectPath] || [];
+    const state = get();
+    const tabs = state.browserTabsByProject[projectPath] || [];
     const filtered = tabs.filter((t) => t.id !== tabId);
-    const activeId = get().activeBrowserTabByProject[projectPath];
-    const newActive = activeId === tabId ? (filtered[filtered.length - 1]?.id ?? '') : activeId;
+    const activeId = state.activeBrowserTabByProject[projectPath];
+    const stillHasActive =
+      typeof activeId === 'string' &&
+      activeId.length > 0 &&
+      filtered.some((tab) => tab.id === activeId);
+    const newActive =
+      activeId === tabId || !stillHasActive ? (filtered[filtered.length - 1]?.id ?? '') : activeId;
+
+    const browserTabsByProject = { ...state.browserTabsByProject };
+    if (filtered.length > 0) {
+      browserTabsByProject[projectPath] = filtered;
+    } else {
+      delete browserTabsByProject[projectPath];
+    }
+
+    const activeBrowserTabByProject = { ...state.activeBrowserTabByProject };
+    if (filtered.length > 0 && newActive) {
+      activeBrowserTabByProject[projectPath] = newActive;
+    } else {
+      delete activeBrowserTabByProject[projectPath];
+    }
+
+    persistBrowserPanelState(browserTabsByProject, activeBrowserTabByProject);
+
     set({
-      browserTabsByProject: {
-        ...get().browserTabsByProject,
-        [projectPath]: filtered,
-      },
-      activeBrowserTabByProject: {
-        ...get().activeBrowserTabByProject,
-        [projectPath]: newActive,
-      },
+      browserTabsByProject,
+      activeBrowserTabByProject,
     });
   },
   setActiveBrowserTab: (projectPath, tabId) => {
+    const state = get();
+    const tabs = state.browserTabsByProject[projectPath] || [];
+    if (tabs.length === 0) return;
+    if (!tabs.some((tab) => tab.id === tabId)) return;
+
+    const activeBrowserTabByProject = {
+      ...state.activeBrowserTabByProject,
+      [projectPath]: tabId,
+    };
+
+    persistBrowserPanelState(state.browserTabsByProject, activeBrowserTabByProject);
+
     set({
-      activeBrowserTabByProject: {
-        ...get().activeBrowserTabByProject,
-        [projectPath]: tabId,
-      },
+      activeBrowserTabByProject,
     });
   },
   updateBrowserTab: (projectPath, tabId, updates) => {
-    const tabs = get().browserTabsByProject[projectPath] || [];
+    const state = get();
+    const tabs = state.browserTabsByProject[projectPath] || [];
+    if (tabs.length === 0) return;
+
+    const browserTabsByProject = {
+      ...state.browserTabsByProject,
+      [projectPath]: tabs.map((t) => (t.id === tabId ? { ...t, ...updates } : t)),
+    };
+
+    persistBrowserPanelState(browserTabsByProject, state.activeBrowserTabByProject);
+
     set({
-      browserTabsByProject: {
-        ...get().browserTabsByProject,
-        [projectPath]: tabs.map((t) => (t.id === tabId ? { ...t, ...updates } : t)),
-      },
+      browserTabsByProject,
     });
   },
   getBrowserTabs: (projectPath) => {

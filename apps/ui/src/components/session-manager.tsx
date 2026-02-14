@@ -103,7 +103,7 @@ function generateRandomSessionName(): string {
 
 interface SessionManagerProps {
   currentSessionId: string | null;
-  onSelectSession: (sessionId: string | null) => void;
+  onSelectSession: (sessionId: string | null, sessionProjectPath?: string) => void;
   projectPath: string;
   isCurrentSessionThinking?: boolean;
   onQuickCreateRef?: React.MutableRefObject<(() => Promise<void>) | null>;
@@ -648,7 +648,8 @@ export function SessionManager({
                   if (isMultiselectMode) {
                     toggleSessionSelection(session.id);
                   } else if (!session.isArchived) {
-                    onSelectSession(session.id);
+                    // Pass session's projectPath to trigger project switch if needed
+                    onSelectSession(session.id, session.projectPath);
                   }
                 }}
                 data-testid={`session-item-${session.id}`}

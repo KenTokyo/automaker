@@ -28,9 +28,9 @@ function preserveLineBreaks(text: string): string {
     .map((part, index) => {
       // Even indices are regular text, odd indices are code blocks
       if (index % 2 === 0) {
-        // Replace single newlines with double newlines for markdown paragraphs
-        // But preserve double/multiple newlines as they are
-        return part.replace(/(?<!\n)\n(?!\n)/g, '\n\n');
+        // Replace single newlines with <br> tags for proper line breaks
+        // This works because we have rehype-raw enabled
+        return part.replace(/(?<!\n)\n(?!\n)/g, '<br>\n');
       }
       return part;
     })

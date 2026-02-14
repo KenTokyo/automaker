@@ -37,9 +37,17 @@ export function ProjectSwitcherItem({
   const IconComponent = getIconComponent();
   const hasCustomIcon = !!project.customIconPath;
 
+  // Get custom colors from project
+  const backgroundColor = project.backgroundColor;
+  const borderColor = project.badgeColor;
+  const iconColor = project.iconColor;
+
   // Combine project.id with sanitized name for uniqueness and readability
   // Format: project-switcher-{id}-{sanitizedName}
   const testId = `project-switcher-${project.id}-${sanitizeForTestId(project.name)}`;
+
+  // Check if project has any custom styling
+  const hasCustomStyling = backgroundColor || borderColor;
 
   return (
     <button
@@ -49,21 +57,32 @@ export function ProjectSwitcherItem({
       className={cn(
         'group w-full aspect-square rounded-xl flex items-center justify-center relative overflow-hidden',
         'transition-all duration-200 ease-out',
-        isActive
-          ? [
-              // Active: Premium gradient with glow
-              'bg-gradient-to-r from-brand-500/20 via-brand-500/15 to-brand-600/10',
-              'border border-brand-500/30',
-              'shadow-md shadow-brand-500/10',
-            ]
-          : [
-              // Inactive: Subtle hover state
-              'hover:bg-accent/50',
-              'border border-transparent hover:border-border/40',
-              'hover:shadow-sm',
-            ],
+        !hasCustomStyling &&
+          (isActive
+            ? [
+                // Active: Premium gradient with glow
+                'bg-gradient-to-r from-brand-500/20 via-brand-500/15 to-brand-600/10',
+                'border border-brand-500/30',
+                'shadow-md shadow-brand-500/10',
+              ]
+            : [
+                // Inactive: Subtle hover state
+                'hover:bg-accent/50',
+                'border border-transparent hover:border-border/40',
+                'hover:shadow-sm',
+              ]),
+        hasCustomStyling && 'border',
         'hover:scale-105 active:scale-95'
       )}
+      style={{
+        backgroundColor: backgroundColor || undefined,
+        borderColor:
+          borderColor || (isActive && hasCustomStyling ? 'hsl(var(--brand-500))' : undefined),
+        boxShadow:
+          isActive && hasCustomStyling
+            ? `0 4px 12px ${borderColor || backgroundColor}40`
+            : undefined,
+      }}
       title={project.name}
     >
       {hasCustomIcon ? (
@@ -79,10 +98,13 @@ export function ProjectSwitcherItem({
         <IconComponent
           className={cn(
             'w-6 h-6 transition-all duration-200',
-            isActive
-              ? 'text-brand-500 drop-shadow-sm'
-              : 'text-muted-foreground group-hover:text-brand-400 group-hover:scale-110'
+            !iconColor &&
+              (isActive
+                ? 'text-brand-500 drop-shadow-sm'
+                : 'text-muted-foreground group-hover:text-brand-400 group-hover:scale-110'),
+            iconColor && 'group-hover:scale-110'
           )}
+          style={{ color: iconColor || undefined }}
         />
       )}
 

@@ -3399,6 +3399,9 @@ export interface Project {
   icon?: string; // Lucide icon name for project identification
   customIconPath?: string; // Path to custom uploaded icon image in .automaker/images/
   badgeColor?: string; // Border color for project badge (hex color, e.g., "#ff0000")
+  backgroundColor?: string; // Background color for project items in sidebar (hex color)
+  textColor?: string; // Text/foreground color for project (hex color)
+  iconColor?: string; // Icon color for project (hex color)
   /**
    * Override the active Claude API profile for this project.
    * - undefined: Use global setting (activeClaudeApiProfileId)
