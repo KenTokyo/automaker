@@ -7,19 +7,18 @@ import {
   Trash2,
   Edit2,
   MessageSquarePlus,
+  ClipboardCopy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -47,6 +46,8 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+export type DocsSortBy = 'modified' | 'name';
+
 interface DocsListProps {
   docs: DocFile[];
   isLoading: boolean;
@@ -55,6 +56,7 @@ interface DocsListProps {
   onDeleteDoc: (doc: DocFile) => void;
   onRenameDoc: (oldPath: string, newName: string) => void;
   currentDocPath: string | null;
+  sortBy?: DocsSortBy;
 }
 
 export const DocsList = memo(function DocsList({
@@ -65,6 +67,7 @@ export const DocsList = memo(function DocsList({
   onDeleteDoc,
   onRenameDoc,
   currentDocPath,
+  sortBy = 'modified',
 }: DocsListProps) {
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -113,9 +116,12 @@ export const DocsList = memo(function DocsList({
     );
   }
 
-  // Sort: directories first, then alphabetically
+  // Sort: directories first, then by selected sort mode
   const sorted = [...docs].sort((a, b) => {
     if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+    if (sortBy === 'modified') {
+      return new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime();
+    }
     return a.name.localeCompare(b.name);
   });
 
@@ -173,7 +179,11 @@ export const DocsList = memo(function DocsList({
                     <div className="text-sm font-medium truncate">{doc.name}</div>
                     <div className="text-xs text-muted-foreground">
                       {doc.isDirectory ? (
-                        'Folder'
+                        <>
+                          Folder
+                          <span className="mx-1">&middot;</span>
+                          {formatRelativeTime(doc.modifiedAt)}
+                        </>
                       ) : (
                         <>
                           {formatRelativeTime(doc.modifiedAt)}
@@ -189,45 +199,74 @@ export const DocsList = memo(function DocsList({
 
             {renamingPath !== doc.path && (
               <div
-                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                 onClick={(e) => e.stopPropagation()}
               >
+                <TooltipProvider delayDuration={300}>
+                  {/* Copy Relative Path */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() =>
+                          handleCopyPath(`.automaker/docs/${doc.path}`, 'Relative path')
+                        }
+                      >
+                        <ClipboardCopy className="w-3 h-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      Copy relative path
+                    </TooltipContent>
+                  </Tooltip>
+
+                  {/* Copy Absolute Path */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => handleCopyPath(doc.absolutePath, 'Absolute path')}
+                      >
+                        <Copy className="w-3 h-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      Copy absolute path
+                    </TooltipContent>
+                  </Tooltip>
+
+                  {/* Insert into Chat (files only) */}
+                  {!doc.isDirectory && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => handleInsertIntoChat(doc.absolutePath)}
+                        >
+                          <MessageSquarePlus className="w-3 h-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="text-xs">
+                        Insert into chat
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </TooltipProvider>
+
+                {/* More actions menu */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                      <MoreVertical className="w-3.5 h-3.5" />
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                      <MoreVertical className="w-3 h-3" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {!doc.isDirectory && (
-                      <DropdownMenuItem onClick={() => handleInsertIntoChat(doc.absolutePath)}>
-                        <MessageSquarePlus className="w-3.5 h-3.5 mr-2" />
-                        Insert into Chat
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger>
-                        <Copy className="w-3.5 h-3.5 mr-2" />
-                        Copy Path
-                      </DropdownMenuSubTrigger>
-                      <DropdownMenuSubContent>
-                        <DropdownMenuItem
-                          onClick={() => handleCopyPath(doc.absolutePath, 'Absolute path')}
-                        >
-                          Absolute Path
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            handleCopyPath(`.automaker/docs/${doc.path}`, 'Relative path')
-                          }
-                        >
-                          Relative Path
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleCopyPath(doc.name, 'Filename')}>
-                          Filename Only
-                        </DropdownMenuItem>
-                      </DropdownMenuSubContent>
-                    </DropdownMenuSub>
                     <DropdownMenuItem onClick={() => startRename(doc)}>
                       <Edit2 className="w-3.5 h-3.5 mr-2" />
                       Rename

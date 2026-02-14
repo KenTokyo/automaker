@@ -1,9 +1,19 @@
 import { memo, useCallback, useState } from 'react';
-import { Plus, FolderPlus, ChevronRight, FileText } from 'lucide-react';
+import {
+  Plus,
+  FolderPlus,
+  ChevronRight,
+  FileText,
+  ArrowUpDown,
+  Clock,
+  SortAsc,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useDocs } from '@/hooks/use-docs';
 import { useAppStore } from '@/store/app-store';
 import { DocsList } from './docs-list';
+import type { DocsSortBy } from './docs-list';
 import { DocsViewer } from './docs-viewer';
 import { DocsCreateDialog, DocsFolderDialog, DocsDeleteDialog } from './docs-create-dialog';
 import type { DocFile } from '@automaker/types';
@@ -39,6 +49,7 @@ export const DocsPanel = memo(function DocsPanel({ projectPath }: DocsPanelProps
   const [folderDialogOpen, setFolderDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<DocFile | null>(null);
+  const [sortBy, setSortBy] = useState<DocsSortBy>('modified');
 
   // Build breadcrumb segments
   const breadcrumbs = currentSubfolder ? ['docs', ...currentSubfolder.split('/')] : ['docs'];
@@ -156,6 +167,28 @@ export const DocsPanel = memo(function DocsPanel({ projectPath }: DocsPanelProps
             <FolderPlus className="w-3.5 h-3.5 mr-1" />
             New Folder
           </Button>
+          <div className="flex-1" />
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setSortBy(sortBy === 'modified' ? 'name' : 'modified')}
+                >
+                  {sortBy === 'modified' ? (
+                    <Clock className="w-3.5 h-3.5" />
+                  ) : (
+                    <SortAsc className="w-3.5 h-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                {sortBy === 'modified' ? 'Sorted by last modified' : 'Sorted by name'}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
 
@@ -184,6 +217,7 @@ export const DocsPanel = memo(function DocsPanel({ projectPath }: DocsPanelProps
           onDeleteDoc={handleDeleteRequest}
           onRenameDoc={handleRenameDoc}
           currentDocPath={currentDocPath}
+          sortBy={sortBy}
         />
       )}
 

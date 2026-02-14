@@ -9,6 +9,48 @@ import { SUPPORTED_DOC_EXTENSIONS } from '@automaker/types';
 import type { DocFile, ListDocsResponse } from '@automaker/types';
 import { getErrorMessage, logError } from '../common.js';
 
+/**
+ * Recursively find the newest modifiedAt timestamp among all files in a directory.
+ * Returns the folder's own mtime if empty or on error.
+ */
+async function getNewestChildModifiedAt(
+  dirPath: string,
+  folderMtime: Date,
+  depth = 0
+): Promise<Date> {
+  if (depth > 5) return folderMtime;
+
+  let entries;
+  try {
+    entries = await secureFs.readdir(dirPath, { withFileTypes: true });
+  } catch {
+    return folderMtime;
+  }
+
+  let newest = folderMtime;
+
+  for (const entry of entries) {
+    const entryPath = path.join(dirPath, entry.name);
+    try {
+      if (entry.isDirectory()) {
+        const stats = await secureFs.stat(entryPath);
+        const childNewest = await getNewestChildModifiedAt(entryPath, stats.mtime, depth + 1);
+        if (childNewest > newest) newest = childNewest;
+      } else {
+        const ext = path.extname(entry.name).toLowerCase();
+        if ((SUPPORTED_DOC_EXTENSIONS as readonly string[]).includes(ext)) {
+          const stats = await secureFs.stat(entryPath);
+          if (stats.mtime > newest) newest = stats.mtime;
+        }
+      }
+    } catch {
+      // Skip entries that can't be read
+    }
+  }
+
+  return newest;
+}
+
 export function createListHandler() {
   return async (req: Request, res: Response): Promise<void> => {
     try {
@@ -54,6 +96,7 @@ export function createListHandler() {
 
         if (entry.isDirectory()) {
           const stats = await secureFs.stat(entryPath);
+          const newestChild = await getNewestChildModifiedAt(entryPath, stats.mtime);
           files.push({
             name: entry.name,
             path: relativePath,
@@ -61,7 +104,7 @@ export function createListHandler() {
             extension: '',
             size: 0,
             createdAt: stats.birthtime.toISOString(),
-            modifiedAt: stats.mtime.toISOString(),
+            modifiedAt: newestChild.toISOString(),
             isDirectory: true,
           });
         } else if ((SUPPORTED_DOC_EXTENSIONS as readonly string[]).includes(ext)) {

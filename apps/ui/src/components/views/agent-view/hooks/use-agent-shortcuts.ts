@@ -18,6 +18,7 @@ export function useAgentShortcuts({
   const shortcuts = useKeyboardShortcutsConfig();
   const docsOpen = useAppStore((s) => s.docsOpen);
   const setDocsOpen = useAppStore((s) => s.setDocsOpen);
+  const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
 
   // Keyboard shortcuts for agent view
   const agentShortcuts: KeyboardShortcut[] = useMemo(() => {
@@ -43,10 +44,19 @@ export function useAgentShortcuts({
         },
         description: 'Toggle docs panel',
       });
+
+      // Toggle browser panel
+      shortcutsList.push({
+        key: 'ctrl+shift+b',
+        action: () => {
+          toggleBrowserPanel();
+        },
+        description: 'Toggle browser panel',
+      });
     }
 
     return shortcutsList;
-  }, [currentProject, shortcuts, quickCreateSessionRef, docsOpen, setDocsOpen]);
+  }, [currentProject, shortcuts, quickCreateSessionRef, docsOpen, setDocsOpen, toggleBrowserPanel]);
 
   // Register keyboard shortcuts
   useKeyboardShortcuts(agentShortcuts);

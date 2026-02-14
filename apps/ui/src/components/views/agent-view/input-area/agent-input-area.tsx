@@ -30,6 +30,8 @@ interface AgentInputAreaProps {
   messages?: Message[];
   /** Elapsed seconds for time limiter display */
   elapsedSeconds?: number;
+  /** Current session name for Save-to-Docs feature */
+  sessionName?: string | null;
   // File attachments
   selectedImages: ImageAttachment[];
   selectedTextFiles: TextFileAttachment[];
@@ -65,6 +67,7 @@ export function AgentInputArea({
   projectPath,
   messages = [],
   elapsedSeconds = 0,
+  sessionName,
   selectedImages,
   selectedTextFiles,
   showImageDropZone,
@@ -139,6 +142,7 @@ export function AgentInputArea({
         projectPath={projectPath}
         messages={messages}
         elapsedSeconds={elapsedSeconds}
+        sessionName={sessionName}
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}
         onDragOver={onDragOver}

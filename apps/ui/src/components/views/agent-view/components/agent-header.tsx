@@ -3,6 +3,8 @@ import {
   Bot,
   PanelLeftClose,
   PanelLeft,
+  PanelRight,
+  PanelRightClose,
   Wrench,
   Trash2,
   ChevronDown,
@@ -15,6 +17,7 @@ import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getAuthenticatedImageUrl } from '@/lib/api-fetch';
+import { useAppStore } from '@/store/app-store';
 import type { Project } from '@/lib/electron';
 
 interface AgentHeaderProps {
@@ -127,6 +130,9 @@ export function AgentHeader({
     const item = listRef.current.children[selectedIndex] as HTMLElement | undefined;
     item?.scrollIntoView({ block: 'nearest' });
   }, [selectedIndex, isOpen]);
+
+  const browserPanelOpen = useAppStore((s) => s.browserPanelOpen);
+  const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
 
   const IconComponent = getProjectIcon(currentProject);
   const hasCustomIcon = !!currentProject.customIconPath;
@@ -298,6 +304,25 @@ export function AgentHeader({
             Clear
           </Button>
         )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleBrowserPanel}
+          className={cn(
+            'h-8 w-8 p-0 hidden lg:inline-flex',
+            browserPanelOpen
+              ? 'text-primary hover:text-primary/80'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+          aria-label={browserPanelOpen ? 'Hide browser panel' : 'Show browser panel'}
+          title={browserPanelOpen ? 'Hide Browser Preview' : 'Show Browser Preview'}
+        >
+          {browserPanelOpen ? (
+            <PanelRightClose className="w-4 h-4" />
+          ) : (
+            <PanelRight className="w-4 h-4" />
+          )}
+        </Button>
         <Button
           variant="ghost"
           size="sm"

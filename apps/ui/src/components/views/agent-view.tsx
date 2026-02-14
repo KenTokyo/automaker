@@ -6,6 +6,7 @@ import { useElectronAgent } from '@/hooks/use-electron-agent';
 import { SessionManager } from '@/components/session-manager';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { generateContextSummary } from '@/lib/copy-all-chat';
+import { useSessions } from '@/hooks/queries/use-sessions';
 
 // Extracted hooks
 import {
@@ -16,15 +17,24 @@ import {
 } from './agent-view/hooks';
 
 // Extracted components
-import { NoProjectState, AgentHeader, ChatArea } from './agent-view/components';
+import { NoProjectState, AgentHeader, ChatArea, BrowserPanel } from './agent-view/components';
 import { AgentInputArea } from './agent-view/input-area';
 
 /** Tailwind lg breakpoint in pixels */
 const LG_BREAKPOINT = 1024;
+/** Breakpoint above which all three panels can coexist */
+const XL_BREAKPOINT = 1440;
 
 export function AgentView() {
-  const { currentProject, projects, setCurrentProject, selectedAgentModel, setSelectedAgentModel } =
-    useAppStore();
+  const {
+    currentProject,
+    projects,
+    setCurrentProject,
+    selectedAgentModel,
+    setSelectedAgentModel,
+    browserPanelOpen,
+    setBrowserPanelOpen,
+  } = useAppStore();
   const [input, setInput] = useState('');
   const [currentTool, setCurrentTool] = useState<string | null>(null);
   const [isDesktop, setIsDesktop] = useState(true);
@@ -38,6 +48,10 @@ export function AgentView() {
       const desktop = window.innerWidth >= LG_BREAKPOINT;
       setIsDesktop(desktop);
       setShowSessionManager(desktop);
+      // Auto-close browser panel on mobile (it's not supported below lg)
+      if (!desktop) {
+        setBrowserPanelOpen(false);
+      }
     };
 
     // Set initial value
@@ -46,7 +60,7 @@ export function AgentView() {
     // Listen for resize events
     window.addEventListener('resize', updateViewportState);
     return () => window.removeEventListener('resize', updateViewportState);
-  }, []);
+  }, [setBrowserPanelOpen]);
 
   // Model selection now persisted via app-store
   const modelSelection = selectedAgentModel;
@@ -67,6 +81,10 @@ export function AgentView() {
   const { currentSessionId, handleSelectSession } = useAgentSession({
     projectPath: currentProject?.path,
   });
+
+  // Session name for Save-to-Docs feature
+  const { data: allSessions = [] } = useSessions(true);
+  const currentSessionName = allSessions.find((s) => s.id === currentSessionId)?.name ?? null;
 
   // Use the Electron agent hook (only if we have a session)
   const {
@@ -237,8 +255,22 @@ export function AgentView() {
   }, []);
 
   const handleToggleSessionManager = useCallback(() => {
-    setShowSessionManager((previous) => !previous);
-  }, []);
+    setShowSessionManager((previous) => {
+      const willShow = !previous;
+      // On mid-size viewports, auto-close browser panel when opening session manager
+      if (willShow && window.innerWidth < XL_BREAKPOINT && browserPanelOpen) {
+        setBrowserPanelOpen(false);
+      }
+      return willShow;
+    });
+  }, [browserPanelOpen, setBrowserPanelOpen]);
+
+  // On mid-size viewports (1024-1440px), auto-close session manager when browser opens
+  useEffect(() => {
+    if (browserPanelOpen && isDesktop && window.innerWidth < XL_BREAKPOINT && showSessionManager) {
+      setShowSessionManager(false);
+    }
+  }, [browserPanelOpen, isDesktop]);
 
   // Auto-focus input when session is selected/changed
   useEffect(() => {
@@ -302,15 +334,23 @@ export function AgentView() {
         <ResizablePanelGroup
           direction="horizontal"
           className="flex"
-          autoSaveId="agent-view-sidebar"
+          autoSaveId={
+            showSessionManager && currentProject && browserPanelOpen
+              ? 'agent-view-3panel'
+              : showSessionManager && currentProject
+                ? 'agent-view-sidebar'
+                : browserPanelOpen
+                  ? 'agent-view-browser'
+                  : 'agent-view-chat'
+          }
         >
           {/* Session Manager Sidebar - Desktop (resizable) */}
           {showSessionManager && currentProject && (
             <>
               <ResizablePanel
-                defaultSize={25}
+                defaultSize={browserPanelOpen ? 20 : 25}
                 minSize={15}
-                maxSize={40}
+                maxSize={browserPanelOpen ? 35 : 40}
                 className="bg-card border-r border-border"
               >
                 <SessionManager
@@ -326,7 +366,17 @@ export function AgentView() {
           )}
 
           {/* Chat Area - Desktop */}
-          <ResizablePanel defaultSize={showSessionManager && currentProject ? 75 : 100}>
+          <ResizablePanel
+            defaultSize={
+              showSessionManager && currentProject && browserPanelOpen
+                ? 45
+                : showSessionManager && currentProject
+                  ? 75
+                  : browserPanelOpen
+                    ? 60
+                    : 100
+            }
+          >
             <div className="flex-1 flex flex-col overflow-hidden h-full">
               {/* Header */}
               <AgentHeader
@@ -368,6 +418,7 @@ export function AgentView() {
                   projectPath={currentProject?.path || null}
                   messages={messages}
                   elapsedSeconds={elapsedSeconds}
+                  sessionName={currentSessionName}
                   selectedImages={fileAttachments.selectedImages}
                   selectedTextFiles={fileAttachments.selectedTextFiles}
                   showImageDropZone={fileAttachments.showImageDropZone}
@@ -390,6 +441,16 @@ export function AgentView() {
               )}
             </div>
           </ResizablePanel>
+
+          {/* Browser Panel - Desktop (resizable) */}
+          {browserPanelOpen && currentProject && (
+            <>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize={showSessionManager ? 35 : 40} minSize={20} maxSize={50}>
+                <BrowserPanel projectPath={currentProject.path} />
+              </ResizablePanel>
+            </>
+          )}
         </ResizablePanelGroup>
       ) : (
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -433,6 +494,7 @@ export function AgentView() {
               projectPath={currentProject?.path || null}
               messages={messages}
               elapsedSeconds={elapsedSeconds}
+              sessionName={currentSessionName}
               selectedImages={fileAttachments.selectedImages}
               selectedTextFiles={fileAttachments.selectedTextFiles}
               showImageDropZone={fileAttachments.showImageDropZone}

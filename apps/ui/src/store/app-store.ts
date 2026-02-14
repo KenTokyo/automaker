@@ -594,6 +594,14 @@ export interface InitScriptState {
   error?: string;
 }
 
+// Browser Panel Types
+export interface BrowserTab {
+  id: string; // Unique tab ID (uuid)
+  url: string; // Current URL (e.g. "http://localhost:3000")
+  title: string; // Tab title (from page or manual)
+  port: number | null; // Configured port (e.g. 3000)
+}
+
 export interface AppState {
   // Project state
   projects: Project[];
@@ -884,6 +892,12 @@ export interface AppState {
   // Docs Auto-Save
   docsAutoSave: boolean;
   docsAutoSaveDelay: number; // ms
+
+  // Browser Panel State (per-project, keyed by project path)
+  browserPanelOpen: boolean; // Whether the browser panel is visible
+  browserTabsByProject: Record<string, BrowserTab[]>; // Per-project browser tabs
+  activeBrowserTabByProject: Record<string, string>; // Per-project active tab ID
+  browserPanelSize: number; // Panel width in percent (default: 35)
 }
 
 // Claude Usage interface matching the server response
@@ -1458,6 +1472,17 @@ export interface AppActions {
   setDocsAutoSave: (enabled: boolean) => void;
   setDocsAutoSaveDelay: (ms: number) => void;
 
+  // Browser Panel actions
+  setBrowserPanelOpen: (open: boolean) => void;
+  toggleBrowserPanel: () => void;
+  addBrowserTab: (projectPath: string, tab: BrowserTab) => void;
+  removeBrowserTab: (projectPath: string, tabId: string) => void;
+  setActiveBrowserTab: (projectPath: string, tabId: string) => void;
+  updateBrowserTab: (projectPath: string, tabId: string, updates: Partial<BrowserTab>) => void;
+  getBrowserTabs: (projectPath: string) => BrowserTab[];
+  getActiveBrowserTab: (projectPath: string) => BrowserTab | null;
+  setBrowserPanelSize: (size: number) => void;
+
   // Reset
   reset: () => void;
 }
@@ -1599,6 +1624,11 @@ const initialState: AppState = {
   // Docs Auto-Save
   docsAutoSave: getItem('automaker:docsAutoSave') !== 'false', // default true
   docsAutoSaveDelay: parseInt(getItem('automaker:docsAutoSaveDelay') || '3000', 10),
+  // Browser Panel State
+  browserPanelOpen: false,
+  browserTabsByProject: {},
+  activeBrowserTabByProject: {},
+  browserPanelSize: 35,
 };
 
 export const useAppStore = create<AppState & AppActions>()((set, get) => ({
@@ -4361,6 +4391,65 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     set({ docsAutoSaveDelay: ms });
     setItem('automaker:docsAutoSaveDelay', String(ms));
   },
+
+  // Browser Panel actions
+  setBrowserPanelOpen: (open) => set({ browserPanelOpen: open }),
+  toggleBrowserPanel: () => set({ browserPanelOpen: !get().browserPanelOpen }),
+  addBrowserTab: (projectPath, tab) => {
+    const tabs = get().browserTabsByProject[projectPath] || [];
+    set({
+      browserTabsByProject: {
+        ...get().browserTabsByProject,
+        [projectPath]: [...tabs, tab],
+      },
+      activeBrowserTabByProject: {
+        ...get().activeBrowserTabByProject,
+        [projectPath]: tab.id,
+      },
+    });
+  },
+  removeBrowserTab: (projectPath, tabId) => {
+    const tabs = get().browserTabsByProject[projectPath] || [];
+    const filtered = tabs.filter((t) => t.id !== tabId);
+    const activeId = get().activeBrowserTabByProject[projectPath];
+    const newActive = activeId === tabId ? (filtered[filtered.length - 1]?.id ?? '') : activeId;
+    set({
+      browserTabsByProject: {
+        ...get().browserTabsByProject,
+        [projectPath]: filtered,
+      },
+      activeBrowserTabByProject: {
+        ...get().activeBrowserTabByProject,
+        [projectPath]: newActive,
+      },
+    });
+  },
+  setActiveBrowserTab: (projectPath, tabId) => {
+    set({
+      activeBrowserTabByProject: {
+        ...get().activeBrowserTabByProject,
+        [projectPath]: tabId,
+      },
+    });
+  },
+  updateBrowserTab: (projectPath, tabId, updates) => {
+    const tabs = get().browserTabsByProject[projectPath] || [];
+    set({
+      browserTabsByProject: {
+        ...get().browserTabsByProject,
+        [projectPath]: tabs.map((t) => (t.id === tabId ? { ...t, ...updates } : t)),
+      },
+    });
+  },
+  getBrowserTabs: (projectPath) => {
+    return get().browserTabsByProject[projectPath] || [];
+  },
+  getActiveBrowserTab: (projectPath) => {
+    const tabs = get().browserTabsByProject[projectPath] || [];
+    const activeId = get().activeBrowserTabByProject[projectPath];
+    return tabs.find((t) => t.id === activeId) || null;
+  },
+  setBrowserPanelSize: (size) => set({ browserPanelSize: size }),
 
   // Reset
   reset: () => set(initialState),

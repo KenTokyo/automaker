@@ -8,6 +8,7 @@ import {
   FilePlus,
   FileInput,
   ClipboardPaste,
+  Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -148,12 +149,46 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
             })}
           </p>
 
-          {showInsertDocs && <InsertIntoDocsButton content={message.content} />}
+          {showInsertDocs && (
+            <div className="flex items-center gap-1.5">
+              <CopyButton content={message.content} />
+              <InsertIntoDocsButton content={message.content} />
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 });
+
+/** Direct copy-to-clipboard button (single click) */
+function CopyButton({ content }: { content: string }) {
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(content).then(
+      () => toast.success('Copied to clipboard'),
+      () => toast.error('Failed to copy')
+    );
+  }, [content]);
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="opacity-0 group-hover/msg:opacity-100 focus:opacity-100 transition-opacity inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+          >
+            <Copy className="w-3 h-3" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="text-xs">
+          Copy to clipboard
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 /** Button with dropdown to insert AI message content into docs */
 function InsertIntoDocsButton({ content }: { content: string }) {
