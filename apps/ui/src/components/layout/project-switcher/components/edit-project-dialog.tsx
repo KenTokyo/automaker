@@ -13,6 +13,7 @@ import type { Project } from '@/lib/electron';
 import { IconPicker } from './icon-picker';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
 
 /** Predefined colors for quick selection */
 const PROJECT_COLORS = [
@@ -212,11 +213,18 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
     // Validate file type
     const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (!validTypes.includes(file.type)) {
+      toast.error(
+        `Invalid file type: ${file.type || 'unknown'}. Please use JPG, PNG, GIF or WebP.`
+      );
       return;
     }
 
-    // Validate file size (max 2MB for icons)
-    if (file.size > 2 * 1024 * 1024) {
+    // Validate file size (max 5MB for icons - allows animated GIFs)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error(
+        `File too large (${(file.size / 1024 / 1024).toFixed(2)} MB). Maximum size is 5 MB.`
+      );
       return;
     }
 
@@ -232,15 +240,24 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
           file.type,
           project.path
         );
+
         if (result.success && result.path) {
           setCustomIconPath(result.path);
           // Clear the Lucide icon when custom icon is set
           setIcon(null);
+          toast.success('Icon uploaded successfully');
+        } else {
+          toast.error('Failed to upload icon');
         }
+        setIsUploadingIcon(false);
+      };
+      reader.onerror = () => {
+        toast.error('Failed to read file');
         setIsUploadingIcon(false);
       };
       reader.readAsDataURL(file);
     } catch {
+      toast.error('Failed to upload icon');
       setIsUploadingIcon(false);
     }
   };
