@@ -764,6 +764,8 @@ export interface ProjectRef {
   textColor?: string;
   /** Icon color for project (hex color) */
   iconColor?: string;
+  /** Chat area background tint color (hex color with alpha, e.g., "#3b82f620") */
+  chatBackgroundColor?: string;
 }
 
 /**

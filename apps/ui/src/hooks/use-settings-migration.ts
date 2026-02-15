@@ -650,6 +650,11 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     isFavorite: ref.isFavorite,
     icon: ref.icon,
     customIconPath: ref.customIconPath,
+    badgeColor: ref.badgeColor,
+    backgroundColor: ref.backgroundColor,
+    textColor: ref.textColor,
+    iconColor: ref.iconColor,
+    chatBackgroundColor: ref.chatBackgroundColor,
     features: [], // Features are loaded separately when project is opened
   }));
 
