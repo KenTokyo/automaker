@@ -89,6 +89,7 @@ const SETTINGS_FIELDS_TO_SYNC = [
   // Model Selection Persistence
   'favoriteModels', // User's favorite models in the model selector
   'selectedAgentModel', // Last selected model in agent chat view
+  'maxSessionsPerProject', // Max active sessions per project (0 = unlimited)
 ] as const;
 
 // Fields from setup store to sync

@@ -44,6 +44,11 @@ export {
   getIdeationDraftsDir,
   getIdeationAnalysisPath,
   ensureIdeationDir,
+  // Agent prompts paths
+  getGlobalAgentsDir,
+  getProjectAgentsDir,
+  ensureGlobalAgentsDir,
+  ensureProjectAgentsDir,
 } from './paths.js';
 
 // Subprocess management

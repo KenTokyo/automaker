@@ -117,7 +117,7 @@ export function SessionManager({
   onQuickCreateRef,
 }: SessionManagerProps) {
   const shortcuts = useKeyboardShortcutsConfig();
-  const { getProjectName, getBadgeColor } = useProjectLookup();
+  const { getProjectName, getBadgeColor, getProject } = useProjectLookup();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -352,6 +352,51 @@ export function SessionManager({
 
   const activeSessions = sessions.filter((s) => !s.isArchived);
   const archivedSessions = sessions.filter((s) => s.isArchived);
+
+  // Session limit auto-cleanup
+  const maxSessionsPerProject = useAppStore((s) => s.maxSessionsPerProject);
+  const cleanupInProgressRef = useRef(false);
+
+  useEffect(() => {
+    if (maxSessionsPerProject <= 0 || cleanupInProgressRef.current) return;
+
+    // Get active sessions for the current project
+    const projectActiveSessions = activeSessions
+      .filter((s) => s.projectPath === projectPath)
+      .sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+
+    const excess = projectActiveSessions.length - maxSessionsPerProject;
+    if (excess <= 0) return;
+
+    // Delete the oldest sessions, but never delete the currently selected one
+    const sessionsToDelete = projectActiveSessions
+      .filter((s) => s.id !== currentSessionId)
+      .slice(0, excess);
+
+    if (sessionsToDelete.length === 0) return;
+
+    cleanupInProgressRef.current = true;
+    const api = getElectronAPI();
+    const sessionsApi = api?.sessions;
+    if (!sessionsApi) {
+      cleanupInProgressRef.current = false;
+      return;
+    }
+
+    (async () => {
+      try {
+        for (const session of sessionsToDelete) {
+          await sessionsApi.delete(session.id);
+          logger.info(`Auto-deleted old session: ${session.name} (${session.id})`);
+        }
+        await invalidateSessions();
+      } catch (err) {
+        logger.error('Failed to auto-cleanup sessions:', err);
+      } finally {
+        cleanupInProgressRef.current = false;
+      }
+    })();
+  }, [sessions, maxSessionsPerProject, projectPath, currentSessionId, invalidateSessions]);
 
   // Multiselect functions
   const toggleSessionSelection = (sessionId: string) => {
@@ -633,193 +678,208 @@ export function SessionManager({
             )}
 
             {/* Session list */}
-            {displayedSessions.map((session) => (
-              <div
-                key={session.id}
-                className={cn(
-                  'p-3 border rounded-lg cursor-pointer transition-colors hover:bg-accent/50',
-                  currentSessionId === session.id && 'bg-primary/10 border-primary',
-                  session.isArchived && 'opacity-60',
-                  isMultiselectMode &&
-                    selectedSessionIds.has(session.id) &&
-                    'bg-primary/20 border-primary'
-                )}
-                onClick={() => {
-                  if (isMultiselectMode) {
-                    toggleSessionSelection(session.id);
-                  } else if (!session.isArchived) {
-                    // Pass session's projectPath to trigger project switch if needed
-                    onSelectSession(session.id, session.projectPath);
-                  }
-                }}
-                data-testid={`session-item-${session.id}`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  {/* Checkbox for multiselect mode */}
-                  {isMultiselectMode && (
-                    <div className="flex items-center pt-0.5" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={selectedSessionIds.has(session.id)}
-                        onCheckedChange={() => toggleSessionSelection(session.id)}
-                        data-testid={`session-checkbox-${session.id}`}
-                      />
-                    </div>
+            {displayedSessions.map((session) => {
+              const sessionBadgeColor = getBadgeColor(session.projectPath);
+              return (
+                <div
+                  key={session.id}
+                  className={cn(
+                    'p-3 border rounded-lg cursor-pointer transition-colors hover:bg-accent/50',
+                    currentSessionId === session.id && 'bg-primary/10 border-primary',
+                    session.isArchived && 'opacity-60',
+                    isMultiselectMode &&
+                      selectedSessionIds.has(session.id) &&
+                      'bg-primary/20 border-primary'
                   )}
-                  <div className="flex-1 min-w-0">
-                    {editingSessionId === session.id ? (
-                      <div className="flex gap-2 mb-2">
-                        <Input
-                          value={editingName}
-                          onChange={(e) => setEditingName(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleRenameSession(session.id);
-                            if (e.key === 'Escape') {
+                  style={{
+                    borderLeftWidth: sessionBadgeColor ? '3px' : undefined,
+                    borderLeftColor: sessionBadgeColor || undefined,
+                  }}
+                  onClick={() => {
+                    if (isMultiselectMode) {
+                      toggleSessionSelection(session.id);
+                    } else if (!session.isArchived) {
+                      // Pass session's projectPath to trigger project switch if needed
+                      onSelectSession(session.id, session.projectPath);
+                    }
+                  }}
+                  data-testid={`session-item-${session.id}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    {/* Checkbox for multiselect mode */}
+                    {isMultiselectMode && (
+                      <div
+                        className="flex items-center pt-0.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          checked={selectedSessionIds.has(session.id)}
+                          onCheckedChange={() => toggleSessionSelection(session.id)}
+                          data-testid={`session-checkbox-${session.id}`}
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      {editingSessionId === session.id ? (
+                        <div className="flex gap-2 mb-2">
+                          <Input
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleRenameSession(session.id);
+                              if (e.key === 'Escape') {
+                                setEditingSessionId(null);
+                                setEditingName('');
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            autoFocus
+                            className="h-7"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRenameSession(session.id);
+                            }}
+                            className="h-7"
+                          >
+                            <Check className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setEditingSessionId(null);
                               setEditingName('');
-                            }
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          autoFocus
-                          className="h-7"
-                        />
+                            }}
+                            className="h-7"
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2 mb-1">
+                            {/* Show loading indicator if this session is running (either current session thinking or any session in runningSessions) */}
+                            {(currentSessionId === session.id && isCurrentSessionThinking) ||
+                            runningSessions.has(session.id) ? (
+                              <Spinner size="sm" className="shrink-0" />
+                            ) : (
+                              <MessageSquare className="w-4 h-4 text-muted-foreground shrink-0" />
+                            )}
+                            <h3 className="font-medium truncate">{session.name}</h3>
+                            {((currentSessionId === session.id && isCurrentSessionThinking) ||
+                              runningSessions.has(session.id)) && (
+                              <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                thinking...
+                              </span>
+                            )}
+                          </div>
+                          {session.description && (
+                            <p className="text-sm text-foreground/80 line-clamp-3 whitespace-pre-line">
+                              {session.description}
+                            </p>
+                          )}
+                          {!session.description && session.preview && (
+                            <p className="text-xs text-muted-foreground truncate">
+                              {session.preview}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            <span className="text-xs text-muted-foreground">
+                              {session.messageCount} messages
+                            </span>
+                            <span className="text-xs text-muted-foreground">·</span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(session.updatedAt).toLocaleDateString()}
+                            </span>
+                            {session.projectPath && (
+                              <>
+                                <span className="text-xs text-muted-foreground">·</span>
+                                <ProjectBadge
+                                  projectName={getProjectName(session.projectPath)}
+                                  projectPath={session.projectPath}
+                                  badgeColor={getBadgeColor(session.projectPath)}
+                                  backgroundColor={getProject(session.projectPath)?.backgroundColor}
+                                  textColor={getProject(session.projectPath)?.textColor}
+                                  iconColor={getProject(session.projectPath)?.iconColor}
+                                  icon={getProject(session.projectPath)?.icon}
+                                  customIconPath={getProject(session.projectPath)?.customIconPath}
+                                />
+                              </>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Actions - hidden in multiselect mode */}
+                    {!isMultiselectMode && !session.isArchived && (
+                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                         <Button
                           size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRenameSession(session.id);
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingSessionId(session.id);
+                            setEditingName(session.name);
                           }}
-                          className="h-7"
+                          className="h-7 w-7 p-0"
+                          title="Rename session"
                         >
-                          <Check className="w-3 h-3" />
+                          <Edit2 className="w-3 h-3" />
                         </Button>
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingSessionId(null);
-                            setEditingName('');
-                          }}
-                          className="h-7"
+                          onClick={() => handleArchiveSession(session.id)}
+                          className="h-7 w-7 p-0"
+                          data-testid={`archive-session-${session.id}`}
+                          title="Archive session"
                         >
-                          <X className="w-3 h-3" />
+                          <Archive className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteSession(session)}
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          data-testid={`delete-session-${session.id}`}
+                          title="Delete session"
+                        >
+                          <Trash2 className="w-3 h-3" />
                         </Button>
                       </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2 mb-1">
-                          {/* Show loading indicator if this session is running (either current session thinking or any session in runningSessions) */}
-                          {(currentSessionId === session.id && isCurrentSessionThinking) ||
-                          runningSessions.has(session.id) ? (
-                            <Spinner size="sm" className="shrink-0" />
-                          ) : (
-                            <MessageSquare className="w-4 h-4 text-muted-foreground shrink-0" />
-                          )}
-                          <h3 className="font-medium truncate">{session.name}</h3>
-                          {((currentSessionId === session.id && isCurrentSessionThinking) ||
-                            runningSessions.has(session.id)) && (
-                            <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                              thinking...
-                            </span>
-                          )}
-                        </div>
-                        {session.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-line">
-                            {session.description}
-                          </p>
-                        )}
-                        {!session.description && session.preview && (
-                          <p className="text-xs text-muted-foreground truncate">
-                            {session.preview}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <span className="text-xs text-muted-foreground">
-                            {session.messageCount} messages
-                          </span>
-                          <span className="text-xs text-muted-foreground">·</span>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(session.updatedAt).toLocaleDateString()}
-                          </span>
-                          {session.projectPath && (
-                            <>
-                              <span className="text-xs text-muted-foreground">·</span>
-                              <ProjectBadge
-                                projectName={getProjectName(session.projectPath)}
-                                projectPath={session.projectPath}
-                                badgeColor={getBadgeColor(session.projectPath)}
-                              />
-                            </>
-                          )}
-                        </div>
-                      </>
+                    )}
+
+                    {!isMultiselectMode && session.isArchived && (
+                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleUnarchiveSession(session.id)}
+                          className="h-7 w-7 p-0"
+                          title="Restore session"
+                        >
+                          <ArchiveRestore className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteSession(session)}
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          data-testid={`delete-archived-session-${session.id}`}
+                          title="Delete session"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
                     )}
                   </div>
-
-                  {/* Actions - hidden in multiselect mode */}
-                  {!isMultiselectMode && !session.isArchived && (
-                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingSessionId(session.id);
-                          setEditingName(session.name);
-                        }}
-                        className="h-7 w-7 p-0"
-                        title="Rename session"
-                      >
-                        <Edit2 className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleArchiveSession(session.id)}
-                        className="h-7 w-7 p-0"
-                        data-testid={`archive-session-${session.id}`}
-                        title="Archive session"
-                      >
-                        <Archive className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDeleteSession(session)}
-                        className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                        data-testid={`delete-session-${session.id}`}
-                        title="Delete session"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  )}
-
-                  {!isMultiselectMode && session.isArchived && (
-                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleUnarchiveSession(session.id)}
-                        className="h-7 w-7 p-0"
-                        title="Restore session"
-                      >
-                        <ArchiveRestore className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDeleteSession(session)}
-                        className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                        data-testid={`delete-archived-session-${session.id}`}
-                        title="Delete session"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {displayedSessions.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">

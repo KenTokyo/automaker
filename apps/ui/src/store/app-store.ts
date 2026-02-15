@@ -741,6 +741,9 @@ export interface AppState {
   // Agent Session state (per-project, keyed by project path)
   lastSelectedSessionByProject: Record<string, string>; // projectPath -> sessionId
 
+  // Session History Limit (max active sessions per project, 0 = unlimited)
+  maxSessionsPerProject: number;
+
   // Theme
   theme: ThemeMode;
 
@@ -1182,6 +1185,7 @@ export interface AppActions {
   setProjectBackgroundColor: (projectId: string, backgroundColor: string | null) => void; // Set project background color (null to clear)
   setProjectTextColor: (projectId: string, textColor: string | null) => void; // Set project text color (null to clear)
   setProjectIconColor: (projectId: string, iconColor: string | null) => void; // Set project icon color (null to clear)
+  setProjectChatBackgroundColor: (projectId: string, chatBackgroundColor: string | null) => void; // Set project chat background color (null to clear)
 
   // View actions
   setCurrentView: (view: ViewMode) => void;
@@ -1594,6 +1598,9 @@ export interface AppActions {
   setTableStyles: (styles: Partial<TableThemeStyles>) => void;
   resetEditorTheme: () => void;
 
+  // Session History Limit actions
+  setMaxSessionsPerProject: (max: number) => void;
+
   // Docs Auto-Save actions
   setDocsAutoSave: (enabled: boolean) => void;
   setDocsAutoSaveDelay: (ms: number) => void;
@@ -1749,11 +1756,13 @@ const initialState: AppState = {
   recentDocs: JSON.parse(getItem('automaker:recentDocs') || '[]'),
   // Docs Editor Theme
   editorTheme: JSON.parse(getItem('automaker:editorTheme') || 'null') || DEFAULT_EDITOR_THEME,
+  // Session History Limit
+  maxSessionsPerProject: parseInt(getItem('automaker:maxSessionsPerProject') || '15', 10),
   // Docs Auto-Save
   docsAutoSave: getItem('automaker:docsAutoSave') !== 'false', // default true
   docsAutoSaveDelay: parseInt(getItem('automaker:docsAutoSaveDelay') || '3000', 10),
   // Browser Panel State
-  browserPanelOpen: false,
+  browserPanelOpen: true,
   browserTabsByProject: storedBrowserPanelState.tabsByProject,
   activeBrowserTabByProject: storedBrowserPanelState.activeByProject,
   browserPanelSize: 35,
@@ -1901,10 +1910,10 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     let project: Project;
 
     if (existingProject) {
-      // Update existing project, preserving theme and other properties
+      // Update existing project, preserving user-set name and other properties.
+      // Never overwrite the name automatically — only setProjectName (user action) should rename.
       project = {
         ...existingProject,
-        name, // Update name in case it changed
         lastOpened: new Date().toISOString(),
       };
       // Update the project in the store
@@ -2153,6 +2162,27 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         currentProject: {
           ...currentProject,
           iconColor: iconColor === null ? undefined : iconColor,
+        },
+      });
+    }
+  },
+
+  setProjectChatBackgroundColor: (projectId, chatBackgroundColor) => {
+    const { projects, currentProject } = get();
+    const updatedProjects = projects.map((p) =>
+      p.id === projectId
+        ? {
+            ...p,
+            chatBackgroundColor: chatBackgroundColor === null ? undefined : chatBackgroundColor,
+          }
+        : p
+    );
+    set({ projects: updatedProjects });
+    if (currentProject?.id === projectId) {
+      set({
+        currentProject: {
+          ...currentProject,
+          chatBackgroundColor: chatBackgroundColor === null ? undefined : chatBackgroundColor,
         },
       });
     }
@@ -4561,6 +4591,13 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   resetEditorTheme: () => {
     set({ editorTheme: DEFAULT_EDITOR_THEME });
     setItem('automaker:editorTheme', JSON.stringify(DEFAULT_EDITOR_THEME));
+  },
+
+  // Session History Limit actions
+  setMaxSessionsPerProject: (max) => {
+    const clamped = Math.max(0, Math.min(100, max));
+    set({ maxSessionsPerProject: clamped });
+    setItem('automaker:maxSessionsPerProject', String(clamped));
   },
 
   // Docs Auto-Save actions

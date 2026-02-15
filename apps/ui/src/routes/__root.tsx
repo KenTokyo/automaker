@@ -21,7 +21,6 @@ import { initializeProject } from '@/lib/project-init';
 import {
   initApiKey,
   verifySession,
-  checkSandboxEnvironment,
   getServerUrlSync,
   getHttpApiClient,
   handleServerOffline,
@@ -34,8 +33,6 @@ import {
 import { queryClient } from '@/lib/query-client';
 import { Toaster } from 'sonner';
 import { ThemeOption, themeOptions } from '@/config/theme-options';
-import { SandboxRiskDialog } from '@/components/dialogs/sandbox-risk-dialog';
-import { SandboxRejectionScreen } from '@/components/dialogs/sandbox-rejection-screen';
 import { LoadingState } from '@/components/ui/loading-state';
 import { useProjectSettingsLoader } from '@/hooks/use-project-settings-loader';
 import { useIsCompact } from '@/hooks/use-media-query';
@@ -170,8 +167,6 @@ function RootLayoutContent() {
     theme,
     fontFamilySans,
     fontFamilyMono,
-    skipSandboxWarning,
-    setSkipSandboxWarning,
     fetchCodexModels,
     sidebarOpen,
     toggleSidebar,
@@ -228,12 +223,6 @@ function RootLayoutContent() {
   const shouldBlockForSettings =
     authChecked && isAuthenticated && !settingsLoaded && !isLoginRoute && !isLoggedOutRoute;
 
-  // Sandbox environment check state
-  type SandboxStatus = 'pending' | 'containerized' | 'needs-confirmation' | 'denied' | 'confirmed';
-  // Always start from pending on a fresh page load so the user sees the prompt
-  // each time the app is launched/refreshed (unless running in a container).
-  const [sandboxStatus, setSandboxStatus] = useState<SandboxStatus>('pending');
-
   // Hidden streamer panel - opens with "\" key
   const handleStreamerPanelShortcut = useCallback((event: KeyboardEvent) => {
     const activeElement = document.activeElement;
@@ -289,86 +278,6 @@ function RootLayoutContent() {
 
   useEffect(() => {
     setIsMounted(true);
-  }, []);
-
-  // Check sandbox environment only after user is authenticated, setup is complete, and settings are loaded
-  useEffect(() => {
-    // Skip if already decided
-    if (sandboxStatus !== 'pending') {
-      return;
-    }
-
-    // Don't check sandbox until user is authenticated, has completed setup, and settings are loaded
-    // CRITICAL: settingsLoaded must be true to ensure skipSandboxWarning has been hydrated from server
-    if (!authChecked || !isAuthenticated || !setupComplete || !settingsLoaded) {
-      return;
-    }
-
-    const checkSandbox = async () => {
-      try {
-        const result = await checkSandboxEnvironment();
-
-        if (result.isContainerized) {
-          // Running in a container, no warning needed
-          setSandboxStatus('containerized');
-        } else if (result.skipSandboxWarning || skipSandboxWarning) {
-          // Skip if env var is set OR if user preference is set
-          setSandboxStatus('confirmed');
-        } else {
-          // Not containerized, show warning dialog
-          setSandboxStatus('needs-confirmation');
-        }
-      } catch (error) {
-        logger.error('Failed to check environment:', error);
-        // On error, assume not containerized and show warning
-        if (skipSandboxWarning) {
-          setSandboxStatus('confirmed');
-        } else {
-          setSandboxStatus('needs-confirmation');
-        }
-      }
-    };
-
-    checkSandbox();
-  }, [
-    sandboxStatus,
-    skipSandboxWarning,
-    authChecked,
-    isAuthenticated,
-    setupComplete,
-    settingsLoaded,
-  ]);
-
-  // Handle sandbox risk confirmation
-  const handleSandboxConfirm = useCallback(
-    (skipInFuture: boolean) => {
-      if (skipInFuture) {
-        setSkipSandboxWarning(true);
-      }
-      setSandboxStatus('confirmed');
-    },
-    [setSkipSandboxWarning]
-  );
-
-  // Handle sandbox risk denial
-  const handleSandboxDeny = useCallback(async () => {
-    if (isElectron()) {
-      // In Electron mode, quit the application
-      // Use window.electronAPI directly since getElectronAPI() returns the HTTP client
-      try {
-        const electronAPI = window.electronAPI;
-        if (electronAPI?.quit) {
-          await electronAPI.quit();
-        } else {
-          logger.error('quit() not available on electronAPI');
-        }
-      } catch (error) {
-        logger.error('Failed to quit app:', error);
-      }
-    } else {
-      // In web mode, show rejection screen
-      setSandboxStatus('denied');
-    }
   }, []);
 
   // Ref to prevent concurrent auth checks from running
@@ -791,17 +700,7 @@ function RootLayoutContent() {
     }
   }, [effectiveFontSans, effectiveFontMono]);
 
-  // Show sandbox rejection screen if user denied the risk warning
-  if (sandboxStatus === 'denied') {
-    return <SandboxRejectionScreen />;
-  }
-
-  // Show sandbox risk dialog if not containerized and user hasn't confirmed
-  // The dialog is rendered as an overlay while the main content is blocked
-  const showSandboxDialog = sandboxStatus === 'needs-confirmation';
-
   // Show login page (full screen, no sidebar)
-  // Note: No sandbox dialog here - it only shows after login and setup complete
   if (isLoginRoute || isLoggedOutRoute) {
     return (
       <main className="h-screen overflow-hidden" data-testid="app-container">
@@ -862,11 +761,6 @@ function RootLayoutContent() {
           <Outlet />
           <Toaster richColors position="bottom-right" />
         </main>
-        <SandboxRiskDialog
-          open={showSandboxDialog}
-          onConfirm={handleSandboxConfirm}
-          onDeny={handleSandboxDeny}
-        />
       </>
     );
   }
@@ -903,11 +797,6 @@ function RootLayoutContent() {
         />
         <Toaster richColors position="bottom-right" />
       </main>
-      <SandboxRiskDialog
-        open={showSandboxDialog}
-        onConfirm={handleSandboxConfirm}
-        onDeny={handleSandboxDeny}
-      />
       <ProjectCommandBox open={projectCommandBoxOpen} onOpenChange={setProjectCommandBoxOpen} />
     </>
   );

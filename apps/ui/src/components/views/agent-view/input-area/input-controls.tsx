@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 import { AgentModelSelector } from '../shared/agent-model-selector';
 import { AgentPromptsSelector } from './agent-prompts-selector';
 import { TimeLimiterSettings } from './time-limiter-settings';
+import { OrchestratorSettings } from './orchestrator-settings';
 import { generateChatSummary, copyToClipboard } from '@/lib/copy-all-chat';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
@@ -65,6 +66,10 @@ interface InputControlsProps {
   onDrop: (e: React.DragEvent) => Promise<void>;
   // Refs
   inputRef?: React.RefObject<HTMLTextAreaElement | null>;
+  /** Project accent color for border/focus styling */
+  accentColor?: string;
+  /** Called when the textarea height changes (e.g. during speech input) so the parent can scroll the message list */
+  onInputHeightChange?: () => void;
 }
 
 const TEXTAREA_MIN_HEIGHT = 44;
@@ -94,27 +99,48 @@ export function InputControls({
   onDragOver,
   onDrop,
   inputRef: externalInputRef,
+  accentColor,
+  onInputHeightChange,
 }: InputControlsProps) {
   const internalInputRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = externalInputRef || internalInputRef;
   const onSendRef = useRef(onSend);
   const inputSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resizeFrameRef = useRef<number | null>(null);
+  const lastTextareaHeightRef = useRef<number>(TEXTAREA_MIN_HEIGHT);
   const [draftInput, setDraftInput] = useState(input);
   const draftInputRef = useRef(input);
   const [copySuccess, setCopySuccess] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
   onSendRef.current = onSend;
 
-  const resizeTextarea = useCallback((textarea: HTMLTextAreaElement | null) => {
+  const resizeTextarea = useCallback(
+    (textarea: HTMLTextAreaElement | null) => {
+      if (!textarea) return;
+
+      textarea.style.height = 'auto';
+      const scrollHeight = textarea.scrollHeight;
+      const newHeight = Math.max(TEXTAREA_MIN_HEIGHT, Math.min(scrollHeight, TEXTAREA_MAX_HEIGHT));
+
+      textarea.style.height = `${newHeight}px`;
+      textarea.style.overflowY = scrollHeight > TEXTAREA_MAX_HEIGHT ? 'auto' : 'hidden';
+
+      // Notify parent when height grows so the message list can scroll down
+      if (newHeight !== lastTextareaHeightRef.current) {
+        lastTextareaHeightRef.current = newHeight;
+        onInputHeightChange?.();
+      }
+    },
+    [onInputHeightChange]
+  );
+
+  // Auto-scroll textarea to bottom (for speech input)
+  const scrollTextareaToBottom = useCallback((textarea: HTMLTextAreaElement | null) => {
     if (!textarea) return;
-
-    textarea.style.height = 'auto';
-    const scrollHeight = textarea.scrollHeight;
-    const newHeight = Math.max(TEXTAREA_MIN_HEIGHT, Math.min(scrollHeight, TEXTAREA_MAX_HEIGHT));
-
-    textarea.style.height = `${newHeight}px`;
-    textarea.style.overflowY = scrollHeight > TEXTAREA_MAX_HEIGHT ? 'auto' : 'hidden';
+    // Use requestAnimationFrame to ensure scroll happens after content update
+    requestAnimationFrame(() => {
+      textarea.scrollTop = textarea.scrollHeight;
+    });
   }, []);
 
   const clearPendingInputSync = useCallback(() => {
@@ -201,12 +227,16 @@ export function InputControls({
           });
           setInterimTranscript('');
           scheduleTextareaResize(inputRef.current);
+          // Auto-scroll to bottom so user sees the latest text
+          scrollTextareaToBottom(inputRef.current);
         } else {
           // Show interim results
           setInterimTranscript(transcript);
+          // Auto-scroll to bottom during speech input
+          scrollTextareaToBottom(inputRef.current);
         }
       },
-      [inputRef, scheduleTextareaResize, syncInputToParent]
+      [inputRef, scheduleTextareaResize, scrollTextareaToBottom, syncInputToParent]
     ),
     onError: useCallback((error: string) => {
       console.error('Speech recognition error:', error);
@@ -386,12 +416,32 @@ export function InputControls({
             rows={1}
             className={cn(
               'w-full bg-background border-border rounded-xl pl-4 pr-4 sm:pr-20 text-sm resize-none py-2.5',
-              'focus:ring-2 focus:ring-primary/20 focus:border-primary/50',
+              !accentColor && 'focus:ring-2 focus:ring-primary/20 focus:border-primary/50',
               'min-h-[44px]',
-              hasFiles && 'border-primary/30',
+              hasFiles && !accentColor && 'border-primary/30',
               isDragOver && 'border-primary bg-primary/5',
               isListening && 'border-red-500/50 ring-2 ring-red-500/20'
             )}
+            style={
+              accentColor && !isDragOver && !isListening
+                ? {
+                    borderColor: accentColor + '40',
+                    boxShadow: `0 0 0 1px ${accentColor}20`,
+                  }
+                : undefined
+            }
+            onFocus={(e) => {
+              if (accentColor && !isDragOver && !isListening) {
+                e.currentTarget.style.borderColor = accentColor + '70';
+                e.currentTarget.style.boxShadow = `0 0 0 2px ${accentColor}30`;
+              }
+            }}
+            onBlurCapture={(e) => {
+              if (accentColor && !isDragOver && !isListening) {
+                e.currentTarget.style.borderColor = accentColor + '40';
+                e.currentTarget.style.boxShadow = `0 0 0 1px ${accentColor}20`;
+              }
+            }}
           />
           {hasFiles && !isDragOver && (
             <div className="hidden sm:block absolute right-3 top-1/2 -translate-y-1/2 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full font-medium">
@@ -503,6 +553,9 @@ export function InputControls({
 
           {/* Time Limiter Settings */}
           <TimeLimiterSettings disabled={!isConnected} elapsedSeconds={elapsedSeconds} />
+
+          {/* Orchestrator Settings */}
+          <OrchestratorSettings disabled={!isConnected} />
 
           {/* Copy-All Button */}
           <Button

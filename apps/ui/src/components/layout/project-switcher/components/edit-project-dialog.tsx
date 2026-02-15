@@ -1,11 +1,5 @@
 import { useState, useRef } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -132,20 +126,22 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
     setProjectBackgroundColor,
     setProjectTextColor,
     setProjectIconColor,
+    setProjectChatBackgroundColor,
   } = useAppStore();
   const [name, setName] = useState(project.name);
   const [icon, setIcon] = useState<string | null>(project.icon || null);
   const [customIconPath, setCustomIconPath] = useState<string | null>(
     project.customIconPath || null
   );
-  const [badgeColor, setBadgeColor] = useState<string | null>(project.badgeColor || null);
-  const [backgroundColor, setBackgroundColor] = useState<string | null>(
-    project.backgroundColor || null
-  );
-  const [textColor, setTextColor] = useState<string | null>(project.textColor || null);
-  const [iconColor, setIconColor] = useState<string | null>(project.iconColor || null);
   const [isUploadingIcon, setIsUploadingIcon] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Read appearance values directly from project (auto-save)
+  const badgeColor = project.badgeColor || null;
+  const backgroundColor = project.backgroundColor || null;
+  const textColor = project.textColor || null;
+  const iconColor = project.iconColor || null;
+  const chatBackgroundColor = project.chatBackgroundColor || null;
 
   // Get the icon component for preview
   const getIconComponent = (): LucideIcon => {
@@ -170,28 +166,43 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
       setProjectCustomIcon(project.id, customIconPath);
       hasChanges = true;
     }
-    if (badgeColor !== (project.badgeColor ?? null)) {
-      setProjectBadgeColor(project.id, badgeColor);
-      hasChanges = true;
-    }
-    if (backgroundColor !== (project.backgroundColor ?? null)) {
-      setProjectBackgroundColor(project.id, backgroundColor);
-      hasChanges = true;
-    }
-    if (textColor !== (project.textColor ?? null)) {
-      setProjectTextColor(project.id, textColor);
-      hasChanges = true;
-    }
-    if (iconColor !== (project.iconColor ?? null)) {
-      setProjectIconColor(project.id, iconColor);
-      hasChanges = true;
-    }
     onOpenChange(false);
     // Persist all project changes to server in one batch
     if (hasChanges) {
       const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
       await syncSettingsToServer();
     }
+  };
+
+  // Auto-save appearance handlers
+  const handleBadgeColorChange = async (color: string | null) => {
+    setProjectBadgeColor(project.id, color);
+    const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+    await syncSettingsToServer();
+  };
+
+  const handleBackgroundColorChange = async (color: string | null) => {
+    setProjectBackgroundColor(project.id, color);
+    const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+    await syncSettingsToServer();
+  };
+
+  const handleTextColorChange = async (color: string | null) => {
+    setProjectTextColor(project.id, color);
+    const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+    await syncSettingsToServer();
+  };
+
+  const handleIconColorChange = async (color: string | null) => {
+    setProjectIconColor(project.id, color);
+    const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+    await syncSettingsToServer();
+  };
+
+  const handleChatBackgroundColorChange = async (color: string | null) => {
+    setProjectChatBackgroundColor(project.id, color);
+    const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+    await syncSettingsToServer();
   };
 
   const handleCustomIconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -241,21 +252,28 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
     }
   };
 
-  const handleResetColors = () => {
-    setBadgeColor(null);
-    setBackgroundColor(null);
-    setTextColor(null);
-    setIconColor(null);
+  const handleResetColors = async () => {
+    setProjectBadgeColor(project.id, null);
+    setProjectBackgroundColor(project.id, null);
+    setProjectTextColor(project.id, null);
+    setProjectIconColor(project.id, null);
+    setProjectChatBackgroundColor(project.id, null);
+    const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+    await syncSettingsToServer();
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Edit Project</DialogTitle>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        transparentOverlay
+        className="sm:max-w-md w-[400px] flex flex-col p-0"
+      >
+        <SheetHeader className="px-5 pt-5 pb-0">
+          <SheetTitle>Edit Project</SheetTitle>
+        </SheetHeader>
 
-        <Tabs defaultValue="general" className="flex-1 overflow-hidden flex flex-col">
+        <Tabs defaultValue="general" className="flex-1 overflow-hidden flex flex-col px-5">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="appearance" className="flex items-center gap-1.5">
@@ -398,9 +416,23 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
                 </p>
                 <ColorPicker
                   value={backgroundColor}
-                  onChange={setBackgroundColor}
+                  onChange={handleBackgroundColorChange}
                   colors={BACKGROUND_COLORS}
                   label="background"
+                />
+              </div>
+
+              {/* Chat Background Color */}
+              <div className="space-y-2">
+                <Label>Chat Background Color</Label>
+                <p className="text-xs text-muted-foreground">
+                  Background tint for the message area when this project is active
+                </p>
+                <ColorPicker
+                  value={chatBackgroundColor}
+                  onChange={handleChatBackgroundColorChange}
+                  colors={BACKGROUND_COLORS}
+                  label="chat background"
                 />
               </div>
 
@@ -412,7 +444,7 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
                 </p>
                 <ColorPicker
                   value={badgeColor}
-                  onChange={setBadgeColor}
+                  onChange={handleBadgeColorChange}
                   colors={PROJECT_COLORS}
                   label="border"
                 />
@@ -426,7 +458,7 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
                 </p>
                 <ColorPicker
                   value={iconColor}
-                  onChange={setIconColor}
+                  onChange={handleIconColorChange}
                   colors={PROJECT_COLORS}
                   label="icon color"
                 />
@@ -440,7 +472,7 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
                 </p>
                 <ColorPicker
                   value={textColor}
-                  onChange={setTextColor}
+                  onChange={handleTextColorChange}
                   colors={PROJECT_COLORS}
                   label="text color"
                 />
@@ -460,15 +492,12 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
           </div>
         </Tabs>
 
-        <DialogFooter className="flex-shrink-0 mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+        <div className="px-5 pb-5 pt-2">
+          <Button onClick={handleSave} disabled={!name.trim()} className="w-full">
+            Done
           </Button>
-          <Button onClick={handleSave} disabled={!name.trim()}>
-            Save Changes
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

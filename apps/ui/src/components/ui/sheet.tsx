@@ -24,9 +24,10 @@ function SheetPortal({ ...props }: React.ComponentProps<typeof SheetPrimitive.Po
 
 interface SheetOverlayProps extends React.HTMLAttributes<HTMLDivElement> {
   forceMount?: true;
+  transparent?: boolean;
 }
 
-const SheetOverlay = ({ className, ...props }: SheetOverlayProps) => {
+const SheetOverlay = ({ className, transparent, ...props }: SheetOverlayProps) => {
   const Overlay = SheetPrimitive.Overlay as React.ComponentType<
     SheetOverlayProps & { 'data-slot': string }
   >;
@@ -34,7 +35,8 @@ const SheetOverlay = ({ className, ...props }: SheetOverlayProps) => {
     <Overlay
       data-slot="sheet-overlay"
       className={cn(
-        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50',
+        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50',
+        transparent ? 'bg-transparent' : 'bg-black/50',
         className
       )}
       {...props}
@@ -45,12 +47,19 @@ const SheetOverlay = ({ className, ...props }: SheetOverlayProps) => {
 interface SheetContentProps extends React.HTMLAttributes<HTMLDivElement> {
   side?: 'top' | 'right' | 'bottom' | 'left';
   forceMount?: true;
+  transparentOverlay?: boolean;
   onEscapeKeyDown?: (event: KeyboardEvent) => void;
   onPointerDownOutside?: (event: PointerEvent) => void;
   onInteractOutside?: (event: Event) => void;
 }
 
-const SheetContent = ({ className, children, side = 'right', ...props }: SheetContentProps) => {
+const SheetContent = ({
+  className,
+  children,
+  side = 'right',
+  transparentOverlay,
+  ...props
+}: SheetContentProps) => {
   const Content = SheetPrimitive.Content as React.ComponentType<
     SheetContentProps & { 'data-slot': string }
   >;
@@ -61,7 +70,7 @@ const SheetContent = ({ className, children, side = 'right', ...props }: SheetCo
 
   return (
     <SheetPortal>
-      <SheetOverlay />
+      <SheetOverlay transparent={transparentOverlay} />
       <Content
         data-slot="sheet-content"
         className={cn(

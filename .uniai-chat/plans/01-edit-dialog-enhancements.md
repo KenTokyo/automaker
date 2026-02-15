@@ -4,7 +4,7 @@
 
 > Zugehörig zu: [00-master-plan.md](./00-master-plan.md)
 > Chat: CHAT 1
-> Status: OFFEN
+> Status: ERLEDIGT
 
 ---
 

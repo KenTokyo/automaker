@@ -53,6 +53,10 @@ interface AgentInputAreaProps {
   onClearQueue: () => void;
   // Refs
   inputRef?: React.RefObject<HTMLTextAreaElement | null>;
+  /** Project accent color for border/focus styling */
+  accentColor?: string;
+  /** Called when the textarea height changes (e.g. during speech input) so the parent can scroll the message list */
+  onInputHeightChange?: () => void;
 }
 
 export function AgentInputArea({
@@ -86,6 +90,8 @@ export function AgentInputArea({
   onRemoveFromQueue,
   onClearQueue,
   inputRef,
+  accentColor,
+  onInputHeightChange,
 }: AgentInputAreaProps) {
   const hasFiles = selectedImages.length > 0 || selectedTextFiles.length > 0;
 
@@ -148,6 +154,8 @@ export function AgentInputArea({
         onDragOver={onDragOver}
         onDrop={onDrop}
         inputRef={inputRef}
+        accentColor={accentColor}
+        onInputHeightChange={onInputHeightChange}
       />
     </div>
   );

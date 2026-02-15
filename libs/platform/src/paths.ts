@@ -490,3 +490,62 @@ export async function ensureDataDir(dataDir: string): Promise<string> {
   await secureFs.mkdir(dataDir, { recursive: true });
   return dataDir;
 }
+
+// ============================================================================
+// Agent Prompts Paths
+// ============================================================================
+
+/**
+ * Get the global agent prompts directory
+ *
+ * Contains user-defined agent prompts that are available across all projects.
+ * Located in the platform-specific userData directory.
+ *
+ * @param dataDir - User data directory (from app.getPath('userData'))
+ * @returns Absolute path to {dataDir}/agents
+ */
+export function getGlobalAgentsDir(dataDir: string): string {
+  return path.join(dataDir, 'agents');
+}
+
+/**
+ * Get the project-level agent prompts directory
+ *
+ * Contains project-specific agent prompts.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Absolute path to {projectPath}/.automaker/agents
+ */
+export function getProjectAgentsDir(projectPath: string): string {
+  return path.join(getAutomakerDir(projectPath), 'agents');
+}
+
+/**
+ * Create the global agents directory if it doesn't exist
+ *
+ * Creates {dataDir}/agents for storing global agent prompts.
+ * Safe to call multiple times - uses recursive: true.
+ *
+ * @param dataDir - User data directory path
+ * @returns Promise resolving to the created agents directory path
+ */
+export async function ensureGlobalAgentsDir(dataDir: string): Promise<string> {
+  const agentsDir = getGlobalAgentsDir(dataDir);
+  await secureFs.mkdir(agentsDir, { recursive: true });
+  return agentsDir;
+}
+
+/**
+ * Create the project agents directory if it doesn't exist
+ *
+ * Creates {projectPath}/.automaker/agents for storing project agent prompts.
+ * Safe to call multiple times - uses recursive: true.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Promise resolving to the created agents directory path
+ */
+export async function ensureProjectAgentsDir(projectPath: string): Promise<string> {
+  const agentsDir = getProjectAgentsDir(projectPath);
+  await secureFs.mkdir(agentsDir, { recursive: true });
+  return agentsDir;
+}

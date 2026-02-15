@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { useAgentPromptsStore } from '@/store/agent-prompts-store';
 import { useTimeLimiterStore } from '@/store/time-limiter-store';
+import { useOrchestratorStore } from '@/store/orchestrator-store';
 import { useElectronAgent } from '@/hooks/use-electron-agent';
 import { SessionManager } from '@/components/session-manager';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
@@ -113,10 +114,17 @@ export function AgentView() {
   });
 
   // Scroll management hook
-  const { messagesContainerRef, handleScroll } = useAgentScroll({
+  const { messagesContainerRef, handleScroll, scrollToBottom, isUserAtBottom } = useAgentScroll({
     messagesLength: messages.length,
     currentSessionId,
   });
+
+  // Scroll message list when input area height changes (e.g. during speech input)
+  const handleInputHeightChange = useCallback(() => {
+    if (isUserAtBottom) {
+      scrollToBottom('smooth');
+    }
+  }, [isUserAtBottom, scrollToBottom]);
 
   // Keyboard shortcuts hook
   useAgentShortcuts({
@@ -198,6 +206,86 @@ export function AgentView() {
     messages,
     isTimeExceeded,
     setPendingCopiedContent,
+  ]);
+
+  // Orchestrator store
+  const {
+    isEnabled: orchestratorEnabled,
+    shouldTrigger: orchestratorShouldTrigger,
+    incrementIteration: orchestratorIncrementIteration,
+    setPendingContent: setOrchestratorPendingContent,
+    pendingOrchestratorContent,
+    clearPendingContent: clearOrchestratorPendingContent,
+    autoSendEnabled: orchestratorAutoSend,
+  } = useOrchestratorStore();
+
+  // Track previous isProcessing to detect complete events (true → false)
+  const wasProcessingRef = useRef(false);
+
+  // Detect when processing finishes and check for orchestrator trigger
+  useEffect(() => {
+    const wasProcessing = wasProcessingRef.current;
+    wasProcessingRef.current = isProcessing;
+
+    // Only trigger when processing transitions from true → false
+    if (!wasProcessing || isProcessing) return;
+    if (!orchestratorEnabled || !currentSessionId || !isConnected) return;
+
+    // Find the last assistant message
+    const lastAssistantMessage = [...messages].reverse().find((m) => m.role === 'assistant');
+    if (!lastAssistantMessage) return;
+
+    // Check if the trigger keyword is present
+    if (!orchestratorShouldTrigger(lastAssistantMessage.content)) return;
+
+    // Increment iteration (returns false if max reached)
+    const canContinue = orchestratorIncrementIteration();
+    if (!canContinue) return;
+
+    // Store the last AI message as pending content for the new chat
+    setOrchestratorPendingContent(lastAssistantMessage.content);
+
+    // Create a new session
+    if (quickCreateSessionRef.current) {
+      quickCreateSessionRef.current();
+    }
+  }, [
+    isProcessing,
+    orchestratorEnabled,
+    currentSessionId,
+    isConnected,
+    messages,
+    orchestratorShouldTrigger,
+    orchestratorIncrementIteration,
+    setOrchestratorPendingContent,
+  ]);
+
+  // Handle pending orchestrator content in new session
+  useEffect(() => {
+    if (!pendingOrchestratorContent || !currentSessionId || !isConnected || isProcessing) return;
+
+    const content = pendingOrchestratorContent;
+    clearOrchestratorPendingContent();
+
+    if (orchestratorAutoSend) {
+      // Auto-send: set input and trigger send immediately
+      setInput(content);
+      // Use setTimeout to ensure input state is set before sending
+      setTimeout(() => {
+        sendMessage(content);
+      }, 100);
+    } else {
+      // Just paste into input
+      setInput(content);
+    }
+  }, [
+    pendingOrchestratorContent,
+    currentSessionId,
+    isConnected,
+    isProcessing,
+    clearOrchestratorPendingContent,
+    orchestratorAutoSend,
+    sendMessage,
   ]);
 
   // Handle send message
@@ -402,6 +490,7 @@ export function AgentView() {
                 messagesContainerRef={messagesContainerRef}
                 onScroll={handleScroll}
                 onShowSessionManager={handleShowSessionManager}
+                chatBackgroundColor={currentProject?.chatBackgroundColor}
               />
 
               {/* Input Area */}
@@ -437,6 +526,8 @@ export function AgentView() {
                   onRemoveFromQueue={removeFromServerQueue}
                   onClearQueue={clearServerQueue}
                   inputRef={inputRef}
+                  accentColor={currentProject?.badgeColor || currentProject?.backgroundColor}
+                  onInputHeightChange={handleInputHeightChange}
                 />
               )}
             </div>
@@ -478,6 +569,7 @@ export function AgentView() {
             messagesContainerRef={messagesContainerRef}
             onScroll={handleScroll}
             onShowSessionManager={handleShowSessionManager}
+            chatBackgroundColor={currentProject?.chatBackgroundColor}
           />
 
           {/* Input Area */}
@@ -513,6 +605,7 @@ export function AgentView() {
               onRemoveFromQueue={removeFromServerQueue}
               onClearQueue={clearServerQueue}
               inputRef={inputRef}
+              onInputHeightChange={handleInputHeightChange}
             />
           )}
         </div>

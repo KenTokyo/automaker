@@ -39,14 +39,14 @@ Automaker verwaltet 20+ Projekte in einer Agent-Sidebar. Der User möchte **pro 
 
 ## Feature-Planungen (Referenzen)
 
-| #   | Feature                               | Planungs-Datei                                                                 | Status | Chat   |
-| --- | ------------------------------------- | ------------------------------------------------------------------------------ | ------ | ------ |
-| 1   | Edit-Dialog erweitern (Chat-BG Farbe) | [01-edit-dialog-enhancements.md](./01-edit-dialog-enhancements.md)             | OFFEN  | CHAT 1 |
-| 2   | Message-List Projekt-Hintergrund      | [02-message-list-project-bg.md](./02-message-list-project-bg.md)               | OFFEN  | CHAT 1 |
-| 3   | Project-Dropdown Styling              | [03-project-dropdown-styling.md](./03-project-dropdown-styling.md)             | OFFEN  | CHAT 2 |
-| 4   | Session-Manager Projekt-Farben        | [04-session-manager-project-colors.md](./04-session-manager-project-colors.md) | OFFEN  | CHAT 2 |
-| 5   | Input-Area Akzentfarbe                | [05-input-area-accent.md](./05-input-area-accent.md)                           | OFFEN  | CHAT 3 |
-| 6   | ProjectBadge vollständiges Styling    | [06-project-badge-full-styling.md](./06-project-badge-full-styling.md)         | OFFEN  | CHAT 3 |
+| #   | Feature                               | Planungs-Datei                                                                 | Status   | Chat   |
+| --- | ------------------------------------- | ------------------------------------------------------------------------------ | -------- | ------ |
+| 1   | Edit-Dialog erweitern (Chat-BG Farbe) | [01-edit-dialog-enhancements.md](./01-edit-dialog-enhancements.md)             | ERLEDIGT | CHAT 1 |
+| 2   | Message-List Projekt-Hintergrund      | [02-message-list-project-bg.md](./02-message-list-project-bg.md)               | ERLEDIGT | CHAT 1 |
+| 3   | Project-Dropdown Styling              | [03-project-dropdown-styling.md](./03-project-dropdown-styling.md)             | ERLEDIGT | CHAT 2 |
+| 4   | Session-Manager Projekt-Farben        | [04-session-manager-project-colors.md](./04-session-manager-project-colors.md) | ERLEDIGT | CHAT 2 |
+| 5   | Input-Area Akzentfarbe                | [05-input-area-accent.md](./05-input-area-accent.md)                           | ERLEDIGT | CHAT 3 |
+| 6   | ProjectBadge vollständiges Styling    | [06-project-badge-full-styling.md](./06-project-badge-full-styling.md)         | ERLEDIGT | CHAT 3 |
 
 ---
 
@@ -141,8 +141,8 @@ chatBackgroundColor?: string  // Separate Hintergrundfarbe für den Chat-Bereich
 
 ## Fortschritts-Tracking
 
-- [ ] CHAT 1: Features 1+2 (Edit-Dialog + Message-List BG)
-- [ ] CHAT 2: Features 3+4 (Dropdown + Session-Manager)
-- [ ] CHAT 3: Features 5+6 (Input-Area + Badge)
+- [x] CHAT 1: Features 1+2 (Edit-Dialog + Message-List BG)
+- [x] CHAT 2: Features 3+4 (Dropdown + Session-Manager)
+- [x] CHAT 3: Features 5+6 (Input-Area + Badge)
 
 **NEXT_PHASE_READY**

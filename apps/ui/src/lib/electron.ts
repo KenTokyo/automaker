@@ -3402,6 +3402,7 @@ export interface Project {
   backgroundColor?: string; // Background color for project items in sidebar (hex color)
   textColor?: string; // Text/foreground color for project (hex color)
   iconColor?: string; // Icon color for project (hex color)
+  chatBackgroundColor?: string; // Background color for the chat/message area (hex color with alpha, e.g., '#3b82f620')
   /**
    * Override the active Claude API profile for this project.
    * - undefined: Use global setting (activeClaudeApiProfileId)

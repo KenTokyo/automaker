@@ -20,6 +20,7 @@ interface ChatAreaProps {
   messagesContainerRef: React.RefObject<HTMLDivElement | null>;
   onScroll: () => void;
   onShowSessionManager: () => void;
+  chatBackgroundColor?: string;
 }
 
 export const ChatArea = memo(function ChatArea({
@@ -30,6 +31,7 @@ export const ChatArea = memo(function ChatArea({
   messagesContainerRef,
   onScroll,
   onShowSessionManager,
+  chatBackgroundColor,
 }: ChatAreaProps) {
   if (!currentSessionId) {
     return (
@@ -46,6 +48,7 @@ export const ChatArea = memo(function ChatArea({
       isProcessing={isProcessing}
       messagesContainerRef={messagesContainerRef}
       onScroll={onScroll}
+      chatBackgroundColor={chatBackgroundColor}
     />
   );
 });

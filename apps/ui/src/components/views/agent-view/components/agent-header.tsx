@@ -12,10 +12,14 @@ import {
   Search,
   Check,
   Settings2,
+  Copy,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { getAuthenticatedImageUrl } from '@/lib/api-fetch';
 import { useAppStore } from '@/store/app-store';
@@ -60,6 +64,7 @@ export function AgentHeader({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [pathCopied, setPathCopied] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -142,6 +147,8 @@ export function AgentHeader({
 
   const browserPanelOpen = useAppStore((s) => s.browserPanelOpen);
   const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
+  const maxSessionsPerProject = useAppStore((s) => s.maxSessionsPerProject);
+  const setMaxSessionsPerProject = useAppStore((s) => s.setMaxSessionsPerProject);
 
   const IconComponent = getProjectIcon(currentProject);
   const hasCustomIcon = !!currentProject.customIconPath;
@@ -208,7 +215,7 @@ export function AgentHeader({
                   />
                 )}
                 <span
-                  className="max-w-[200px] truncate"
+                  className="max-w-[200px] truncate font-medium text-foreground"
                   style={{ color: projectTextColor || undefined }}
                 >
                   {currentProject.name}
@@ -223,6 +230,30 @@ export function AgentHeader({
                   )}
                 />
               </button>
+              <div className="flex items-center gap-1 -mt-0.5">
+                <p
+                  className="text-[10px] text-foreground/70 truncate max-w-[300px]"
+                  title={currentProject.path}
+                >
+                  {currentProject.path}
+                </p>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(currentProject.path);
+                    setPathCopied(true);
+                    setTimeout(() => setPathCopied(false), 1500);
+                  }}
+                  className="p-0.5 rounded hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-colors"
+                  title="Copy path"
+                >
+                  {pathCopied ? (
+                    <Check className="w-3 h-3 text-green-500" />
+                  ) : (
+                    <Copy className="w-3 h-3" />
+                  )}
+                </button>
+              </div>
 
               {isOpen && (
                 <div
@@ -288,6 +319,15 @@ export function AgentHeader({
                                 : 'text-foreground/80 hover:bg-accent/50',
                               isActive && 'font-medium'
                             )}
+                            style={{
+                              borderLeft: project.badgeColor
+                                ? `3px solid ${project.badgeColor}`
+                                : undefined,
+                              backgroundColor:
+                                !isHighlighted && project.backgroundColor
+                                  ? `${project.backgroundColor}15`
+                                  : undefined,
+                            }}
                           >
                             {projHasCustomIcon ? (
                               <img
@@ -300,10 +340,13 @@ export function AgentHeader({
                               />
                             ) : (
                               <ProjIcon
-                                className={cn(
-                                  'w-4 h-4 shrink-0',
-                                  isActive ? 'text-brand-500' : 'text-muted-foreground'
-                                )}
+                                className="w-4 h-4 shrink-0"
+                                style={{
+                                  color:
+                                    project.iconColor ||
+                                    project.badgeColor ||
+                                    (isActive ? 'hsl(var(--brand-500))' : undefined),
+                                }}
                               />
                             )}
                             <span className="truncate flex-1 text-left">{project.name}</span>
@@ -332,17 +375,53 @@ export function AgentHeader({
 
         {/* Status indicators & actions */}
         <div className="flex items-center gap-3">
-          {/* Edit Project Button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowEditDialog(true)}
-            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-            aria-label="Edit project appearance"
-            title="Edit project appearance"
-          >
-            <Settings2 className="w-4 h-4" />
-          </Button>
+          {/* Settings Popover */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                aria-label="Agent settings"
+                title="Agent settings"
+              >
+                <Settings2 className="w-4 h-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-3" align="end">
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="max-sessions" className="text-xs font-medium">
+                    Max Sessions per Project
+                  </Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input
+                      id="max-sessions"
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={maxSessionsPerProject}
+                      onChange={(e) => setMaxSessionsPerProject(parseInt(e.target.value, 10) || 0)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    0 = unlimited. Oldest sessions auto-deleted when exceeded.
+                  </p>
+                </div>
+                <div className="border-t pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setShowEditDialog(true)}
+                  >
+                    Edit Project Appearance
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
           {currentTool && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full border border-border">
               <Wrench className="w-3 h-3 text-primary" />
