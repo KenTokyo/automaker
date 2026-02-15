@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -136,6 +136,13 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
   );
   const [isUploadingIcon, setIsUploadingIcon] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Reset local state when the project changes (component stays mounted across project switches)
+  useEffect(() => {
+    setName(project.name);
+    setIcon(project.icon || null);
+    setCustomIconPath(project.customIconPath || null);
+  }, [project.id]);
 
   // Read appearance values directly from project (auto-save)
   const badgeColor = project.badgeColor || null;

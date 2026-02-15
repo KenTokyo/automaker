@@ -757,94 +757,81 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   },
 
   setProjectBadgeColor: (projectId, badgeColor) => {
-    const { projects, currentProject } = get();
-    const updatedProjects = projects.map((p) =>
-      p.id === projectId ? { ...p, badgeColor: badgeColor === null ? undefined : badgeColor } : p
-    );
-    set({ projects: updatedProjects });
-    // Also update currentProject if it matches
-    if (currentProject?.id === projectId) {
-      set({
-        currentProject: {
-          ...currentProject,
-          badgeColor: badgeColor === null ? undefined : badgeColor,
-        },
-      });
-    }
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId ? { ...p, badgeColor: badgeColor === null ? undefined : badgeColor } : p
+      ),
+      currentProject:
+        state.currentProject?.id === projectId
+          ? { ...state.currentProject, badgeColor: badgeColor === null ? undefined : badgeColor }
+          : state.currentProject,
+    }));
+    saveProjects(get().projects);
   },
 
   setProjectBackgroundColor: (projectId, backgroundColor) => {
-    const { projects, currentProject } = get();
-    const updatedProjects = projects.map((p) =>
-      p.id === projectId
-        ? { ...p, backgroundColor: backgroundColor === null ? undefined : backgroundColor }
-        : p
-    );
-    set({ projects: updatedProjects });
-    // Also update currentProject if it matches
-    if (currentProject?.id === projectId) {
-      set({
-        currentProject: {
-          ...currentProject,
-          backgroundColor: backgroundColor === null ? undefined : backgroundColor,
-        },
-      });
-    }
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId
+          ? { ...p, backgroundColor: backgroundColor === null ? undefined : backgroundColor }
+          : p
+      ),
+      currentProject:
+        state.currentProject?.id === projectId
+          ? {
+              ...state.currentProject,
+              backgroundColor: backgroundColor === null ? undefined : backgroundColor,
+            }
+          : state.currentProject,
+    }));
+    saveProjects(get().projects);
   },
 
   setProjectTextColor: (projectId, textColor) => {
-    const { projects, currentProject } = get();
-    const updatedProjects = projects.map((p) =>
-      p.id === projectId ? { ...p, textColor: textColor === null ? undefined : textColor } : p
-    );
-    set({ projects: updatedProjects });
-    // Also update currentProject if it matches
-    if (currentProject?.id === projectId) {
-      set({
-        currentProject: {
-          ...currentProject,
-          textColor: textColor === null ? undefined : textColor,
-        },
-      });
-    }
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId ? { ...p, textColor: textColor === null ? undefined : textColor } : p
+      ),
+      currentProject:
+        state.currentProject?.id === projectId
+          ? { ...state.currentProject, textColor: textColor === null ? undefined : textColor }
+          : state.currentProject,
+    }));
+    saveProjects(get().projects);
   },
 
   setProjectIconColor: (projectId, iconColor) => {
-    const { projects, currentProject } = get();
-    const updatedProjects = projects.map((p) =>
-      p.id === projectId ? { ...p, iconColor: iconColor === null ? undefined : iconColor } : p
-    );
-    set({ projects: updatedProjects });
-    // Also update currentProject if it matches
-    if (currentProject?.id === projectId) {
-      set({
-        currentProject: {
-          ...currentProject,
-          iconColor: iconColor === null ? undefined : iconColor,
-        },
-      });
-    }
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId ? { ...p, iconColor: iconColor === null ? undefined : iconColor } : p
+      ),
+      currentProject:
+        state.currentProject?.id === projectId
+          ? { ...state.currentProject, iconColor: iconColor === null ? undefined : iconColor }
+          : state.currentProject,
+    }));
+    saveProjects(get().projects);
   },
 
   setProjectChatBackgroundColor: (projectId, chatBackgroundColor) => {
-    const { projects, currentProject } = get();
-    const updatedProjects = projects.map((p) =>
-      p.id === projectId
-        ? {
-            ...p,
-            chatBackgroundColor: chatBackgroundColor === null ? undefined : chatBackgroundColor,
-          }
-        : p
-    );
-    set({ projects: updatedProjects });
-    if (currentProject?.id === projectId) {
-      set({
-        currentProject: {
-          ...currentProject,
-          chatBackgroundColor: chatBackgroundColor === null ? undefined : chatBackgroundColor,
-        },
-      });
-    }
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              chatBackgroundColor: chatBackgroundColor === null ? undefined : chatBackgroundColor,
+            }
+          : p
+      ),
+      currentProject:
+        state.currentProject?.id === projectId
+          ? {
+              ...state.currentProject,
+              chatBackgroundColor: chatBackgroundColor === null ? undefined : chatBackgroundColor,
+            }
+          : state.currentProject,
+    }));
+    saveProjects(get().projects);
   },
 
   // View actions
