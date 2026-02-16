@@ -142,7 +142,9 @@ export function AgentView() {
   // Time limiter store
   const {
     isEnabled: timeLimiterEnabled,
-    startSession,
+    startProcessing: timeLimiterStartProcessing,
+    stopProcessing: timeLimiterStopProcessing,
+    resetTimer: timeLimiterResetTimer,
     getElapsedSeconds,
     isTimeExceeded,
     pendingCopiedContent,
@@ -153,24 +155,52 @@ export function AgentView() {
   // Track elapsed seconds for display
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
-  // Start session timer when session changes
+  // Reset timer when session changes
   useEffect(() => {
     if (currentSessionId) {
-      startSession();
+      timeLimiterResetTimer();
       setElapsedSeconds(0);
     }
-  }, [currentSessionId, startSession]);
+  }, [currentSessionId, timeLimiterResetTimer]);
 
-  // Update elapsed seconds every second
+  // Start/stop timer based on isProcessing transitions
+  const wasProcessingForTimerRef = useRef(false);
   useEffect(() => {
-    if (!currentSessionId || !timeLimiterEnabled) return;
+    const wasProcessing = wasProcessingForTimerRef.current;
+    wasProcessingForTimerRef.current = isProcessing;
+
+    if (!timeLimiterEnabled) return;
+
+    if (!wasProcessing && isProcessing) {
+      // Agent started processing → start the timer
+      timeLimiterStartProcessing();
+    } else if (wasProcessing && !isProcessing) {
+      // Agent finished processing → stop/accumulate the timer
+      timeLimiterStopProcessing();
+      // Update display with final accumulated value
+      setElapsedSeconds(getElapsedSeconds());
+    }
+  }, [
+    isProcessing,
+    timeLimiterEnabled,
+    timeLimiterStartProcessing,
+    timeLimiterStopProcessing,
+    getElapsedSeconds,
+  ]);
+
+  // Update elapsed seconds every second (only while processing)
+  useEffect(() => {
+    if (!currentSessionId || !timeLimiterEnabled || !isProcessing) return;
 
     const interval = setInterval(() => {
       setElapsedSeconds(getElapsedSeconds());
     }, 1000);
 
+    // Also set immediately when processing starts
+    setElapsedSeconds(getElapsedSeconds());
+
     return () => clearInterval(interval);
-  }, [currentSessionId, timeLimiterEnabled, getElapsedSeconds]);
+  }, [currentSessionId, timeLimiterEnabled, isProcessing, getElapsedSeconds]);
 
   // Handle pending content from previous session (paste into new session)
   useEffect(() => {

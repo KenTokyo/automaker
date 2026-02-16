@@ -3,6 +3,9 @@
  *
  * Manages session time limits to automatically switch to new sessions
  * when the time limit is exceeded, preserving context via copy-all.
+ *
+ * The timer only counts time while the agent is actively processing (isProcessing = true).
+ * It pauses when the agent finishes and resumes on the next processing cycle.
  */
 
 import { create } from 'zustand';
@@ -25,24 +28,29 @@ interface TimeLimiterState {
   timeLimitSeconds: number;
   // Whether time limiter is enabled
   isEnabled: boolean;
-  // Session start timestamp (ISO string)
-  sessionStartTime: string | null;
+  // Cumulative elapsed seconds from previous processing phases
+  accumulatedSeconds: number;
+  // Timestamp when the current processing phase started (null if not processing)
+  processingStartTime: number | null;
   // Pending copied content to paste into new session
   pendingCopiedContent: string | null;
 
   // Actions
   setTimeLimit: (seconds: number) => void;
   setEnabled: (enabled: boolean) => void;
-  startSession: () => void;
+  /** Call when the agent starts processing */
+  startProcessing: () => void;
+  /** Call when the agent stops processing - accumulates elapsed time */
+  stopProcessing: () => void;
+  /** Reset timer for a new session */
+  resetTimer: () => void;
+  /** Get total elapsed seconds (accumulated + current processing phase) */
   getElapsedSeconds: () => number;
   isTimeExceeded: () => boolean;
   setPendingCopiedContent: (content: string | null) => void;
   clearPendingContent: () => void;
 }
 
-/**
- * Load time limit from local storage
- */
 function loadTimeLimit(): number {
   const stored = getItem(TIME_LIMIT_KEY);
   if (stored) {
@@ -54,9 +62,6 @@ function loadTimeLimit(): number {
   return DEFAULT_TIME_LIMIT;
 }
 
-/**
- * Load enabled state from local storage
- */
 function loadEnabled(): boolean {
   const stored = getItem(TIME_LIMIT_ENABLED_KEY);
   if (stored !== null) {
@@ -65,16 +70,10 @@ function loadEnabled(): boolean {
   return true; // Default enabled
 }
 
-/**
- * Save time limit to local storage
- */
 function saveTimeLimit(seconds: number): void {
   setItem(TIME_LIMIT_KEY, seconds.toString());
 }
 
-/**
- * Save enabled state to local storage
- */
 function saveEnabled(enabled: boolean): void {
   setItem(TIME_LIMIT_ENABLED_KEY, enabled.toString());
 }
@@ -82,11 +81,11 @@ function saveEnabled(enabled: boolean): void {
 export const useTimeLimiterStore = create<TimeLimiterState>((set, get) => ({
   timeLimitSeconds: loadTimeLimit(),
   isEnabled: loadEnabled(),
-  sessionStartTime: null,
+  accumulatedSeconds: 0,
+  processingStartTime: null,
   pendingCopiedContent: null,
 
   setTimeLimit: (seconds) => {
-    // Clamp to valid range (60s - 3600s / 1min - 60min)
     const clamped = Math.max(60, Math.min(3600, seconds));
     set({ timeLimitSeconds: clamped });
     saveTimeLimit(clamped);
@@ -97,17 +96,40 @@ export const useTimeLimiterStore = create<TimeLimiterState>((set, get) => ({
     saveEnabled(enabled);
   },
 
-  startSession: () => {
-    set({ sessionStartTime: new Date().toISOString() });
+  startProcessing: () => {
+    const { processingStartTime } = get();
+    // Only set if not already processing (idempotent)
+    if (processingStartTime === null) {
+      set({ processingStartTime: Date.now() });
+    }
+  },
+
+  stopProcessing: () => {
+    const { processingStartTime, accumulatedSeconds } = get();
+    if (processingStartTime !== null) {
+      const elapsed = Math.floor((Date.now() - processingStartTime) / 1000);
+      set({
+        accumulatedSeconds: accumulatedSeconds + elapsed,
+        processingStartTime: null,
+      });
+    }
+  },
+
+  resetTimer: () => {
+    set({
+      accumulatedSeconds: 0,
+      processingStartTime: null,
+    });
   },
 
   getElapsedSeconds: () => {
-    const { sessionStartTime } = get();
-    if (!sessionStartTime) return 0;
-
-    const start = new Date(sessionStartTime).getTime();
-    const now = Date.now();
-    return Math.floor((now - start) / 1000);
+    const { accumulatedSeconds, processingStartTime } = get();
+    if (processingStartTime === null) {
+      return accumulatedSeconds;
+    }
+    // Add current processing phase time
+    const currentPhaseSeconds = Math.floor((Date.now() - processingStartTime) / 1000);
+    return accumulatedSeconds + currentPhaseSeconds;
   },
 
   isTimeExceeded: () => {
