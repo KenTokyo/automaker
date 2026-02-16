@@ -1,4 +1,4 @@
-# Agent: coder
+# Agent: coder-light
 
 Fange mit der nächsten Phase an, falls noch vorhanden, entscheide du die nächste Phase!
 
