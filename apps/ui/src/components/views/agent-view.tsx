@@ -8,6 +8,7 @@ import { SessionManager } from '@/components/session-manager';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { generateContextSummary } from '@/lib/copy-all-chat';
 import { useSessions } from '@/hooks/queries/use-sessions';
+import { useSessionQueryInvalidation } from '@/hooks/use-query-invalidation';
 
 // Extracted hooks
 import {
@@ -82,6 +83,9 @@ export function AgentView() {
   const { currentSessionId, handleSelectSession } = useAgentSession({
     projectPath: currentProject?.path,
   });
+
+  // Invalidate session queries when WebSocket events arrive (e.g. session_metadata_updated, complete)
+  useSessionQueryInvalidation(currentSessionId ?? undefined);
 
   // Session name for Save-to-Docs feature
   const { data: allSessions = [] } = useSessions(true);
@@ -419,26 +423,15 @@ export function AgentView() {
       )}
 
       {isDesktop ? (
-        <ResizablePanelGroup
-          direction="horizontal"
-          className="flex"
-          autoSaveId={
-            showSessionManager && currentProject && browserPanelOpen
-              ? 'agent-view-3panel'
-              : showSessionManager && currentProject
-                ? 'agent-view-sidebar'
-                : browserPanelOpen
-                  ? 'agent-view-browser'
-                  : 'agent-view-chat'
-          }
-        >
+        <ResizablePanelGroup direction="horizontal" className="flex" autoSaveId="agent-view-panels">
           {/* Session Manager Sidebar - Desktop (resizable) */}
           {showSessionManager && currentProject && (
             <>
               <ResizablePanel
-                defaultSize={browserPanelOpen ? 20 : 25}
+                id="session-manager"
+                defaultSize={20}
                 minSize={15}
-                maxSize={browserPanelOpen ? 35 : 40}
+                maxSize={35}
                 className="bg-card border-r border-border"
               >
                 <SessionManager
@@ -454,17 +447,7 @@ export function AgentView() {
           )}
 
           {/* Chat Area - Desktop */}
-          <ResizablePanel
-            defaultSize={
-              showSessionManager && currentProject && browserPanelOpen
-                ? 45
-                : showSessionManager && currentProject
-                  ? 75
-                  : browserPanelOpen
-                    ? 60
-                    : 100
-            }
-          >
+          <ResizablePanel id="chat-area" defaultSize={60} minSize={30}>
             <div className="flex-1 flex flex-col overflow-hidden h-full">
               {/* Header */}
               <AgentHeader
@@ -537,7 +520,7 @@ export function AgentView() {
           {browserPanelOpen && currentProject && (
             <>
               <ResizableHandle withHandle />
-              <ResizablePanel defaultSize={showSessionManager ? 35 : 40} minSize={20} maxSize={50}>
+              <ResizablePanel id="browser-panel" defaultSize={20} minSize={15} maxSize={50}>
                 <BrowserPanel projectPath={currentProject.path} />
               </ResizablePanel>
             </>

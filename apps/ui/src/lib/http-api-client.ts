@@ -2956,6 +2956,55 @@ export class HttpApiClient implements ElectronAPI {
       this.post('/api/pipeline/steps/reorder', { projectPath, stepIds }),
   };
 
+  // Agent Prompts API
+  agentPrompts = {
+    list: (
+      projectPath?: string
+    ): Promise<{
+      success: boolean;
+      globalPrompts: Array<{
+        id: string;
+        name: string;
+        prompt: string;
+        scope: 'global' | 'local';
+      }>;
+      localPrompts: Array<{
+        id: string;
+        name: string;
+        prompt: string;
+        scope: 'global' | 'local';
+      }>;
+    }> => this.post('/api/agent-prompts/list', { projectPath }),
+
+    add: (
+      name: string,
+      prompt: string,
+      scope: 'global' | 'local',
+      projectPath?: string
+    ): Promise<{
+      success: boolean;
+      prompt: { id: string; name: string; prompt: string; scope: 'global' | 'local' };
+    }> => this.post('/api/agent-prompts/add', { name, prompt, scope, projectPath }),
+
+    update: (
+      id: string,
+      name: string,
+      prompt: string,
+      scope: 'global' | 'local',
+      projectPath?: string
+    ): Promise<{
+      success: boolean;
+      prompt: { id: string; name: string; prompt: string; scope: 'global' | 'local' };
+    }> => this.put('/api/agent-prompts/update', { id, name, prompt, scope, projectPath }),
+
+    delete: (
+      id: string,
+      scope: 'global' | 'local',
+      projectPath?: string
+    ): Promise<{ success: boolean }> =>
+      this.httpDelete('/api/agent-prompts/delete', { id, scope, projectPath }),
+  };
+
   // Docs API
   docs = {
     list: (projectPath: string, subfolder?: string): Promise<ListDocsResponse> =>

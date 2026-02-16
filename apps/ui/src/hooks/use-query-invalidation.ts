@@ -339,9 +339,10 @@ export function useSessionQueryInvalidation(sessionId: string | undefined) {
       }
 
       // Invalidate sessions list when any session changes
+      // Use ['sessions'] prefix to match all session queries regardless of includeArchived param
       if (event.type === 'complete' || event.type === 'session_metadata_updated') {
         queryClient.invalidateQueries({
-          queryKey: queryKeys.sessions.all(),
+          queryKey: ['sessions'],
         });
       }
     });

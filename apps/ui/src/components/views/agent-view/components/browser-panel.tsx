@@ -368,13 +368,18 @@ function ErrorState({ url, onRetry }: { url: string; onRetry: () => void }) {
 // considers "changed", triggering another render → infinite loop.
 const EMPTY_TABS: BrowserTab[] = [];
 
+/** Per-tab loading/error state so each iframe is independent */
+interface TabFrameState {
+  isLoading: boolean;
+  hasError: boolean;
+}
+
 export const BrowserPanel = memo(function BrowserPanel({ projectPath }: BrowserPanelProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasError, setHasError] = useState(false);
-  // The URL currently loaded in the iframe — separate from store URL to avoid re-render loops.
-  // Store URL changes (e.g. from same-origin tracking) must NOT cause iframe src reset.
-  const [iframeSrc, setIframeSrc] = useState('');
+  const iframeRefs = useRef<Map<string, HTMLIFrameElement>>(new Map());
+  // Per-tab loading/error state keyed by tab ID
+  const [tabStates, setTabStates] = useState<Map<string, TabFrameState>>(new Map());
+  // Stable src per tab — only changes on explicit navigation, not on same-origin URL tracking
+  const [tabSrcs, setTabSrcs] = useState<Map<string, string>>(new Map());
 
   // Store bindings — use useShallow for derived arrays to prevent infinite re-renders
   const { tabs, activeTabId } = useAppStore(
@@ -393,6 +398,19 @@ export const BrowserPanel = memo(function BrowserPanel({ projectPath }: BrowserP
     [tabs, activeTabId]
   );
 
+  const activeState = tabStates.get(activeTabId) ?? { isLoading: false, hasError: false };
+
+  /** Update per-tab state helper */
+  const setTabState = useCallback((tabId: string, update: Partial<TabFrameState>) => {
+    setTabStates((prev) => {
+      const current = prev.get(tabId) ?? { isLoading: false, hasError: false };
+      const next = { ...current, ...update };
+      const map = new Map(prev);
+      map.set(tabId, next);
+      return map;
+    });
+  }, []);
+
   // Heal legacy/incomplete persisted state: ensure projects with tabs always
   // have a valid active tab ID.
   useEffect(() => {
@@ -403,6 +421,53 @@ export const BrowserPanel = memo(function BrowserPanel({ projectPath }: BrowserP
       setActiveBrowserTab(projectPath, fallbackTabId);
     }
   }, [projectPath, tabs, activeTabId, setActiveBrowserTab]);
+
+  // Clean up stale tab states/srcs when tabs are removed
+  useEffect(() => {
+    const tabIds = new Set(tabs.map((t) => t.id));
+    setTabStates((prev) => {
+      let changed = false;
+      const next = new Map(prev);
+      for (const key of next.keys()) {
+        if (!tabIds.has(key)) {
+          next.delete(key);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+    setTabSrcs((prev) => {
+      let changed = false;
+      const next = new Map(prev);
+      for (const key of next.keys()) {
+        if (!tabIds.has(key)) {
+          next.delete(key);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+    // Also clean up stale iframe refs
+    const refs = iframeRefs.current;
+    for (const key of refs.keys()) {
+      if (!tabIds.has(key)) refs.delete(key);
+    }
+  }, [tabs]);
+
+  // Initialize tabSrcs for tabs that were restored from persistence (e.g. page reload)
+  useEffect(() => {
+    setTabSrcs((prev) => {
+      let changed = false;
+      const next = new Map(prev);
+      for (const tab of tabs) {
+        if (tab.url && !next.has(tab.id)) {
+          next.set(tab.id, tab.url);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [tabs]);
 
   /** Create a new tab with a given URL and make it active */
   const createTab = useCallback(
@@ -416,11 +481,12 @@ export const BrowserPanel = memo(function BrowserPanel({ projectPath }: BrowserP
         port,
       };
       addBrowserTab(projectPath, tab);
-      setIframeSrc(url);
-      setIsLoading(true);
-      setHasError(false);
+      if (url) {
+        setTabSrcs((prev) => new Map(prev).set(tab.id, url));
+        setTabState(tab.id, { isLoading: true, hasError: false });
+      }
     },
-    [projectPath, addBrowserTab, tabs.length]
+    [projectPath, addBrowserTab, tabs.length, setTabState]
   );
 
   /** Navigate active tab to a new URL */
@@ -434,39 +500,43 @@ export const BrowserPanel = memo(function BrowserPanel({ projectPath }: BrowserP
         url,
         port: extractPort(url),
       });
-      setIframeSrc(url);
-      setIsLoading(true);
-      setHasError(false);
+      setTabSrcs((prev) => new Map(prev).set(activeTab.id, url));
+      setTabState(activeTab.id, { isLoading: true, hasError: false });
     },
-    [activeTab, projectPath, createTab, updateBrowserTab]
+    [activeTab, projectPath, createTab, updateBrowserTab, setTabState]
   );
 
   /** Handle selecting a quick port (from EmptyState or new tab) */
   const handlePortSelect = useCallback(
     (port: number) => {
       const url = `http://localhost:${port}`;
-      createTab(url);
+      // If active tab has no URL (empty/new tab), navigate it instead of creating a new one
+      if (activeTab && !activeTab.url) {
+        updateBrowserTab(projectPath, activeTab.id, {
+          url,
+          port,
+        });
+        setTabSrcs((prev) => new Map(prev).set(activeTab.id, url));
+        setTabState(activeTab.id, { isLoading: true, hasError: false });
+      } else {
+        createTab(url);
+      }
     },
-    [createTab]
+    [activeTab, projectPath, createTab, updateBrowserTab, setTabState]
   );
 
-  /** Switch to a different tab */
+  /** Switch to a different tab — just change the active ID, no reload */
   const handleSelectTab = useCallback(
     (tabId: string) => {
       setActiveBrowserTab(projectPath, tabId);
-      const switchedTab = tabs.find((t) => t.id === tabId);
-      setIframeSrc(switchedTab?.url ?? '');
-      setIsLoading(false);
-      setHasError(false);
     },
-    [projectPath, setActiveBrowserTab, tabs]
+    [projectPath, setActiveBrowserTab]
   );
 
   /** Close a tab */
   const handleCloseTab = useCallback(
     (tabId: string) => {
       removeBrowserTab(projectPath, tabId);
-      setHasError(false);
     },
     [projectPath, removeBrowserTab]
   );
@@ -481,42 +551,42 @@ export const BrowserPanel = memo(function BrowserPanel({ projectPath }: BrowserP
       port: null,
     };
     addBrowserTab(projectPath, tab);
-    setIsLoading(false);
-    setHasError(false);
   }, [projectPath, addBrowserTab, tabs.length]);
 
   /** Refresh iframe with debounce (min 500ms between reloads) */
   const lastRefreshRef = useRef(0);
   const handleRefresh = useCallback(() => {
-    if (iframeRef.current && activeTab) {
+    const iframe = activeTabId ? iframeRefs.current.get(activeTabId) : null;
+    if (iframe && activeTab?.url) {
       const now = Date.now();
       if (now - lastRefreshRef.current < 500) return;
       lastRefreshRef.current = now;
-      setIsLoading(true);
-      setHasError(false);
+      setTabState(activeTabId, { isLoading: true, hasError: false });
       // Force reload by resetting src
-      const src = iframeRef.current.src;
-      iframeRef.current.src = '';
-      iframeRef.current.src = src;
+      const src = iframe.src;
+      iframe.src = '';
+      iframe.src = src;
     }
-  }, [activeTab]);
+  }, [activeTab?.url, activeTabId, setTabState]);
 
   /** Back/Forward: best-effort for same-origin iframes */
   const handleBack = useCallback(() => {
     try {
-      iframeRef.current?.contentWindow?.history.back();
+      const iframe = activeTabId ? iframeRefs.current.get(activeTabId) : null;
+      iframe?.contentWindow?.history.back();
     } catch {
       // cross-origin, ignore
     }
-  }, []);
+  }, [activeTabId]);
 
   const handleForward = useCallback(() => {
     try {
-      iframeRef.current?.contentWindow?.history.forward();
+      const iframe = activeTabId ? iframeRefs.current.get(activeTabId) : null;
+      iframe?.contentWindow?.history.forward();
     } catch {
       // cross-origin, ignore
     }
-  }, []);
+  }, [activeTabId]);
 
   /** Open current URL in system browser */
   const handleOpenExternal = useCallback(() => {
@@ -526,53 +596,48 @@ export const BrowserPanel = memo(function BrowserPanel({ projectPath }: BrowserP
     api.openExternalLink(url);
   }, [activeTab?.url]);
 
-  /** iframe load handler — also tracks URL for same-origin iframes */
-  const handleIframeLoad = useCallback(() => {
-    setIsLoading(false);
-    setHasError(false);
+  /** Create per-tab iframe load handler */
+  const handleIframeLoad = useCallback(
+    (tabId: string) => {
+      setTabState(tabId, { isLoading: false, hasError: false });
 
-    // Try to read the current URL from the iframe (same-origin only)
-    if (iframeRef.current && activeTab) {
-      try {
-        const currentHref = iframeRef.current.contentWindow?.location.href;
-        if (currentHref && currentHref !== 'about:blank' && currentHref !== activeTab.url) {
-          updateBrowserTab(projectPath, activeTab.id, {
-            url: currentHref,
-            port: extractPort(currentHref),
-          });
+      const iframe = iframeRefs.current.get(tabId);
+      const tab = tabs.find((t) => t.id === tabId);
+      if (iframe && tab) {
+        try {
+          const currentHref = iframe.contentWindow?.location.href;
+          if (currentHref && currentHref !== 'about:blank' && currentHref !== tab.url) {
+            updateBrowserTab(projectPath, tabId, {
+              url: currentHref,
+              port: extractPort(currentHref),
+            });
+          }
+        } catch {
+          // cross-origin — cannot read location
         }
-      } catch {
-        // cross-origin — cannot read location, keep existing URL
       }
-    }
-  }, [activeTab, projectPath, updateBrowserTab]);
+    },
+    [tabs, projectPath, updateBrowserTab, setTabState]
+  );
 
-  /** iframe error handler */
-  const handleIframeError = useCallback(() => {
-    setIsLoading(false);
-    setHasError(true);
-  }, []);
+  /** Create per-tab iframe error handler */
+  const handleIframeError = useCallback(
+    (tabId: string) => {
+      setTabState(tabId, { isLoading: false, hasError: true });
+    },
+    [setTabState]
+  );
 
-  // Sync iframe source when selected tab or project changes.
-  // Intentionally not depending on activeTabUrl itself, so same-origin URL tracking
-  // updates do not force iframe reloads.
-  const activeTabUrl = activeTab?.url ?? '';
+  // Timeout: if active tab iframe takes >10s, show error
   useEffect(() => {
-    setIframeSrc(activeTabUrl);
-    setHasError(false);
-  }, [projectPath, activeTabId]);
-
-  // Timeout: if iframe takes >10s, show error
-  useEffect(() => {
-    if (!isLoading) return;
+    if (!activeState.isLoading || !activeTabId) return;
     const timer = setTimeout(() => {
-      setIsLoading(false);
-      setHasError(true);
+      setTabState(activeTabId, { isLoading: false, hasError: true });
     }, 10000);
     return () => clearTimeout(timer);
-  }, [isLoading, activeTab?.url]);
+  }, [activeState.isLoading, activeTabId, setTabState]);
 
-  const hasUrl = !!iframeSrc;
+  const activeTabHasUrl = !!activeTab?.url;
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -594,29 +659,45 @@ export const BrowserPanel = memo(function BrowserPanel({ projectPath }: BrowserP
         onBack={handleBack}
         onForward={handleForward}
         onOpenExternal={handleOpenExternal}
-        isLoading={isLoading}
+        isLoading={activeState.isLoading}
       />
 
-      {/* Content area */}
+      {/* Content area — one iframe per tab, only active one is visible */}
       <div className="flex-1 relative overflow-hidden">
-        {!hasUrl ? (
+        {/* Show empty state or error for the active tab */}
+        {!activeTabHasUrl ? (
           <EmptyState onPortSelect={handlePortSelect} />
-        ) : hasError ? (
-          <ErrorState url={iframeSrc} onRetry={handleRefresh} />
+        ) : activeState.hasError ? (
+          <ErrorState url={activeTab?.url ?? ''} onRetry={handleRefresh} />
         ) : (
-          <>
-            {isLoading && <LoadingOverlay url={iframeSrc} />}
-            <iframe
-              ref={iframeRef}
-              src={iframeSrc}
-              className="w-full h-full border-0"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-              onLoad={handleIframeLoad}
-              onError={handleIframeError}
-              title={activeTab?.title || 'Browser Preview'}
-            />
-          </>
+          activeState.isLoading && <LoadingOverlay url={activeTab?.url ?? ''} />
         )}
+
+        {/* Render all tab iframes — hidden tabs stay alive in the DOM */}
+        {tabs.map((tab) => {
+          const src = tabSrcs.get(tab.id);
+          if (!src) return null;
+          const isActive = tab.id === activeTabId;
+          const tabState = tabStates.get(tab.id);
+          // Hide iframe when tab has error (show error state instead) or is not active
+          const isVisible = isActive && !tabState?.hasError;
+          return (
+            <iframe
+              key={tab.id}
+              ref={(el) => {
+                if (el) iframeRefs.current.set(tab.id, el);
+                else iframeRefs.current.delete(tab.id);
+              }}
+              src={src}
+              className="w-full h-full border-0 absolute inset-0"
+              style={{ visibility: isVisible ? 'visible' : 'hidden' }}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-storage-access-by-user-activation"
+              onLoad={() => handleIframeLoad(tab.id)}
+              onError={() => handleIframeError(tab.id)}
+              title={tab.title || 'Browser Preview'}
+            />
+          );
+        })}
       </div>
     </div>
   );
