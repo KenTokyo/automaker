@@ -193,7 +193,7 @@ export class CodexModelCacheService {
    * Infer tier from model ID
    */
   private inferTier(modelId: string): 'premium' | 'standard' | 'basic' {
-    if (modelId.includes('max') || modelId.includes('gpt-5.2-codex')) {
+    if (modelId.includes('max') || /gpt-5\.[2-9]-codex/.test(modelId)) {
       return 'premium';
     }
     if (modelId.includes('mini')) {

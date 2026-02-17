@@ -14,7 +14,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import { getHttpApiClient, waitForApiKeyInit } from '@/lib/http-api-client';
-import { setItem } from '@/lib/storage';
+import { getJSON, setItem } from '@/lib/storage';
 import { useAppStore, type ThemeMode, THEME_STORAGE_KEY } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 import { useAuthStore } from '@/store/auth-store';
@@ -38,6 +38,8 @@ import {
 } from '@automaker/types';
 
 const logger = createLogger('SettingsSync');
+const FAVORITE_MODELS_STORAGE_KEY = 'automaker:favoriteModels';
+const SELECTED_AGENT_MODEL_STORAGE_KEY = 'automaker:selectedAgentModel';
 
 // Debounce delay for syncing settings to server (ms)
 const SYNC_DEBOUNCE_MS = 1000;
@@ -682,6 +684,29 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       }
     }
 
+    const localFavoriteModels = (() => {
+      const stored = getJSON<unknown>(FAVORITE_MODELS_STORAGE_KEY);
+      if (!Array.isArray(stored)) return [];
+      return stored.filter((modelId): modelId is string => typeof modelId === 'string');
+    })();
+
+    const resolvedFavoriteModels =
+      Array.isArray(serverSettings.favoriteModels) && serverSettings.favoriteModels.length > 0
+        ? serverSettings.favoriteModels
+        : localFavoriteModels;
+
+    const localSelectedAgentModel = (() => {
+      const stored = getJSON<unknown>(SELECTED_AGENT_MODEL_STORAGE_KEY);
+      if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return null;
+      const parsed = stored as { model?: unknown };
+      if (typeof parsed.model !== 'string' || parsed.model.length === 0) return null;
+      return migratePhaseModelEntry(stored as Parameters<typeof migratePhaseModelEntry>[0]);
+    })();
+
+    const resolvedSelectedAgentModel = serverSettings.selectedAgentModel
+      ? migratePhaseModelEntry(serverSettings.selectedAgentModel)
+      : localSelectedAgentModel || { model: 'claude-opus', thinkingLevel: 'high' };
+
     useAppStore.setState({
       theme: serverSettings.theme as unknown as ThemeMode,
       sidebarOpen: serverSettings.sidebarOpen,
@@ -739,10 +764,8 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       lastProjectDir: serverSettings.lastProjectDir ?? '',
       recentFolders: serverSettings.recentFolders ?? [],
       // Model Selection Persistence
-      favoriteModels: serverSettings.favoriteModels ?? [],
-      selectedAgentModel: serverSettings.selectedAgentModel
-        ? migratePhaseModelEntry(serverSettings.selectedAgentModel)
-        : { model: 'claude-opus', thinkingLevel: 'high' },
+      favoriteModels: resolvedFavoriteModels,
+      selectedAgentModel: resolvedSelectedAgentModel,
       // Event hooks
       eventHooks: serverSettings.eventHooks ?? [],
       // Terminal settings (nested in terminalState)
@@ -758,6 +781,10 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
         },
       }),
     });
+
+    // Keep local fallback keys aligned with resolved settings.
+    setItem(FAVORITE_MODELS_STORAGE_KEY, JSON.stringify(resolvedFavoriteModels));
+    setItem(SELECTED_AGENT_MODEL_STORAGE_KEY, JSON.stringify(resolvedSelectedAgentModel));
 
     // Also refresh setup wizard state
     useSetupStore.setState({

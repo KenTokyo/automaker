@@ -51,6 +51,7 @@ import {
   getAllOpencodeModelIds,
   getAllGeminiModelIds,
   getAllCopilotModelIds,
+  migratePhaseModelEntry,
   DEFAULT_PHASE_MODELS,
   DEFAULT_OPENCODE_MODEL,
   DEFAULT_GEMINI_MODEL,
@@ -134,6 +135,12 @@ import {
 const logger = createLogger('AppStore');
 const OPENCODE_BEDROCK_PROVIDER_ID = 'amazon-bedrock';
 const OPENCODE_BEDROCK_MODEL_PREFIX = `${OPENCODE_BEDROCK_PROVIDER_ID}/`;
+const FAVORITE_MODELS_STORAGE_KEY = 'automaker:favoriteModels';
+const SELECTED_AGENT_MODEL_STORAGE_KEY = 'automaker:selectedAgentModel';
+const DEFAULT_SELECTED_AGENT_MODEL: PhaseModelEntry = {
+  model: 'claude-opus',
+  thinkingLevel: 'high',
+};
 
 // Re-export types from @automaker/types for convenience
 export type {
@@ -312,6 +319,26 @@ function getStoredBrowserPanelState(): {
   );
 }
 
+function getStoredFavoriteModels(): string[] {
+  const stored = getJSON<unknown>(FAVORITE_MODELS_STORAGE_KEY);
+  if (!Array.isArray(stored)) return [];
+  return stored.filter((id): id is string => typeof id === 'string' && id.length > 0);
+}
+
+function getStoredSelectedAgentModel(): PhaseModelEntry {
+  const stored = getJSON<unknown>(SELECTED_AGENT_MODEL_STORAGE_KEY);
+  if (!stored || typeof stored !== 'object' || Array.isArray(stored)) {
+    return DEFAULT_SELECTED_AGENT_MODEL;
+  }
+
+  const parsed = stored as Partial<PhaseModelEntry>;
+  if (typeof parsed.model !== 'string' || parsed.model.length === 0) {
+    return DEFAULT_SELECTED_AGENT_MODEL;
+  }
+
+  return migratePhaseModelEntry(parsed as PhaseModelEntry);
+}
+
 function persistBrowserPanelState(
   browserTabsByProject: BrowserTabsByProject,
   activeBrowserTabByProject: ActiveBrowserTabByProject
@@ -400,7 +427,7 @@ const initialState: AppState = {
   enhancementModel: 'claude-sonnet',
   validationModel: 'claude-opus',
   phaseModels: DEFAULT_PHASE_MODELS,
-  favoriteModels: [],
+  favoriteModels: getStoredFavoriteModels(),
   enabledCursorModels: getAllCursorModelIds(),
   cursorDefaultModel: 'cursor-auto',
   enabledCodexModels: getAllCodexModelIds(),
@@ -448,7 +475,7 @@ const initialState: AppState = {
   defaultPlanningMode: 'skip' as PlanningMode,
   defaultRequirePlanApproval: false,
   defaultFeatureModel: DEFAULT_GLOBAL_SETTINGS.defaultFeatureModel,
-  selectedAgentModel: { model: 'claude-opus', thinkingLevel: 'high' } as PhaseModelEntry,
+  selectedAgentModel: getStoredSelectedAgentModel(),
   pendingPlanApproval: null,
   claudeRefreshInterval: 60,
   claudeUsage: null,
@@ -1395,14 +1422,19 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       logger.error('Failed to sync phase models reset:', error);
     }
   },
-  toggleFavoriteModel: (modelId) =>
-    set((state) => ({
-      favoriteModels: state.favoriteModels.includes(modelId)
-        ? state.favoriteModels.filter((id) => id !== modelId)
-        : [...state.favoriteModels, modelId],
-    })),
+  toggleFavoriteModel: (modelId) => {
+    const current = get().favoriteModels;
+    const updated = current.includes(modelId)
+      ? current.filter((id) => id !== modelId)
+      : [...current, modelId];
+    set({ favoriteModels: updated });
+    setJSON(FAVORITE_MODELS_STORAGE_KEY, updated);
+  },
 
-  setSelectedAgentModel: (entry) => set({ selectedAgentModel: entry }),
+  setSelectedAgentModel: (entry) => {
+    set({ selectedAgentModel: entry });
+    setJSON(SELECTED_AGENT_MODEL_STORAGE_KEY, entry);
+  },
   // Cursor CLI Settings actions
   setEnabledCursorModels: (models) => set({ enabledCursorModels: models }),
   setCursorDefaultModel: (model) => set({ cursorDefaultModel: model }),

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
 import { useIsMobile } from '@/hooks/use-media-query';
@@ -6,7 +6,6 @@ import type {
   ModelAlias,
   CursorModelId,
   CodexModelId,
-  OpencodeModelId,
   GeminiModelId,
   CopilotModelId,
   GroupedModel,
@@ -21,6 +20,7 @@ import {
   isGroupSelected,
   getSelectedVariant,
   codexModelHasThinking,
+  CODEX_MODEL_CONFIG_MAP,
 } from '@automaker/types';
 import {
   CLAUDE_MODELS,
@@ -34,7 +34,7 @@ import {
   REASONING_EFFORT_LABELS,
   type ModelOption,
 } from '@/components/views/board-view/shared/model-constants';
-import { Check, ChevronsUpDown, Star, ChevronRight } from 'lucide-react';
+import { Check, ChevronsUpDown, Star, ChevronRight, Settings2 } from 'lucide-react';
 import {
   AnthropicIcon,
   CursorIcon,
@@ -98,6 +98,8 @@ const OPENCODE_DYNAMIC_PROVIDER_ORDER = [
 ];
 
 const OPENCODE_SECTION_ORDER = ['free', 'dynamic'] as const;
+const RECENT_MODEL_SELECTIONS_STORAGE_KEY = 'automaker:model-selector-recents';
+const MAX_RECENT_MODEL_SELECTIONS = 12;
 
 const OPENCODE_SECTION_LABELS: Record<(typeof OPENCODE_SECTION_ORDER)[number], string> = {
   free: 'Free Tier',
@@ -107,6 +109,59 @@ const OPENCODE_SECTION_LABELS: Record<(typeof OPENCODE_SECTION_ORDER)[number], s
 const OPENCODE_STATIC_PROVIDER_BY_ID = new Map(
   OPENCODE_MODELS.map((model) => [model.id, model.provider])
 );
+
+function getRecentModelKey(entry: Pick<PhaseModelEntry, 'model' | 'providerId'>): string {
+  return entry.providerId ? `${entry.providerId}::${entry.model}` : entry.model;
+}
+
+function normalizeRecentModelEntry(value: unknown): PhaseModelEntry | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+  const entry = value as Partial<PhaseModelEntry>;
+  if (typeof entry.model !== 'string' || entry.model.length === 0) return null;
+
+  const normalized: PhaseModelEntry = { model: entry.model };
+
+  if (typeof entry.providerId === 'string' && entry.providerId.length > 0) {
+    normalized.providerId = entry.providerId;
+  }
+  if (entry.thinkingLevel) {
+    normalized.thinkingLevel = entry.thinkingLevel;
+  }
+  if (entry.reasoningEffort) {
+    normalized.reasoningEffort = entry.reasoningEffort;
+  }
+
+  return normalized;
+}
+
+function loadRecentModelSelections(): PhaseModelEntry[] {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const raw = window.localStorage.getItem(RECENT_MODEL_SELECTIONS_STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((entry) => normalizeRecentModelEntry(entry))
+      .filter((entry): entry is PhaseModelEntry => entry !== null)
+      .slice(0, MAX_RECENT_MODEL_SELECTIONS);
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentModelSelections(entries: PhaseModelEntry[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(RECENT_MODEL_SELECTIONS_STORAGE_KEY, JSON.stringify(entries));
+  } catch {
+    // Best-effort persistence
+  }
+}
 
 function formatProviderLabel(providerKey: string): string {
   return providerKey
@@ -166,15 +221,19 @@ export function PhaseModelSelector({
   const [expandedClaudeModel, setExpandedClaudeModel] = useState<ModelAlias | null>(null);
   const [expandedCodexModel, setExpandedCodexModel] = useState<CodexModelId | null>(null);
   const [expandedProviderModel, setExpandedProviderModel] = useState<string | null>(null); // Format: providerId:modelId
+  const [recentModelSelections, setRecentModelSelections] = useState<PhaseModelEntry[]>(() =>
+    loadRecentModelSelections()
+  );
   const commandListRef = useRef<HTMLDivElement>(null);
   const expandedTriggerRef = useRef<HTMLDivElement>(null);
-  const expandedClaudeTriggerRef = useRef<HTMLDivElement>(null);
-  const expandedCodexTriggerRef = useRef<HTMLDivElement>(null);
-  const expandedProviderTriggerRef = useRef<HTMLDivElement>(null);
+  const expandedClaudeTriggerRef = useRef<HTMLButtonElement>(null);
+  const expandedCodexTriggerRef = useRef<HTMLButtonElement>(null);
+  const expandedProviderTriggerRef = useRef<HTMLButtonElement>(null);
   const {
     enabledCursorModels,
     enabledGeminiModels,
     enabledCopilotModels,
+    enabledCodexModels,
     favoriteModels,
     toggleFavoriteModel,
     codexModels,
@@ -196,6 +255,79 @@ export function PhaseModelSelector({
   const selectedProviderId = value.providerId;
   const selectedThinkingLevel = value.thinkingLevel || 'none';
   const selectedReasoningEffort = value.reasoningEffort || 'none';
+
+  const recentSelectionByKey = useMemo(() => {
+    const map = new Map<string, PhaseModelEntry>();
+    for (const entry of recentModelSelections) {
+      map.set(getRecentModelKey(entry), entry);
+    }
+    return map;
+  }, [recentModelSelections]);
+
+  const rememberRecentSelection = useCallback((entry: PhaseModelEntry) => {
+    setRecentModelSelections((previous) => {
+      const nextKey = getRecentModelKey(entry);
+      const deduped = previous.filter((item) => getRecentModelKey(item) !== nextKey);
+      const updated = [entry, ...deduped].slice(0, MAX_RECENT_MODEL_SELECTIONS);
+      saveRecentModelSelections(updated);
+      return updated;
+    });
+  }, []);
+
+  const selectModel = useCallback(
+    (entry: PhaseModelEntry) => {
+      onChange(entry);
+      rememberRecentSelection(entry);
+      setOpen(false);
+    },
+    [onChange, rememberRecentSelection]
+  );
+
+  const getRememberedThinkingLevel = useCallback(
+    (modelId: string, providerId?: string) => {
+      if (selectedModel === modelId && selectedProviderId === providerId) {
+        return selectedThinkingLevel;
+      }
+      return recentSelectionByKey.get(getRecentModelKey({ model: modelId, providerId }))
+        ?.thinkingLevel;
+    },
+    [recentSelectionByKey, selectedModel, selectedProviderId, selectedThinkingLevel]
+  );
+
+  const getRememberedReasoningEffort = useCallback(
+    (modelId: string) => {
+      if (selectedModel === modelId && !selectedProviderId) {
+        return selectedReasoningEffort;
+      }
+      return recentSelectionByKey.get(getRecentModelKey({ model: modelId }))?.reasoningEffort;
+    },
+    [recentSelectionByKey, selectedModel, selectedProviderId, selectedReasoningEffort]
+  );
+
+  const buildClaudeSelection = useCallback(
+    (modelId: ModelAlias): PhaseModelEntry => ({
+      model: modelId,
+      thinkingLevel: getRememberedThinkingLevel(modelId, undefined) || 'none',
+    }),
+    [getRememberedThinkingLevel]
+  );
+
+  const buildCodexSelection = useCallback(
+    (modelId: CodexModelId): PhaseModelEntry => ({
+      model: modelId,
+      reasoningEffort: getRememberedReasoningEffort(modelId) || 'none',
+    }),
+    [getRememberedReasoningEffort]
+  );
+
+  const buildProviderSelection = useCallback(
+    (providerId: string, modelId: string): PhaseModelEntry => ({
+      providerId,
+      model: modelId,
+      thinkingLevel: getRememberedThinkingLevel(modelId, providerId) || 'none',
+    }),
+    [getRememberedThinkingLevel]
+  );
 
   // Get enabled providers and their models
   const enabledProviders = useMemo(() => {
@@ -312,16 +444,40 @@ export function PhaseModelSelector({
     return () => observer.disconnect();
   }, [expandedProviderModel]);
 
-  // Transform dynamic Codex models from store to component format
+  // Transform Codex models to component format
+  // Merges dynamic API models with static definitions to ensure all enabled models appear
   const transformedCodexModels = useMemo(() => {
-    return codexModels.map((model) => ({
-      id: model.id,
-      label: model.label,
-      description: model.description,
-      provider: 'codex' as const,
-      badge: model.tier === 'premium' ? 'Premium' : model.tier === 'basic' ? 'Speed' : undefined,
-    }));
-  }, [codexModels]);
+    const dynamicModelIds = new Set(codexModels.map((m) => m.id));
+
+    // Start with dynamic models that are enabled
+    const result = codexModels
+      .filter((model) => enabledCodexModels.includes(model.id as CodexModelId))
+      .map((model) => ({
+        id: model.id,
+        label: model.label,
+        description: model.description,
+        provider: 'codex' as const,
+        badge: model.tier === 'premium' ? 'Premium' : model.tier === 'basic' ? 'Speed' : undefined,
+      }));
+
+    // Add any enabled models missing from the dynamic list (using static definitions)
+    for (const modelId of enabledCodexModels) {
+      if (!dynamicModelIds.has(modelId)) {
+        const config = CODEX_MODEL_CONFIG_MAP[modelId];
+        if (config) {
+          result.push({
+            id: modelId,
+            label: config.label,
+            description: config.description,
+            provider: 'codex' as const,
+            badge: undefined,
+          });
+        }
+      }
+    }
+
+    return result;
+  }, [codexModels, enabledCodexModels]);
 
   // Filter Cursor models to only show enabled ones
   // With canonical IDs, both CURSOR_MODELS and enabledCursorModels use prefixed format
@@ -759,7 +915,10 @@ export function PhaseModelSelector({
     const isFavorite = favoriteModels.includes(model.id);
     const hasReasoning = codexModelHasThinking(model.id as CodexModelId);
     const isExpanded = expandedCodexModel === model.id;
-    const currentReasoning = isSelected ? selectedReasoningEffort : 'none';
+    const preferredSelection = buildCodexSelection(model.id as CodexModelId);
+    const currentReasoning = isSelected
+      ? selectedReasoningEffort
+      : preferredSelection.reasoningEffort || 'none';
 
     // If model doesn't support reasoning, render as simple selector (like Cursor models)
     if (!hasReasoning) {
@@ -768,8 +927,7 @@ export function PhaseModelSelector({
           key={model.id}
           value={model.label}
           onSelect={() => {
-            onChange({ model: model.id as CodexModelId });
-            setOpen(false);
+            selectModel({ model: model.id as CodexModelId });
           }}
           className="group flex items-center justify-between py-2"
         >
@@ -812,13 +970,13 @@ export function PhaseModelSelector({
     }
 
     // Model supports reasoning - show popover with reasoning effort options
-    // On mobile, render inline expansion instead of nested popover
+    // On mobile, keep one-click model selection and show inline settings panel only via settings button
     if (isMobile) {
       return (
         <div key={model.id}>
           <CommandItem
             value={model.label}
-            onSelect={() => setExpandedCodexModel(isExpanded ? null : (model.id as CodexModelId))}
+            onSelect={() => selectModel(preferredSelection)}
             className="group flex items-center justify-between py-2"
           >
             <div className="flex items-center gap-3 overflow-hidden">
@@ -857,13 +1015,27 @@ export function PhaseModelSelector({
               >
                 <Star className={cn('h-3.5 w-3.5', isFavorite && 'fill-current')} />
               </Button>
-              {isSelected && !isExpanded && <Check className="h-4 w-4 text-primary shrink-0" />}
-              <ChevronRight
+              <Button
+                variant="ghost"
+                size="icon"
                 className={cn(
-                  'h-4 w-4 text-muted-foreground transition-transform',
-                  isExpanded && 'rotate-90'
+                  'h-6 w-6 hover:bg-transparent hover:text-primary focus:ring-0',
+                  isExpanded
+                    ? 'text-primary opacity-100'
+                    : isSelected
+                      ? 'opacity-100 text-muted-foreground'
+                      : 'opacity-0 group-hover:opacity-100 text-muted-foreground'
                 )}
-              />
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpandedCodexModel(isExpanded ? null : (model.id as CodexModelId));
+                }}
+                title="Edit reasoning effort"
+                ref={isExpanded ? expandedCodexTriggerRef : undefined}
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+              </Button>
+              {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
             </div>
           </CommandItem>
 
@@ -877,12 +1049,11 @@ export function PhaseModelSelector({
                 <button
                   key={effort}
                   onClick={() => {
-                    onChange({
+                    selectModel({
                       model: model.id as CodexModelId,
                       reasoningEffort: effort,
                     });
                     setExpandedCodexModel(null);
-                    setOpen(false);
                   }}
                   className={cn(
                     'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
@@ -912,131 +1083,132 @@ export function PhaseModelSelector({
       );
     }
 
-    // Desktop: Use nested popover
+    // Desktop: one-click model selection + separate settings popover trigger
     return (
       <CommandItem
         key={model.id}
         value={model.label}
-        onSelect={() => setExpandedCodexModel(isExpanded ? null : (model.id as CodexModelId))}
-        className="p-0 data-[selected=true]:bg-transparent"
+        onSelect={() => selectModel(preferredSelection)}
+        className="group flex items-center justify-between py-2"
       >
-        <Popover
-          open={isExpanded}
-          onOpenChange={(isOpen) => {
-            if (!isOpen) {
-              setExpandedCodexModel(null);
-            }
-          }}
-        >
-          <PopoverTrigger asChild>
-            <div
-              ref={isExpanded ? expandedCodexTriggerRef : undefined}
-              className={cn(
-                'w-full group flex items-center justify-between py-2 px-2 rounded-sm cursor-pointer',
-                'hover:bg-accent',
-                isExpanded && 'bg-accent'
-              )}
-            >
-              <div className="flex items-center gap-3 overflow-hidden">
-                <OpenAIIcon
-                  className={cn(
-                    'h-4 w-4 shrink-0',
-                    isSelected ? 'text-primary' : 'text-muted-foreground'
-                  )}
-                />
-                <div className="flex flex-col truncate">
-                  <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
-                    {model.label}
-                  </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {isSelected && currentReasoning !== 'none'
-                      ? `Reasoning: ${REASONING_EFFORT_LABELS[currentReasoning]}`
-                      : model.description}
-                  </span>
-                </div>
-              </div>
+        <div className="flex items-center gap-3 overflow-hidden">
+          <OpenAIIcon
+            className={cn(
+              'h-4 w-4 shrink-0',
+              isSelected ? 'text-primary' : 'text-muted-foreground'
+            )}
+          />
+          <div className="flex flex-col truncate">
+            <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
+              {model.label}
+            </span>
+            <span className="truncate text-xs text-muted-foreground">
+              {isSelected && currentReasoning !== 'none'
+                ? `Reasoning: ${REASONING_EFFORT_LABELS[currentReasoning]}`
+                : model.description}
+            </span>
+          </div>
+        </div>
 
-              <div className="flex items-center gap-1 ml-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    'h-6 w-6 hover:bg-transparent hover:text-yellow-500 focus:ring-0',
-                    isFavorite
-                      ? 'text-yellow-500 opacity-100'
-                      : 'opacity-0 group-hover:opacity-100 text-muted-foreground'
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFavoriteModel(model.id);
-                  }}
-                >
-                  <Star className={cn('h-3.5 w-3.5', isFavorite && 'fill-current')} />
-                </Button>
-                {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
-                <ChevronRight
-                  className={cn(
-                    'h-4 w-4 text-muted-foreground transition-transform',
-                    isExpanded && 'rotate-90'
-                  )}
-                />
-              </div>
-            </div>
-          </PopoverTrigger>
-          <PopoverContent
-            side="right"
-            align="start"
-            className="w-[220px] p-1"
-            sideOffset={8}
-            collisionPadding={16}
-            onCloseAutoFocus={(e) => e.preventDefault()}
+        <div className="flex items-center gap-1 ml-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              'h-6 w-6 hover:bg-transparent hover:text-yellow-500 focus:ring-0',
+              isFavorite
+                ? 'text-yellow-500 opacity-100'
+                : 'opacity-0 group-hover:opacity-100 text-muted-foreground'
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFavoriteModel(model.id);
+            }}
           >
-            <div className="space-y-1">
-              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border/50 mb-1">
-                Reasoning Effort
+            <Star className={cn('h-3.5 w-3.5', isFavorite && 'fill-current')} />
+          </Button>
+          <Popover
+            open={isExpanded}
+            onOpenChange={(isOpen) =>
+              setExpandedCodexModel(isOpen ? (model.id as CodexModelId) : null)
+            }
+          >
+            <PopoverTrigger asChild>
+              <Button
+                ref={isExpanded ? expandedCodexTriggerRef : undefined}
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  'h-6 w-6 hover:bg-transparent hover:text-primary focus:ring-0',
+                  isExpanded
+                    ? 'text-primary opacity-100'
+                    : isSelected
+                      ? 'opacity-100 text-muted-foreground'
+                      : 'opacity-0 group-hover:opacity-100 text-muted-foreground'
+                )}
+                onClick={(e) => e.stopPropagation()}
+                title="Edit reasoning effort"
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              side="right"
+              align="start"
+              className="w-[220px] p-1"
+              sideOffset={8}
+              collisionPadding={16}
+              onCloseAutoFocus={(e) => e.preventDefault()}
+            >
+              <div className="space-y-1">
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border/50 mb-1">
+                  Reasoning Effort
+                </div>
+                {REASONING_EFFORT_LEVELS.map((effort) => (
+                  <button
+                    key={effort}
+                    onClick={() => {
+                      setExpandedCodexModel(null);
+                      selectModel({
+                        model: model.id as CodexModelId,
+                        reasoningEffort: effort,
+                      });
+                    }}
+                    className={cn(
+                      'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
+                      'hover:bg-accent cursor-pointer transition-colors',
+                      isSelected &&
+                        currentReasoning === effort &&
+                        'bg-accent text-accent-foreground'
+                    )}
+                  >
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">{REASONING_EFFORT_LABELS[effort]}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {effort === 'none' && 'No reasoning capability'}
+                        {effort === 'minimal' && 'Minimal reasoning'}
+                        {effort === 'low' && 'Light reasoning'}
+                        {effort === 'medium' && 'Moderate reasoning'}
+                        {effort === 'high' && 'Deep reasoning'}
+                        {effort === 'xhigh' && 'Maximum reasoning'}
+                      </span>
+                    </div>
+                    {isSelected && currentReasoning === effort && (
+                      <Check className="h-3.5 w-3.5 text-primary" />
+                    )}
+                  </button>
+                ))}
               </div>
-              {REASONING_EFFORT_LEVELS.map((effort) => (
-                <button
-                  key={effort}
-                  onClick={() => {
-                    onChange({
-                      model: model.id as CodexModelId,
-                      reasoningEffort: effort,
-                    });
-                    setExpandedCodexModel(null);
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
-                    'hover:bg-accent cursor-pointer transition-colors',
-                    isSelected && currentReasoning === effort && 'bg-accent text-accent-foreground'
-                  )}
-                >
-                  <div className="flex flex-col items-start">
-                    <span className="font-medium">{REASONING_EFFORT_LABELS[effort]}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {effort === 'none' && 'No reasoning capability'}
-                      {effort === 'minimal' && 'Minimal reasoning'}
-                      {effort === 'low' && 'Light reasoning'}
-                      {effort === 'medium' && 'Moderate reasoning'}
-                      {effort === 'high' && 'Deep reasoning'}
-                      {effort === 'xhigh' && 'Maximum reasoning'}
-                    </span>
-                  </div>
-                  {isSelected && currentReasoning === effort && (
-                    <Check className="h-3.5 w-3.5 text-primary" />
-                  )}
-                </button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
+            </PopoverContent>
+          </Popover>
+          {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+        </div>
       </CommandItem>
     );
   };
 
   // Render OpenCode model item (simple selector, no thinking/reasoning options)
-  const renderOpencodeModelItem = (model: (typeof OPENCODE_MODELS)[0]) => {
+  const renderOpencodeModelItem = (model: ModelOption) => {
     const isSelected = selectedModel === model.id;
     const isFavorite = favoriteModels.includes(model.id);
 
@@ -1048,8 +1220,7 @@ export function PhaseModelSelector({
         key={model.id}
         value={model.label}
         onSelect={() => {
-          onChange({ model: model.id as OpencodeModelId });
-          setOpen(false);
+          selectModel({ model: model.id });
         }}
         className="group flex items-center justify-between py-2"
       >
@@ -1107,8 +1278,7 @@ export function PhaseModelSelector({
         key={model.id}
         value={model.label}
         onSelect={() => {
-          onChange({ model: model.id as GeminiModelId });
-          setOpen(false);
+          selectModel({ model: model.id as GeminiModelId });
         }}
         className="group flex items-center justify-between py-2"
       >
@@ -1160,8 +1330,7 @@ export function PhaseModelSelector({
         key={model.id}
         value={model.label}
         onSelect={() => {
-          onChange({ model: model.id as CopilotModelId });
-          setOpen(false);
+          selectModel({ model: model.id as CopilotModelId });
         }}
         className="group flex items-center justify-between py-2"
       >
@@ -1213,7 +1382,10 @@ export function PhaseModelSelector({
     const isSelected = selectedModel === model.id && selectedProviderId === provider.id;
     const expandKey = `${provider.id}:${model.id}`;
     const isExpanded = expandedProviderModel === expandKey;
-    const currentThinking = isSelected ? selectedThinkingLevel : 'none';
+    const preferredSelection = buildProviderSelection(provider.id, model.id);
+    const currentThinking = isSelected
+      ? selectedThinkingLevel
+      : preferredSelection.thinkingLevel || 'none';
     const displayName = showProviderSuffix
       ? `${model.displayName} (${provider.name})`
       : model.displayName;
@@ -1251,13 +1423,13 @@ export function PhaseModelSelector({
     };
     const ProviderIcon = getProviderTypeIcon();
 
-    // On mobile, render inline expansion instead of nested popover
+    // On mobile, keep one-click model selection and open inline thinking only from settings button
     if (isMobile) {
       return (
         <div key={`${provider.id}-${model.id}`}>
           <CommandItem
             value={`${provider.name} ${model.displayName}`}
-            onSelect={() => setExpandedProviderModel(isExpanded ? null : expandKey)}
+            onSelect={() => selectModel(preferredSelection)}
             className="group flex items-center justify-between py-2"
           >
             <div className="flex items-center gap-3 overflow-hidden">
@@ -1280,13 +1452,27 @@ export function PhaseModelSelector({
             </div>
 
             <div className="flex items-center gap-1 ml-2">
-              {isSelected && !isExpanded && <Check className="h-4 w-4 text-primary shrink-0" />}
-              <ChevronRight
+              <Button
+                variant="ghost"
+                size="icon"
                 className={cn(
-                  'h-4 w-4 text-muted-foreground transition-transform',
-                  isExpanded && 'rotate-90'
+                  'h-6 w-6 hover:bg-transparent hover:text-primary focus:ring-0',
+                  isExpanded
+                    ? 'text-primary opacity-100'
+                    : isSelected
+                      ? 'opacity-100 text-muted-foreground'
+                      : 'opacity-0 group-hover:opacity-100 text-muted-foreground'
                 )}
-              />
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpandedProviderModel(isExpanded ? null : expandKey);
+                }}
+                title="Edit thinking level"
+                ref={isExpanded ? expandedProviderTriggerRef : undefined}
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+              </Button>
+              {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
             </div>
           </CommandItem>
 
@@ -1300,13 +1486,12 @@ export function PhaseModelSelector({
                 <button
                   key={level}
                   onClick={() => {
-                    onChange({
+                    selectModel({
                       providerId: provider.id,
                       model: model.id,
                       thinkingLevel: level,
                     });
                     setExpandedProviderModel(null);
-                    setOpen(false);
                   }}
                   className={cn(
                     'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
@@ -1335,109 +1520,106 @@ export function PhaseModelSelector({
       );
     }
 
-    // Desktop: Use nested popover
+    // Desktop: one-click model selection + separate settings popover trigger
     return (
       <CommandItem
         key={`${provider.id}-${model.id}`}
         value={`${provider.name} ${model.displayName}`}
-        onSelect={() => setExpandedProviderModel(isExpanded ? null : expandKey)}
-        className="p-0 data-[selected=true]:bg-transparent"
+        onSelect={() => selectModel(preferredSelection)}
+        className="group flex items-center justify-between py-2"
       >
-        <Popover
-          open={isExpanded}
-          onOpenChange={(isOpen) => {
-            if (!isOpen) {
-              setExpandedProviderModel(null);
-            }
-          }}
-        >
-          <PopoverTrigger asChild>
-            <div
-              ref={isExpanded ? expandedProviderTriggerRef : undefined}
-              className={cn(
-                'w-full group flex items-center justify-between py-2 px-2 rounded-sm cursor-pointer',
-                'hover:bg-accent',
-                isExpanded && 'bg-accent'
-              )}
-            >
-              <div className="flex items-center gap-3 overflow-hidden">
-                <ProviderIcon
-                  className={cn(
-                    'h-4 w-4 shrink-0',
-                    isSelected ? 'text-primary' : 'text-muted-foreground'
-                  )}
-                />
-                <div className="flex flex-col truncate">
-                  <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
-                    {displayName}
-                  </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {isSelected && currentThinking !== 'none'
-                      ? `Thinking: ${THINKING_LEVEL_LABELS[currentThinking]}`
-                      : `Maps to ${mappedModelLabel}`}
-                  </span>
-                </div>
-              </div>
+        <div className="flex items-center gap-3 overflow-hidden">
+          <ProviderIcon
+            className={cn(
+              'h-4 w-4 shrink-0',
+              isSelected ? 'text-primary' : 'text-muted-foreground'
+            )}
+          />
+          <div className="flex flex-col truncate">
+            <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
+              {displayName}
+            </span>
+            <span className="truncate text-xs text-muted-foreground">
+              {isSelected && currentThinking !== 'none'
+                ? `Thinking: ${THINKING_LEVEL_LABELS[currentThinking]}`
+                : `Maps to ${mappedModelLabel}`}
+            </span>
+          </div>
+        </div>
 
-              <div className="flex items-center gap-1 ml-2">
-                {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
-                <ChevronRight
-                  className={cn(
-                    'h-4 w-4 text-muted-foreground transition-transform',
-                    isExpanded && 'rotate-90'
-                  )}
-                />
-              </div>
-            </div>
-          </PopoverTrigger>
-          <PopoverContent
-            side="right"
-            align="start"
-            className="w-[220px] p-1"
-            sideOffset={8}
-            collisionPadding={16}
-            onCloseAutoFocus={(e) => e.preventDefault()}
+        <div className="flex items-center gap-1 ml-2">
+          <Popover
+            open={isExpanded}
+            onOpenChange={(isOpen) => setExpandedProviderModel(isOpen ? expandKey : null)}
           >
-            <div className="space-y-1">
-              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border/50 mb-1">
-                Thinking Level
+            <PopoverTrigger asChild>
+              <Button
+                ref={isExpanded ? expandedProviderTriggerRef : undefined}
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  'h-6 w-6 hover:bg-transparent hover:text-primary focus:ring-0',
+                  isExpanded
+                    ? 'text-primary opacity-100'
+                    : isSelected
+                      ? 'opacity-100 text-muted-foreground'
+                      : 'opacity-0 group-hover:opacity-100 text-muted-foreground'
+                )}
+                onClick={(e) => e.stopPropagation()}
+                title="Edit thinking level"
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              side="right"
+              align="start"
+              className="w-[220px] p-1"
+              sideOffset={8}
+              collisionPadding={16}
+              onCloseAutoFocus={(e) => e.preventDefault()}
+            >
+              <div className="space-y-1">
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border/50 mb-1">
+                  Thinking Level
+                </div>
+                {THINKING_LEVELS.map((level) => (
+                  <button
+                    key={level}
+                    onClick={() => {
+                      setExpandedProviderModel(null);
+                      selectModel({
+                        providerId: provider.id,
+                        model: model.id,
+                        thinkingLevel: level,
+                      });
+                    }}
+                    className={cn(
+                      'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
+                      'hover:bg-accent cursor-pointer transition-colors',
+                      isSelected && currentThinking === level && 'bg-accent text-accent-foreground'
+                    )}
+                  >
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">{THINKING_LEVEL_LABELS[level]}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {level === 'none' && 'No extended thinking'}
+                        {level === 'low' && 'Light reasoning (1k tokens)'}
+                        {level === 'medium' && 'Moderate reasoning (10k tokens)'}
+                        {level === 'high' && 'Deep reasoning (16k tokens)'}
+                        {level === 'ultrathink' && 'Maximum reasoning (32k tokens)'}
+                      </span>
+                    </div>
+                    {isSelected && currentThinking === level && (
+                      <Check className="h-3.5 w-3.5 text-primary" />
+                    )}
+                  </button>
+                ))}
               </div>
-              {THINKING_LEVELS.map((level) => (
-                <button
-                  key={level}
-                  onClick={() => {
-                    onChange({
-                      providerId: provider.id,
-                      model: model.id,
-                      thinkingLevel: level,
-                    });
-                    setExpandedProviderModel(null);
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
-                    'hover:bg-accent cursor-pointer transition-colors',
-                    isSelected && currentThinking === level && 'bg-accent text-accent-foreground'
-                  )}
-                >
-                  <div className="flex flex-col items-start">
-                    <span className="font-medium">{THINKING_LEVEL_LABELS[level]}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {level === 'none' && 'No extended thinking'}
-                      {level === 'low' && 'Light reasoning (1k tokens)'}
-                      {level === 'medium' && 'Moderate reasoning (10k tokens)'}
-                      {level === 'high' && 'Deep reasoning (16k tokens)'}
-                      {level === 'ultrathink' && 'Maximum reasoning (32k tokens)'}
-                    </span>
-                  </div>
-                  {isSelected && currentThinking === level && (
-                    <Check className="h-3.5 w-3.5 text-primary" />
-                  )}
-                </button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
+            </PopoverContent>
+          </Popover>
+          {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+        </div>
       </CommandItem>
     );
   };
@@ -1453,8 +1635,7 @@ export function PhaseModelSelector({
         key={model.id}
         value={model.label}
         onSelect={() => {
-          onChange({ model: model.id as CursorModelId });
-          setOpen(false);
+          selectModel({ model: model.id as CursorModelId });
         }}
         className="group flex items-center justify-between py-2"
       >
@@ -1501,15 +1682,18 @@ export function PhaseModelSelector({
     const isSelected = selectedModel === model.id;
     const isFavorite = favoriteModels.includes(model.id);
     const isExpanded = expandedClaudeModel === model.id;
-    const currentThinking = isSelected ? selectedThinkingLevel : 'none';
+    const preferredSelection = buildClaudeSelection(model.id as ModelAlias);
+    const currentThinking = isSelected
+      ? selectedThinkingLevel
+      : preferredSelection.thinkingLevel || 'none';
 
-    // On mobile, render inline expansion instead of nested popover
+    // On mobile, keep one-click model selection and show inline thinking only via settings button
     if (isMobile) {
       return (
         <div key={model.id}>
           <CommandItem
             value={model.label}
-            onSelect={() => setExpandedClaudeModel(isExpanded ? null : (model.id as ModelAlias))}
+            onSelect={() => selectModel(preferredSelection)}
             className="group flex items-center justify-between py-2"
           >
             <div className="flex items-center gap-3 overflow-hidden">
@@ -1548,13 +1732,27 @@ export function PhaseModelSelector({
               >
                 <Star className={cn('h-3.5 w-3.5', isFavorite && 'fill-current')} />
               </Button>
-              {isSelected && !isExpanded && <Check className="h-4 w-4 text-primary shrink-0" />}
-              <ChevronRight
+              <Button
+                variant="ghost"
+                size="icon"
                 className={cn(
-                  'h-4 w-4 text-muted-foreground transition-transform',
-                  isExpanded && 'rotate-90'
+                  'h-6 w-6 hover:bg-transparent hover:text-primary focus:ring-0',
+                  isExpanded
+                    ? 'text-primary opacity-100'
+                    : isSelected
+                      ? 'opacity-100 text-muted-foreground'
+                      : 'opacity-0 group-hover:opacity-100 text-muted-foreground'
                 )}
-              />
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpandedClaudeModel(isExpanded ? null : (model.id as ModelAlias));
+                }}
+                title="Edit thinking level"
+                ref={isExpanded ? expandedClaudeTriggerRef : undefined}
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+              </Button>
+              {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
             </div>
           </CommandItem>
 
@@ -1568,12 +1766,11 @@ export function PhaseModelSelector({
                 <button
                   key={level}
                   onClick={() => {
-                    onChange({
+                    selectModel({
                       model: model.id as ModelAlias,
                       thinkingLevel: level,
                     });
                     setExpandedClaudeModel(null);
-                    setOpen(false);
                   }}
                   className={cn(
                     'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
@@ -1602,124 +1799,123 @@ export function PhaseModelSelector({
       );
     }
 
-    // Desktop: Use nested popover
+    // Desktop: one-click model selection + separate settings popover trigger
     return (
       <CommandItem
         key={model.id}
         value={model.label}
-        onSelect={() => setExpandedClaudeModel(isExpanded ? null : (model.id as ModelAlias))}
-        className="p-0 data-[selected=true]:bg-transparent"
+        onSelect={() => selectModel(preferredSelection)}
+        className="group flex items-center justify-between py-2"
       >
-        <Popover
-          open={isExpanded}
-          onOpenChange={(isOpen) => {
-            if (!isOpen) {
-              setExpandedClaudeModel(null);
-            }
-          }}
-        >
-          <PopoverTrigger asChild>
-            <div
-              ref={isExpanded ? expandedClaudeTriggerRef : undefined}
-              className={cn(
-                'w-full group flex items-center justify-between py-2 px-2 rounded-sm cursor-pointer',
-                'hover:bg-accent',
-                isExpanded && 'bg-accent'
-              )}
-            >
-              <div className="flex items-center gap-3 overflow-hidden">
-                <AnthropicIcon
-                  className={cn(
-                    'h-4 w-4 shrink-0',
-                    isSelected ? 'text-primary' : 'text-muted-foreground'
-                  )}
-                />
-                <div className="flex flex-col truncate">
-                  <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
-                    {model.label}
-                  </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {isSelected && currentThinking !== 'none'
-                      ? `Thinking: ${THINKING_LEVEL_LABELS[currentThinking]}`
-                      : model.description}
-                  </span>
-                </div>
-              </div>
+        <div className="flex items-center gap-3 overflow-hidden">
+          <AnthropicIcon
+            className={cn(
+              'h-4 w-4 shrink-0',
+              isSelected ? 'text-primary' : 'text-muted-foreground'
+            )}
+          />
+          <div className="flex flex-col truncate">
+            <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
+              {model.label}
+            </span>
+            <span className="truncate text-xs text-muted-foreground">
+              {isSelected && currentThinking !== 'none'
+                ? `Thinking: ${THINKING_LEVEL_LABELS[currentThinking]}`
+                : model.description}
+            </span>
+          </div>
+        </div>
 
-              <div className="flex items-center gap-1 ml-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    'h-6 w-6 hover:bg-transparent hover:text-yellow-500 focus:ring-0',
-                    isFavorite
-                      ? 'text-yellow-500 opacity-100'
-                      : 'opacity-0 group-hover:opacity-100 text-muted-foreground'
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFavoriteModel(model.id);
-                  }}
-                >
-                  <Star className={cn('h-3.5 w-3.5', isFavorite && 'fill-current')} />
-                </Button>
-                {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
-                <ChevronRight
-                  className={cn(
-                    'h-4 w-4 text-muted-foreground transition-transform',
-                    isExpanded && 'rotate-90'
-                  )}
-                />
-              </div>
-            </div>
-          </PopoverTrigger>
-          <PopoverContent
-            side="right"
-            align="start"
-            className="w-[220px] p-1"
-            sideOffset={8}
-            collisionPadding={16}
-            onCloseAutoFocus={(e) => e.preventDefault()}
+        <div className="flex items-center gap-1 ml-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              'h-6 w-6 hover:bg-transparent hover:text-yellow-500 focus:ring-0',
+              isFavorite
+                ? 'text-yellow-500 opacity-100'
+                : 'opacity-0 group-hover:opacity-100 text-muted-foreground'
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFavoriteModel(model.id);
+            }}
           >
-            <div className="space-y-1">
-              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border/50 mb-1">
-                Thinking Level
+            <Star className={cn('h-3.5 w-3.5', isFavorite && 'fill-current')} />
+          </Button>
+          <Popover
+            open={isExpanded}
+            onOpenChange={(isOpen) =>
+              setExpandedClaudeModel(isOpen ? (model.id as ModelAlias) : null)
+            }
+          >
+            <PopoverTrigger asChild>
+              <Button
+                ref={isExpanded ? expandedClaudeTriggerRef : undefined}
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  'h-6 w-6 hover:bg-transparent hover:text-primary focus:ring-0',
+                  isExpanded
+                    ? 'text-primary opacity-100'
+                    : isSelected
+                      ? 'opacity-100 text-muted-foreground'
+                      : 'opacity-0 group-hover:opacity-100 text-muted-foreground'
+                )}
+                onClick={(e) => e.stopPropagation()}
+                title="Edit thinking level"
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              side="right"
+              align="start"
+              className="w-[220px] p-1"
+              sideOffset={8}
+              collisionPadding={16}
+              onCloseAutoFocus={(e) => e.preventDefault()}
+            >
+              <div className="space-y-1">
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border/50 mb-1">
+                  Thinking Level
+                </div>
+                {THINKING_LEVELS.map((level) => (
+                  <button
+                    key={level}
+                    onClick={() => {
+                      setExpandedClaudeModel(null);
+                      selectModel({
+                        model: model.id as ModelAlias,
+                        thinkingLevel: level,
+                      });
+                    }}
+                    className={cn(
+                      'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
+                      'hover:bg-accent cursor-pointer transition-colors',
+                      isSelected && currentThinking === level && 'bg-accent text-accent-foreground'
+                    )}
+                  >
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">{THINKING_LEVEL_LABELS[level]}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {level === 'none' && 'No extended thinking'}
+                        {level === 'low' && 'Light reasoning (1k tokens)'}
+                        {level === 'medium' && 'Moderate reasoning (10k tokens)'}
+                        {level === 'high' && 'Deep reasoning (16k tokens)'}
+                        {level === 'ultrathink' && 'Maximum reasoning (32k tokens)'}
+                      </span>
+                    </div>
+                    {isSelected && currentThinking === level && (
+                      <Check className="h-3.5 w-3.5 text-primary" />
+                    )}
+                  </button>
+                ))}
               </div>
-              {THINKING_LEVELS.map((level) => (
-                <button
-                  key={level}
-                  onClick={() => {
-                    onChange({
-                      model: model.id as ModelAlias,
-                      thinkingLevel: level,
-                    });
-                    setExpandedClaudeModel(null);
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
-                    'hover:bg-accent cursor-pointer transition-colors',
-                    isSelected && currentThinking === level && 'bg-accent text-accent-foreground'
-                  )}
-                >
-                  <div className="flex flex-col items-start">
-                    <span className="font-medium">{THINKING_LEVEL_LABELS[level]}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {level === 'none' && 'No extended thinking'}
-                      {level === 'low' && 'Light reasoning (1k tokens)'}
-                      {level === 'medium' && 'Moderate reasoning (10k tokens)'}
-                      {level === 'high' && 'Deep reasoning (16k tokens)'}
-                      {level === 'ultrathink' && 'Maximum reasoning (32k tokens)'}
-                    </span>
-                  </div>
-                  {isSelected && currentThinking === level && (
-                    <Check className="h-3.5 w-3.5 text-primary" />
-                  )}
-                </button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
+            </PopoverContent>
+          </Popover>
+          {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+        </div>
       </CommandItem>
     );
   };
@@ -1786,9 +1982,8 @@ export function PhaseModelSelector({
                 <button
                   key={variant.id}
                   onClick={() => {
-                    onChange({ model: variant.id });
+                    selectModel({ model: variant.id });
                     setExpandedGroup(null);
-                    setOpen(false);
                   }}
                   className={cn(
                     'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
@@ -1889,9 +2084,8 @@ export function PhaseModelSelector({
                 <button
                   key={variant.id}
                   onClick={() => {
-                    onChange({ model: variant.id });
+                    selectModel({ model: variant.id });
                     setExpandedGroup(null);
-                    setOpen(false);
                   }}
                   className={cn(
                     'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
@@ -2035,6 +2229,80 @@ export function PhaseModelSelector({
               <CommandSeparator />
             </>
           )}
+
+          {(() => {
+            const recentItems = recentModelSelections
+              .filter((entry, index, entries) => {
+                const key = getRecentModelKey(entry);
+                return entries.findIndex((item) => getRecentModelKey(item) === key) === index;
+              })
+              .filter((entry) => !favoriteModels.includes(entry.model))
+              .map((entry) => {
+                if (entry.providerId) {
+                  const provider = enabledProviders.find((p) => p.id === entry.providerId);
+                  if (!provider || !provider.models) return null;
+
+                  const model = provider.models.find((m) => m.id === entry.model);
+                  if (!model) return null;
+
+                  const sameTypeCount = enabledProviders.filter(
+                    (p) => p.providerType === provider.providerType
+                  ).length;
+                  const mappedModels = Array.from(
+                    new Set(
+                      provider.models
+                        .filter((m) => m.id === entry.model && m.mapsToClaudeModel)
+                        .map((m) => m.mapsToClaudeModel as ClaudeModelAlias)
+                    )
+                  );
+
+                  return renderProviderModelItem(provider, model, sameTypeCount > 1, mappedModels);
+                }
+
+                const claudeModel = !disabledProviders.includes('claude')
+                  ? CLAUDE_MODELS.find((m) => m.id === entry.model)
+                  : null;
+                if (claudeModel) return renderClaudeModelItem(claudeModel);
+
+                const cursorModel = !disabledProviders.includes('cursor')
+                  ? availableCursorModels.find((m) => m.id === entry.model)
+                  : null;
+                if (cursorModel) return renderCursorModelItem(cursorModel);
+
+                const codexModel = !disabledProviders.includes('codex')
+                  ? transformedCodexModels.find((m) => m.id === entry.model)
+                  : null;
+                if (codexModel) return renderCodexModelItem(codexModel);
+
+                const geminiModel = !disabledProviders.includes('gemini')
+                  ? availableGeminiModels.find((m) => m.id === entry.model)
+                  : null;
+                if (geminiModel) return renderGeminiModelItem(geminiModel);
+
+                const copilotModel = !disabledProviders.includes('copilot')
+                  ? availableCopilotModels.find((m) => m.id === entry.model)
+                  : null;
+                if (copilotModel) return renderCopilotModelItem(copilotModel);
+
+                const opencodeModel = !disabledProviders.includes('opencode')
+                  ? allOpencodeModels.find((m) => m.id === entry.model)
+                  : null;
+                if (opencodeModel) return renderOpencodeModelItem(opencodeModel);
+
+                return null;
+              });
+
+            if (!recentItems.some((item) => item !== null)) {
+              return null;
+            }
+
+            return (
+              <>
+                <CommandGroup heading="Recently Used">{recentItems}</CommandGroup>
+                <CommandSeparator />
+              </>
+            );
+          })()}
 
           {claude.length > 0 && (
             <CommandGroup heading="Claude Models">
