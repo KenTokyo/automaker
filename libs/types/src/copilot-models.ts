@@ -44,9 +44,9 @@ export const COPILOT_MODEL_MAP = {
     supportsTools: true,
     contextWindow: 200000,
   },
-  'copilot-claude-opus-4.5': {
-    label: 'Claude Opus 4.5',
-    description: 'Most capable Claude Opus 4.5 via GitHub Copilot.',
+  'copilot-claude-opus-4.6': {
+    label: 'Claude Opus 4.6',
+    description: 'Most capable Claude Opus 4.6 via GitHub Copilot.',
     supportsVision: true,
     supportsTools: true,
     contextWindow: 200000,
