@@ -1,8 +1,7 @@
 import { useState, useCallback } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import type { ImageAttachment, TextFileAttachment } from '@/store/app-store';
-
-const logger = createLogger('FileAttachments');
+import { getHttpApiClient } from '@/lib/http-api-client';
 import {
   fileToBase64,
   generateImageId,
@@ -17,9 +16,14 @@ import {
   DEFAULT_MAX_FILES,
 } from '@/lib/image-utils';
 
+const logger = createLogger('FileAttachments');
+
 interface UseFileAttachmentsOptions {
   isProcessing: boolean;
   isConnected: boolean;
+  projectPath?: string | null;
+  /** Callback to insert text into the input field (e.g., image path) */
+  onInsertText?: (text: string) => void;
 }
 
 interface UseFileAttachmentsResult {
@@ -46,6 +50,8 @@ interface UseFileAttachmentsResult {
 export function useFileAttachments({
   isProcessing,
   isConnected,
+  projectPath,
+  onInsertText,
 }: UseFileAttachmentsOptions): UseFileAttachmentsResult {
   const [selectedImages, setSelectedImages] = useState<ImageAttachment[]>([]);
   const [selectedTextFiles, setSelectedTextFiles] = useState<TextFileAttachment[]>([]);
@@ -124,12 +130,45 @@ export function useFileAttachments({
 
           try {
             const base64 = await fileToBase64(file);
+
+            // Persist image in project .automaker/images and keep the path for chat context
+            let savedPath: string | undefined;
+            if (projectPath) {
+              try {
+                const api = getHttpApiClient();
+                const saveResult = await api.saveImageToTemp(
+                  base64,
+                  file.name,
+                  file.type,
+                  projectPath
+                );
+                if (saveResult.success && saveResult.path) {
+                  savedPath = saveResult.path;
+                  logger.info(`Image saved to .automaker/images: ${savedPath}`);
+
+                  // Insert the path reference into the message input
+                  if (onInsertText) {
+                    const imageIndex = selectedImages.length + newImages.length + 1;
+                    onInsertText(`Bild ${imageIndex}: ${savedPath}`);
+                  }
+                }
+              } catch (saveErr) {
+                logger.warn(
+                  'Failed to persist image to .automaker/images, continuing with inline image only:',
+                  saveErr
+                );
+              }
+            } else {
+              logger.warn('Skipping image path persistence: no project path available');
+            }
+
             const imageAttachment: ImageAttachment = {
               id: generateImageId(),
               data: base64,
               mimeType: file.type,
               filename: file.name,
               size: file.size,
+              savedPath,
             };
             newImages.push(imageAttachment);
           } catch {
@@ -152,7 +191,7 @@ export function useFileAttachments({
         setSelectedTextFiles((prev) => [...prev, ...newTextFiles]);
       }
     },
-    [isProcessing, selectedImages, selectedTextFiles]
+    [isProcessing, onInsertText, projectPath, selectedImages, selectedTextFiles]
   );
 
   // Remove individual image

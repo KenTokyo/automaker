@@ -139,10 +139,11 @@ class DevServerService {
             `Detected actual server URL: ${detectedUrl} (allocated port was ${server.port})`
           );
 
-          // Emit URL update event
+          // Re-emit start event with the detected URL so subscribers can update links.
           if (this.emitter) {
-            this.emitter.emit('dev-server:url-detected', {
+            this.emitter.emit('dev-server:started', {
               worktreePath: server.worktreePath,
+              port: server.port,
               url: detectedUrl,
               timestamp: new Date().toISOString(),
             });

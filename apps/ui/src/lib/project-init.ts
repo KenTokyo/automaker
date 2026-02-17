@@ -72,20 +72,20 @@ export async function initializeProject(projectPath: string): Promise<ProjectIni
       };
     }
 
-    // Initialize git repository if it doesn't exist
+    // Initialize git repository if it doesn't exist locally
+    // The server also checks for parent repos to prevent nested git repos (submodule issue)
     const gitDirExists = await api.exists(`${projectPath}/.git`);
     if (!gitDirExists) {
       logger.info('Initializing git repository...');
       try {
-        // Initialize git and create an initial empty commit via server route
         const result = await api.worktree?.initGit(projectPath);
         if (result?.success && result.result?.initialized) {
           createdFiles.push('.git');
           logger.info('Git repository initialized with initial commit');
         } else if (result?.success && !result.result?.initialized) {
-          // Git already existed (shouldn't happen since we checked, but handle it)
+          // Either .git already existed or we're inside a parent repo
           existingFiles.push('.git');
-          logger.info('Git repository already exists');
+          logger.info(result.result?.message || 'Git repository already exists');
         } else {
           logger.warn('Failed to initialize git repository:', result?.error);
         }

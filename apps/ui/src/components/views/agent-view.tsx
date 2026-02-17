@@ -115,6 +115,14 @@ export function AgentView() {
   const fileAttachments = useFileAttachments({
     isProcessing,
     isConnected,
+    projectPath: currentProject?.path,
+    onInsertText: (text) => {
+      setInput((prev) => {
+        const trimmed = prev.replace(/\s+$/, '');
+        const prefix = trimmed.length > 0 ? '\n\n' : '';
+        return `${trimmed}${prefix}${text}\n`;
+      });
+    },
   });
 
   // Scroll management hook

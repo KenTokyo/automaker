@@ -2,7 +2,6 @@ import { memo, useCallback, useState } from 'react';
 import {
   Bot,
   User,
-  ImageIcon,
   AlertCircle,
   FileText,
   FilePlus,
@@ -31,6 +30,7 @@ interface Message {
   timestamp: string;
   images?: ImageAttachment[];
   isError?: boolean;
+  toolCalls?: Array<{ name: string; input: unknown }>;
 }
 
 interface MessageBubbleProps {
@@ -99,13 +99,15 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
         {/* Display attached images for user messages */}
         {message.role === 'user' && message.images && message.images.length > 0 && (
           <div className="mt-3 space-y-2">
-            <div className="flex items-center gap-1.5 text-xs text-primary-foreground/80">
-              <ImageIcon className="w-3 h-3" />
-              <span>
-                {message.images.length} image
-                {message.images.length > 1 ? 's' : ''} attached
-              </span>
-            </div>
+            {/* Show image paths in chat for traceability/recovery */}
+            {message.images.map((image, index) => (
+              <div
+                key={`path-${image.id || index}`}
+                className="text-xs text-primary-foreground/90 font-mono whitespace-pre-wrap break-all rounded-md bg-primary-foreground/10 px-2 py-1"
+              >
+                {`Bild ${index + 1}: ${image.savedPath || image.filename || `Image ${index + 1}`}`}
+              </div>
+            ))}
             <div className="flex flex-wrap gap-2">
               {message.images.map((image, index) => {
                 // Construct proper data URL from base64 data and mime type

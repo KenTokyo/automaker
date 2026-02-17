@@ -11,6 +11,7 @@ export interface ImageAttachment {
   mimeType: string; // e.g., "image/png", "image/jpeg"
   filename: string;
   size?: number; // file size in bytes - optional for messages from server
+  savedPath?: string; // Absolute path where image is persisted in .automaker/images
 }
 
 export interface Message {
@@ -20,6 +21,7 @@ export interface Message {
   timestamp: string;
   isError?: boolean;
   images?: ImageAttachment[];
+  toolCalls?: ToolUse[];
 }
 
 export interface ToolUse {
@@ -576,6 +578,12 @@ export interface ElectronAPI {
   getApiKey?: () => Promise<string | null>;
   quit?: () => Promise<void>;
   openExternalLink: (url: string) => Promise<{ success: boolean; error?: string }>;
+  openPath?: (filePath: string) => Promise<{ success: boolean; error?: string }>;
+  openInEditor?: (
+    filePath: string,
+    line?: number,
+    column?: number
+  ) => Promise<{ success: boolean; error?: string }>;
 
   // Dialog APIs
   openDirectory: () => Promise<{
@@ -1163,6 +1171,7 @@ export interface WorktreeAPI {
     result?: {
       initialized: boolean;
       message: string;
+      parentRepository?: string;
     };
     error?: string;
   }>;

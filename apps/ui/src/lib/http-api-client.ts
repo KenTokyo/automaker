@@ -3005,6 +3005,19 @@ export class HttpApiClient implements ElectronAPI {
       this.httpDelete('/api/agent-prompts/delete', { id, scope, projectPath }),
   };
 
+  // Chat Images API
+  chatImages = {
+    save: (
+      data: string,
+      mimeType?: string
+    ): Promise<{
+      success: boolean;
+      path?: string;
+      filename?: string;
+      error?: string;
+    }> => this.post('/api/chat-images/save', { data, mimeType }),
+  };
+
   // Docs API
   docs = {
     list: (projectPath: string, subfolder?: string): Promise<ListDocsResponse> =>

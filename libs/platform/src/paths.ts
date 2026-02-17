@@ -549,3 +549,31 @@ export async function ensureProjectAgentsDir(projectPath: string): Promise<strin
   await secureFs.mkdir(agentsDir, { recursive: true });
   return agentsDir;
 }
+
+/**
+ * Get the global chat images directory
+ *
+ * Contains images pasted/attached in chat sessions.
+ * Located in the platform-specific userData directory.
+ *
+ * @param dataDir - User data directory (from app.getPath('userData'))
+ * @returns Absolute path to {dataDir}/chat-images
+ */
+export function getGlobalChatImagesDir(dataDir: string): string {
+  return path.join(dataDir, 'chat-images');
+}
+
+/**
+ * Create the global chat images directory if it doesn't exist
+ *
+ * Creates {dataDir}/chat-images for storing pasted chat images.
+ * Safe to call multiple times - uses recursive: true.
+ *
+ * @param dataDir - User data directory path
+ * @returns Promise resolving to the created chat images directory path
+ */
+export async function ensureGlobalChatImagesDir(dataDir: string): Promise<string> {
+  const imagesDir = getGlobalChatImagesDir(dataDir);
+  await secureFs.mkdir(imagesDir, { recursive: true });
+  return imagesDir;
+}

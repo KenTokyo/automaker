@@ -24,12 +24,12 @@ import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
 import { toast } from 'sonner';
 import { PromptPreview } from './prompt-preview';
-import type { TerminalPromptTheme } from '@automaker/types';
 import {
   PROMPT_THEME_CUSTOM_ID,
   PROMPT_THEME_PRESETS,
   getMatchingPromptThemeId,
   getPromptThemePreset,
+  type TerminalPromptTheme,
   type PromptThemeConfig,
 } from './prompt-theme-presets';
 import { useUpdateGlobalSettings } from '@/hooks/mutations/use-settings-mutations';

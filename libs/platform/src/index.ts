@@ -49,6 +49,9 @@ export {
   getProjectAgentsDir,
   ensureGlobalAgentsDir,
   ensureProjectAgentsDir,
+  // Chat images paths
+  getGlobalChatImagesDir,
+  ensureGlobalChatImagesDir,
 } from './paths.js';
 
 // Subprocess management

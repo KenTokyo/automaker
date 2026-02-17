@@ -4,6 +4,7 @@ export interface ImageAttachment {
   mimeType: string; // e.g., "image/png", "image/jpeg"
   filename: string;
   size?: number; // file size in bytes - optional for messages from server
+  savedPath?: string; // Path where the image is saved on disk (for persistence)
 }
 
 export interface TextFileAttachment {

@@ -6,7 +6,7 @@
  * Supports two scopes: Global (available in all projects) and Project (local).
  */
 
-import { memo, useState, useEffect } from 'react';
+import { memo, useState, useEffect, useMemo } from 'react';
 import {
   Bot,
   Plus,
@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Copy,
   Check,
+  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -78,8 +79,13 @@ export const AgentPromptsSelector = memo(function AgentPromptsSelector({
   const [editorScope, setEditorScope] = useState<AgentPromptScope>('local');
   const [editorError, setEditorError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Reset search when dropdown closes
+  useEffect(() => {
+    if (!isOpen) setSearchQuery('');
+  }, [isOpen]);
 
   // Sync project path with store
   useEffect(() => {
@@ -87,8 +93,38 @@ export const AgentPromptsSelector = memo(function AgentPromptsSelector({
   }, [projectPath, setProjectPath]);
 
   const selectedCount = selectedPromptKeys.length;
-  const allPrompts = [...globalPrompts, ...localPrompts];
+  const allPrompts = useMemo(
+    () => [...globalPrompts, ...localPrompts],
+    [globalPrompts, localPrompts]
+  );
+
+  // Sort: selected prompts first, then filter by search
+  const sortAndFilter = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+
+    const sortBySelection = (prompts: AgentPrompt[]) => {
+      return [...prompts].sort((a, b) => {
+        const aSelected = selectedPromptKeys.includes(getPromptKey(a.scope, a.id)) ? 0 : 1;
+        const bSelected = selectedPromptKeys.includes(getPromptKey(b.scope, b.id)) ? 0 : 1;
+        return aSelected - bSelected;
+      });
+    };
+
+    const filterByQuery = (prompts: AgentPrompt[]) => {
+      if (!query) return prompts;
+      return prompts.filter(
+        (p) => p.name.toLowerCase().includes(query) || p.prompt.toLowerCase().includes(query)
+      );
+    };
+
+    return {
+      global: filterByQuery(sortBySelection(globalPrompts)),
+      local: filterByQuery(sortBySelection(localPrompts)),
+    };
+  }, [globalPrompts, localPrompts, selectedPromptKeys, searchQuery]);
+
   const hasAnyPrompts = allPrompts.length > 0;
+  const hasFilteredResults = sortAndFilter.global.length > 0 || sortAndFilter.local.length > 0;
 
   const getButtonLabel = () => {
     if (selectedCount === 0) return 'Agent';
@@ -182,51 +218,52 @@ export const AgentPromptsSelector = memo(function AgentPromptsSelector({
     return (
       <div
         key={key}
-        className="flex items-center gap-3 px-3 py-2 hover:bg-muted/50 cursor-pointer group"
+        className={cn(
+          'flex items-center gap-2.5 px-3 py-1.5 hover:bg-muted/50 cursor-pointer group',
+          checked && 'bg-primary/5'
+        )}
         onClick={() => togglePromptSelection(prompt.id, prompt.scope)}
-        onMouseEnter={() => setHoveredKey(key)}
-        onMouseLeave={() => setHoveredKey(null)}
       >
-        <Checkbox checked={checked} />
+        <Checkbox checked={checked} className="shrink-0" />
         <div className="flex-1 min-w-0">
-          <span className="text-sm font-medium block truncate">{prompt.name}</span>
-          <p className="text-xs text-muted-foreground truncate">
-            {prompt.prompt.substring(0, 40)}
-            {prompt.prompt.length > 40 ? '...' : ''}
+          <span className="text-sm font-medium block truncate leading-tight">{prompt.name}</span>
+          <p className="text-[11px] text-muted-foreground truncate leading-tight">
+            {prompt.prompt.substring(0, 60)}
+            {prompt.prompt.length > 60 ? '...' : ''}
           </p>
         </div>
-        {/* Action buttons */}
-        <div className="flex items-center gap-1 shrink-0">
+        {/* Action buttons - visible on hover */}
+        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
             onClick={(e) => handleCopy(prompt, e)}
             title="Copy prompt"
           >
             {copiedId === key ? (
-              <Check className="w-3.5 h-3.5 text-green-500" />
+              <Check className="w-3 h-3 text-green-500" />
             ) : (
-              <Copy className="w-3.5 h-3.5" />
+              <Copy className="w-3 h-3" />
             )}
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
             onClick={(e) => handleEdit(prompt, e)}
             title="Edit prompt"
           >
-            <Pencil className="w-3.5 h-3.5" />
+            <Pencil className="w-3 h-3" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+            className="h-6 w-6 text-muted-foreground hover:text-destructive"
             onClick={(e) => handleDelete(prompt, e)}
             title="Delete prompt"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-3 h-3" />
           </Button>
         </div>
       </div>
@@ -255,31 +292,44 @@ export const AgentPromptsSelector = memo(function AgentPromptsSelector({
 
         <DropdownMenuContent
           align="start"
-          className="w-96 p-0"
+          className="w-[480px] p-0"
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
-          {/* Header */}
-          <div className="p-3 border-b border-border">
-            <h4 className="font-medium text-sm mb-1">Select Agent Prompt</h4>
-            <p className="text-xs text-muted-foreground">
-              Select prompts to prepend to every message.
-            </p>
-          </div>
-
-          {/* Clear All Option */}
-          <div
-            className="flex items-center gap-3 px-3 py-2 hover:bg-muted/50 cursor-pointer border-b border-border"
-            onClick={() => clearSelection()}
-          >
-            <Checkbox checked={selectedCount === 0} />
-            <div>
-              <span className="text-sm font-medium">None (Clear All)</span>
-              <p className="text-xs text-muted-foreground">Deselect all agent prompts</p>
+          {/* Header with search */}
+          <div className="p-2.5 border-b border-border space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium text-sm">Agent Prompts</h4>
+              {selectedCount > 0 && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 h-4">
+                  {selectedCount} active
+                </Badge>
+              )}
+            </div>
+            {/* Search field */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Search prompts..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-8 pl-8 text-sm"
+              />
             </div>
           </div>
 
+          {/* Clear All Option */}
+          {!searchQuery && (
+            <div
+              className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-muted/50 cursor-pointer border-b border-border"
+              onClick={() => clearSelection()}
+            >
+              <Checkbox checked={selectedCount === 0} className="shrink-0" />
+              <span className="text-sm text-muted-foreground">None (Clear All)</span>
+            </div>
+          )}
+
           {/* Prompts List with Scope Groups */}
-          <ScrollArea className="max-h-72">
+          <ScrollArea className="max-h-80">
             {isLoading ? (
               <div className="p-4 text-center text-sm text-muted-foreground">Loading...</div>
             ) : error ? (
@@ -288,76 +338,64 @@ export const AgentPromptsSelector = memo(function AgentPromptsSelector({
               <div className="p-4 text-center text-sm text-muted-foreground">
                 No agent prompts yet. Add one below.
               </div>
+            ) : !hasFilteredResults ? (
+              <div className="p-4 text-center text-sm text-muted-foreground">
+                No prompts matching &quot;{searchQuery}&quot;
+              </div>
             ) : (
               <>
                 {/* Global Prompts Section */}
-                {globalPrompts.length > 0 && (
+                {sortAndFilter.global.length > 0 && (
                   <>
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 border-b border-border">
-                      <Globe className="w-3.5 h-3.5 text-blue-500" />
-                      <span className="text-xs font-medium text-muted-foreground">
-                        Global Agents
-                      </span>
+                    <div className="flex items-center gap-2 px-3 py-1 bg-muted/30 border-b border-border">
+                      <Globe className="w-3 h-3 text-blue-500" />
+                      <span className="text-[11px] font-medium text-muted-foreground">Global</span>
                       <Badge
                         variant="secondary"
                         className="text-[10px] px-1.5 py-0 h-4 ml-auto bg-blue-500/10 text-blue-600 dark:text-blue-400"
                       >
-                        {globalPrompts.length}
+                        {sortAndFilter.global.length}
                       </Badge>
                     </div>
-                    {globalPrompts.map(renderPromptItem)}
+                    {sortAndFilter.global.map(renderPromptItem)}
                   </>
                 )}
 
                 {/* Project Prompts Section */}
-                {localPrompts.length > 0 && (
+                {sortAndFilter.local.length > 0 && (
                   <>
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 border-b border-border">
-                      <FolderOpen className="w-3.5 h-3.5 text-primary" />
-                      <span className="text-xs font-medium text-muted-foreground">
-                        Project Agents
-                      </span>
+                    <div className="flex items-center gap-2 px-3 py-1 bg-muted/30 border-b border-border">
+                      <FolderOpen className="w-3 h-3 text-primary" />
+                      <span className="text-[11px] font-medium text-muted-foreground">Project</span>
                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 ml-auto">
-                        {localPrompts.length}
+                        {sortAndFilter.local.length}
                       </Badge>
                     </div>
-                    {localPrompts.map(renderPromptItem)}
+                    {sortAndFilter.local.map(renderPromptItem)}
                   </>
                 )}
               </>
             )}
           </ScrollArea>
 
-          {/* Add New Buttons */}
-          <div className="border-t border-border">
+          {/* Add New Buttons - compact */}
+          <div className="border-t border-border flex">
             <div
-              className="flex items-center gap-3 px-3 py-2 hover:bg-muted/50 cursor-pointer"
+              className="flex-1 flex items-center gap-2 px-3 py-2 hover:bg-muted/50 cursor-pointer justify-center border-r border-border"
               onClick={() => handleAddNew('global')}
             >
-              <div className="w-4 h-4 flex items-center justify-center">
-                <Plus className="w-4 h-4 text-blue-500" />
-              </div>
-              <div className="flex-1">
-                <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                  Add Global Agent
-                </span>
-                <p className="text-xs text-muted-foreground">Available in all projects</p>
-              </div>
-              <Globe className="w-3.5 h-3.5 text-blue-500/50" />
+              <Plus className="w-3.5 h-3.5 text-blue-500" />
+              <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                Add Global
+              </span>
             </div>
             {projectPath && (
               <div
-                className="flex items-center gap-3 px-3 py-2 hover:bg-muted/50 cursor-pointer"
+                className="flex-1 flex items-center gap-2 px-3 py-2 hover:bg-muted/50 cursor-pointer justify-center"
                 onClick={() => handleAddNew('local')}
               >
-                <div className="w-4 h-4 flex items-center justify-center">
-                  <Plus className="w-4 h-4 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <span className="text-sm font-medium text-primary">Add Project Agent</span>
-                  <p className="text-xs text-muted-foreground">Only in this project</p>
-                </div>
-                <FolderOpen className="w-3.5 h-3.5 text-primary/50" />
+                <Plus className="w-3.5 h-3.5 text-primary" />
+                <span className="text-xs font-medium text-primary">Add Project</span>
               </div>
             )}
           </div>

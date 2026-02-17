@@ -629,6 +629,7 @@ export interface ElectronAPI {
   getApiKey?: () => Promise<string | null>;
   quit?: () => Promise<void>;
   openExternalLink: (url: string) => Promise<{ success: boolean; error?: string }>;
+  openPath?: (filePath: string) => Promise<{ success: boolean; error?: string }>;
   openDirectory: () => Promise<DialogResult>;
   openFile: (options?: object) => Promise<DialogResult>;
   readFile: (filePath: string) => Promise<FileResult>;

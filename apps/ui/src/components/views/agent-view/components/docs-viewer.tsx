@@ -621,7 +621,7 @@ export const DocsViewer = memo(function DocsViewer({
               <DropdownMenuItem
                 onClick={() => {
                   if (currentDoc?.file.absolutePath) {
-                    window.electronAPI?.shell?.openPath?.(currentDoc.file.absolutePath);
+                    window.electronAPI?.openPath?.(currentDoc.file.absolutePath);
                   }
                 }}
               >

@@ -26,7 +26,7 @@ export function createInitGitHandler() {
         return;
       }
 
-      // Check if .git already exists
+      // Check if .git already exists in this directory
       const gitDirPath = join(projectPath, '.git');
       try {
         await secureFs.access(gitDirPath);
@@ -40,7 +40,30 @@ export function createInitGitHandler() {
         });
         return;
       } catch {
-        // .git doesn't exist, continue with initialization
+        // .git doesn't exist locally, continue with checks
+      }
+
+      // Check if this directory is already inside a parent git repository
+      // This prevents creating nested repos which get treated as submodules
+      try {
+        const { stdout } = await execAsync('git rev-parse --show-toplevel', {
+          cwd: projectPath,
+        });
+        const parentRepo = stdout.trim();
+        if (parentRepo) {
+          // Already inside a git repo — don't create a nested one
+          res.json({
+            success: true,
+            result: {
+              initialized: false,
+              message: `Already inside git repository: ${parentRepo}`,
+              parentRepository: parentRepo,
+            },
+          });
+          return;
+        }
+      } catch {
+        // Not inside any git repo — safe to initialize
       }
 
       // Initialize git with 'main' as the default branch (matching GitHub's standard since 2020)

@@ -1,7 +1,9 @@
 import { memo } from 'react';
 import type { ImageAttachment } from '@/store/app-store';
+import type { ToolUse } from '@/types/electron';
 import { MessageBubble } from './message-bubble';
 import { ThinkingIndicator } from './thinking-indicator';
+import { ToolCallGroup } from './tool-call-group';
 
 interface Message {
   id: string;
@@ -9,6 +11,7 @@ interface Message {
   content: string;
   timestamp: string;
   images?: ImageAttachment[];
+  toolCalls?: ToolUse[];
 }
 
 interface MessageListProps {
@@ -35,7 +38,15 @@ export const MessageList = memo(function MessageList({
       style={{ backgroundColor: chatBackgroundColor || undefined }}
     >
       {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} />
+        <div key={message.id}>
+          {/* Tool Call Group - shown above assistant messages that used tools */}
+          {message.role === 'assistant' && message.toolCalls && message.toolCalls.length > 0 && (
+            <div className="mb-3">
+              <ToolCallGroup toolCalls={message.toolCalls} />
+            </div>
+          )}
+          <MessageBubble message={message} />
+        </div>
       ))}
 
       {/* Thinking Indicator */}

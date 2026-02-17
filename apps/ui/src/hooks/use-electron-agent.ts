@@ -81,11 +81,57 @@ export function useElectronAgent({
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const currentMessageRef = useRef<Message | null>(null);
   const onToolUseRef = useRef(onToolUse);
+  // Accumulate tool calls for the current assistant message
+  const pendingToolCallsRef = useRef<Array<{ name: string; input: unknown }>>([]);
 
   // Keep onToolUse ref up to date
   useEffect(() => {
     onToolUseRef.current = onToolUse;
   }, [onToolUse]);
+
+  const resolveImagePaths = useCallback(
+    async (
+      api: ReturnType<typeof getElectronAPI>,
+      images?: ImageAttachment[]
+    ): Promise<string[] | undefined> => {
+      if (!images || images.length === 0) {
+        return undefined;
+      }
+
+      const imagePaths: string[] = [];
+
+      for (const image of images) {
+        // Reuse persisted path from paste/drop flow when available.
+        if (image.savedPath) {
+          imagePaths.push(image.savedPath);
+          continue;
+        }
+
+        if (!api?.saveImageToTemp) {
+          logger.warn('saveImageToTemp is not available and no savedPath exists for image');
+          continue;
+        }
+
+        const result = await api.saveImageToTemp(
+          image.data,
+          sanitizeFilename(image.filename),
+          image.mimeType,
+          workingDirectory // Pass workingDirectory as projectPath
+        );
+
+        if (result.success && result.path) {
+          imagePaths.push(result.path);
+          logger.info('Saved image to .automaker/images:', result.path);
+        } else {
+          logger.error('Failed to save image:', result.error);
+        }
+      }
+
+      const uniquePaths = Array.from(new Set(imagePaths));
+      return uniquePaths.length > 0 ? uniquePaths : undefined;
+    },
+    [workingDirectory]
+  );
 
   // Send message directly to the agent (bypassing queue)
   const sendMessageDirectly = useCallback(
@@ -121,25 +167,7 @@ export function useElectronAgent({
           messageContent = contextBlock + content;
         }
 
-        // Save images to .automaker/images and get paths
-        let imagePaths: string[] | undefined;
-        if (images && images.length > 0 && api.saveImageToTemp) {
-          imagePaths = [];
-          for (const image of images) {
-            const result = await api.saveImageToTemp(
-              image.data,
-              sanitizeFilename(image.filename),
-              image.mimeType,
-              workingDirectory // Pass workingDirectory as projectPath
-            );
-            if (result.success && result.path) {
-              imagePaths.push(result.path);
-              logger.info('Saved image to .automaker/images:', result.path);
-            } else {
-              logger.error('Failed to save image:', result.error);
-            }
-          }
-        }
+        const imagePaths = await resolveImagePaths(api, images);
 
         const result = await api.agent!.send(
           sessionId,
@@ -163,7 +191,7 @@ export function useElectronAgent({
         throw err;
       }
     },
-    [sessionId, workingDirectory, model, thinkingLevel, isProcessing]
+    [sessionId, workingDirectory, model, thinkingLevel, isProcessing, resolveImagePaths]
   );
 
   // Message queue for queuing messages when agent is busy
@@ -266,6 +294,7 @@ export function useElectronAgent({
         case 'started':
           // Agent started processing (including from queue)
           logger.info('Agent started processing for session:', sessionId);
+          pendingToolCallsRef.current = [];
           setIsProcessing(true);
           break;
 
@@ -309,23 +338,30 @@ export function useElectronAgent({
           break;
 
         case 'tool_use':
-          // Tool being used
+          // Tool being used - accumulate for current message
           logger.info('Tool use:', event.tool.name);
+          pendingToolCallsRef.current.push({ name: event.tool.name, input: event.tool.input });
           onToolUseRef.current?.(event.tool.name, event.tool.input);
           break;
 
-        case 'complete':
+        case 'complete': {
           // Agent finished processing for THIS session
           logger.info('Processing complete for session:', sessionId);
           setIsProcessing(false);
+          const completedToolCalls =
+            pendingToolCallsRef.current.length > 0 ? [...pendingToolCallsRef.current] : undefined;
+          pendingToolCallsRef.current = [];
           if (event.messageId) {
             setMessages((prev) =>
               prev.map((msg) =>
-                msg.id === event.messageId ? { ...msg, content: event.content } : msg
+                msg.id === event.messageId
+                  ? { ...msg, content: event.content, toolCalls: completedToolCalls }
+                  : msg
               )
             );
           }
           break;
+        }
 
         case 'error':
           // Error occurred for THIS session
@@ -416,25 +452,7 @@ export function useElectronAgent({
           messageContent = contextBlock + content;
         }
 
-        // Save images to .automaker/images and get paths
-        let imagePaths: string[] | undefined;
-        if (images && images.length > 0 && api.saveImageToTemp) {
-          imagePaths = [];
-          for (const image of images) {
-            const result = await api.saveImageToTemp(
-              image.data,
-              sanitizeFilename(image.filename),
-              image.mimeType,
-              workingDirectory // Pass workingDirectory as projectPath
-            );
-            if (result.success && result.path) {
-              imagePaths.push(result.path);
-              logger.info('Saved image to .automaker/images:', result.path);
-            } else {
-              logger.error('Failed to save image:', result.error);
-            }
-          }
-        }
+        const imagePaths = await resolveImagePaths(api, images);
 
         const result = await api.agent!.send(
           sessionId,
@@ -457,7 +475,7 @@ export function useElectronAgent({
         setIsProcessing(false);
       }
     },
-    [sessionId, workingDirectory, model, thinkingLevel, isProcessing]
+    [sessionId, workingDirectory, model, thinkingLevel, isProcessing, resolveImagePaths]
   );
 
   // Stop current execution
@@ -527,22 +545,7 @@ export function useElectronAgent({
           messageContent = contextBlock + message;
         }
 
-        // Save images and get paths
-        let imagePaths: string[] | undefined;
-        if (images && images.length > 0 && api.saveImageToTemp) {
-          imagePaths = [];
-          for (const image of images) {
-            const result = await api.saveImageToTemp(
-              image.data,
-              sanitizeFilename(image.filename),
-              image.mimeType,
-              workingDirectory
-            );
-            if (result.success && result.path) {
-              imagePaths.push(result.path);
-            }
-          }
-        }
+        const imagePaths = await resolveImagePaths(api, images);
 
         logger.info('Adding to server queue');
         const result = await api.agent.queueAdd(
@@ -561,7 +564,7 @@ export function useElectronAgent({
         setError(err instanceof Error ? err.message : 'Failed to add to queue');
       }
     },
-    [sessionId, workingDirectory, model, thinkingLevel]
+    [sessionId, model, thinkingLevel, resolveImagePaths]
   );
 
   // Remove a prompt from the server queue

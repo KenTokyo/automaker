@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import type { ImageAttachment } from '@/store/app-store';
+import type { ToolUse } from '@/types/electron';
 import { MessageList } from './message-list';
 import { NoSessionState } from './empty-states';
 
@@ -10,6 +11,7 @@ interface Message {
   timestamp: string;
   isError?: boolean;
   images?: ImageAttachment[];
+  toolCalls?: ToolUse[];
 }
 
 interface ChatAreaProps {

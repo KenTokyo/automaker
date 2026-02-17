@@ -3,11 +3,14 @@
  */
 
 import type { Request, Response } from 'express';
-import { spawn } from 'child_process';
+import { exec, spawn } from 'child_process';
+import { promisify } from 'util';
 import path from 'path';
 import * as secureFs from '../../../lib/secure-fs.js';
 import { PathNotAllowedError } from '@automaker/platform';
 import { logger, getErrorMessage, logError } from '../common.js';
+
+const execAsync = promisify(exec);
 
 export function createCloneHandler() {
   return async (req: Request, res: Response): Promise<void> => {
@@ -172,22 +175,41 @@ export function createCloneHandler() {
         // Continue anyway - not critical
       }
 
-      // Initialize a fresh git repository
-      await new Promise<void>((resolve) => {
-        const gitInit = spawn('git', ['init'], {
+      // Check if the project directory is inside a parent git repository
+      // If so, skip git init to avoid creating a nested repo (treated as submodule)
+      let insideParentRepo = false;
+      try {
+        const { stdout } = await execAsync('git rev-parse --show-toplevel', {
           cwd: projectPath,
         });
+        if (stdout.trim()) {
+          insideParentRepo = true;
+          logger.info(
+            `[Templates] Project is inside parent git repo: ${stdout.trim()}, skipping git init`
+          );
+        }
+      } catch {
+        // Not inside any git repo
+      }
 
-        gitInit.on('close', () => {
-          logger.info('[Templates] Initialized fresh git repository');
-          resolve();
-        });
+      if (!insideParentRepo) {
+        // Initialize a fresh git repository only when not inside a parent repo
+        await new Promise<void>((resolve) => {
+          const gitInit = spawn('git', ['init'], {
+            cwd: projectPath,
+          });
 
-        gitInit.on('error', () => {
-          logger.warn('[Templates] Could not initialize git');
-          resolve();
+          gitInit.on('close', () => {
+            logger.info('[Templates] Initialized fresh git repository');
+            resolve();
+          });
+
+          gitInit.on('error', () => {
+            logger.warn('[Templates] Could not initialize git');
+            resolve();
+          });
         });
-      });
+      }
 
       logger.info(`[Templates] Successfully cloned template to ${projectPath}`);
 

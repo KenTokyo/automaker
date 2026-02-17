@@ -1,4 +1,4 @@
-import type { TerminalPromptTheme } from '@automaker/types';
+export type TerminalPromptTheme = 'custom' | `omp-${string}`;
 
 export const PROMPT_THEME_CUSTOM_ID: TerminalPromptTheme = 'custom';
 

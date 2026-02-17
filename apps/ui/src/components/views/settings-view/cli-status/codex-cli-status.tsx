@@ -17,6 +17,13 @@ interface CliStatusProps {
   onRefresh: () => void;
 }
 
+interface CodexAuthResponse {
+  success: boolean;
+  requiresManualAuth?: boolean;
+  message?: string;
+  error?: string;
+}
+
 function getAuthMethodLabel(method: string): string {
   switch (method) {
     case 'api_key':
@@ -86,7 +93,7 @@ export function CodexCliStatus({ status, authStatus, isChecking, onRefresh }: Cl
       const api = getElectronAPI();
       // Check if authCodex method exists on the API
       const authCodex = (api.setup as Record<string, unknown> | undefined)?.authCodex as
-        | (() => Promise<{ success: boolean; error?: string }>)
+        | (() => Promise<CodexAuthResponse>)
         | undefined;
       if (!authCodex) {
         toast.error('Authentication Failed', {

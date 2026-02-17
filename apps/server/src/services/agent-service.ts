@@ -41,6 +41,7 @@ interface Message {
     data: string;
     mimeType: string;
     filename: string;
+    savedPath?: string;
   }>;
   timestamp: string;
   isError?: boolean;
@@ -208,6 +209,7 @@ export class AgentService {
             data: imageData.base64,
             mimeType: imageData.mimeType,
             filename: imageData.filename,
+            savedPath: imagePath,
           });
         } catch (error) {
           this.logger.error(`Failed to load image ${imagePath}:`, error);
