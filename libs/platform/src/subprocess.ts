@@ -26,6 +26,42 @@ export interface SubprocessResult {
   exitCode: number | null;
 }
 
+function terminateProcess(childProcess: ChildProcess, reason: string): void {
+  const pid = childProcess.pid;
+  if (!pid) {
+    console.warn(
+      `[SubprocessManager] Missing PID during termination (${reason}), falling back to SIGTERM`
+    );
+    childProcess.kill('SIGTERM');
+    return;
+  }
+
+  if (process.platform === 'win32') {
+    const taskkill = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    taskkill.on('error', (error) => {
+      console.warn(
+        `[SubprocessManager] taskkill failed (${reason}), falling back to child.kill():`,
+        error
+      );
+      childProcess.kill();
+    });
+    return;
+  }
+
+  childProcess.kill('SIGTERM');
+
+  const forceKillTimeout = setTimeout(() => {
+    if (childProcess.exitCode === null) {
+      console.warn(`[SubprocessManager] Forcing SIGKILL after SIGTERM (${reason})`);
+      childProcess.kill('SIGKILL');
+    }
+  }, 2000);
+  forceKillTimeout.unref();
+}
+
 /**
  * Spawns a subprocess and streams JSONL output line-by-line
  */
@@ -66,6 +102,17 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
   let stderrOutput = '';
   let lastOutputTime = Date.now();
   let timeoutHandle: NodeJS.Timeout | null = null;
+  let terminationRequested = false;
+
+  const requestTermination = (reason: string) => {
+    if (terminationRequested) return;
+    terminationRequested = true;
+    console.log(`[SubprocessManager] Terminating process (${reason})`);
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+    terminateProcess(childProcess, reason);
+  };
 
   // Collect stderr for error reporting
   if (childProcess.stderr) {
@@ -86,7 +133,7 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
       const elapsed = Date.now() - lastOutputTime;
       if (elapsed >= timeout) {
         console.error(`[SubprocessManager] Process timeout: no output for ${timeout}ms`);
-        childProcess.kill('SIGTERM');
+        requestTermination(`timeout ${timeout}ms`);
       }
     }, timeout);
   };
@@ -97,11 +144,8 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
   let abortHandler: (() => void) | null = null;
   if (abortController) {
     abortHandler = () => {
-      console.log('[SubprocessManager] Abort signal received, killing process');
-      if (timeoutHandle) {
-        clearTimeout(timeoutHandle);
-      }
-      childProcess.kill('SIGTERM');
+      console.log('[SubprocessManager] Abort signal received');
+      requestTermination('abort signal');
     };
     // Check if already aborted, if so call handler immediately
     if (abortController.signal.aborted) {
@@ -219,6 +263,13 @@ export async function spawnProcess(options: SubprocessOptions): Promise<Subproce
 
     let stdout = '';
     let stderr = '';
+    let terminationRequested = false;
+
+    const requestTermination = (reason: string) => {
+      if (terminationRequested) return;
+      terminationRequested = true;
+      terminateProcess(childProcess, reason);
+    };
 
     if (childProcess.stdout) {
       childProcess.stdout.on('data', (data: Buffer) => {
@@ -244,7 +295,7 @@ export async function spawnProcess(options: SubprocessOptions): Promise<Subproce
     if (abortController) {
       abortHandler = () => {
         cleanupAbortListener();
-        childProcess.kill('SIGTERM');
+        requestTermination('abort signal');
         reject(new Error('Process aborted'));
       };
       abortController.signal.addEventListener('abort', abortHandler);

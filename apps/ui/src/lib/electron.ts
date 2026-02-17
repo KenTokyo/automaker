@@ -776,7 +776,9 @@ export interface ElectronAPI {
       message: string,
       workingDirectory?: string,
       imagePaths?: string[],
-      model?: string
+      model?: string,
+      thinkingLevel?: string,
+      reasoningEffort?: ReasoningEffort
     ) => Promise<{ success: boolean; error?: string }>;
     getHistory: (sessionId: string) => Promise<{
       success: boolean;
@@ -794,6 +796,7 @@ export interface ElectronAPI {
         imagePaths?: string[];
         model?: string;
         thinkingLevel?: string;
+        reasoningEffort?: ReasoningEffort;
         addedAt: string;
       }>;
       error?: string;

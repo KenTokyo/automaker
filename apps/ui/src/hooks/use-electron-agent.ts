@@ -14,6 +14,7 @@ interface UseElectronAgentOptions {
   workingDirectory?: string;
   model?: string;
   thinkingLevel?: string;
+  reasoningEffort?: string;
   onToolUse?: (toolName: string, toolInput: unknown) => void;
 }
 
@@ -24,6 +25,7 @@ interface QueuedPrompt {
   imagePaths?: string[];
   model?: string;
   thinkingLevel?: string;
+  reasoningEffort?: string;
   addedAt: string;
 }
 
@@ -71,6 +73,7 @@ export function useElectronAgent({
   workingDirectory,
   model,
   thinkingLevel,
+  reasoningEffort,
   onToolUse,
 }: UseElectronAgentOptions): UseElectronAgentResult {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -133,6 +136,20 @@ export function useElectronAgent({
     [workingDirectory]
   );
 
+  const logExecutionConfig = useCallback(
+    (context: 'send' | 'queue') => {
+      const ultraModeActive = thinkingLevel === 'ultrathink' || reasoningEffort === 'xhigh';
+      logger.info(`[${context}] Model configuration`, {
+        sessionId,
+        model: model ?? '(session-default)',
+        thinkingLevel: thinkingLevel ?? 'none',
+        reasoningEffort: reasoningEffort ?? 'none',
+        ultraModeActive,
+      });
+    },
+    [sessionId, model, thinkingLevel, reasoningEffort]
+  );
+
   // Send message directly to the agent (bypassing queue)
   const sendMessageDirectly = useCallback(
     async (content: string, images?: ImageAttachment[], textFiles?: TextFileAttachment[]) => {
@@ -168,6 +185,7 @@ export function useElectronAgent({
         }
 
         const imagePaths = await resolveImagePaths(api, images);
+        logExecutionConfig('send');
 
         const result = await api.agent!.send(
           sessionId,
@@ -175,7 +193,8 @@ export function useElectronAgent({
           workingDirectory,
           imagePaths,
           model,
-          thinkingLevel
+          thinkingLevel,
+          reasoningEffort
         );
 
         if (!result.success) {
@@ -191,7 +210,16 @@ export function useElectronAgent({
         throw err;
       }
     },
-    [sessionId, workingDirectory, model, thinkingLevel, isProcessing, resolveImagePaths]
+    [
+      sessionId,
+      workingDirectory,
+      model,
+      thinkingLevel,
+      reasoningEffort,
+      isProcessing,
+      resolveImagePaths,
+      logExecutionConfig,
+    ]
   );
 
   // Message queue for queuing messages when agent is busy
@@ -453,6 +481,7 @@ export function useElectronAgent({
         }
 
         const imagePaths = await resolveImagePaths(api, images);
+        logExecutionConfig('send');
 
         const result = await api.agent!.send(
           sessionId,
@@ -460,7 +489,8 @@ export function useElectronAgent({
           workingDirectory,
           imagePaths,
           model,
-          thinkingLevel
+          thinkingLevel,
+          reasoningEffort
         );
 
         if (!result.success) {
@@ -475,7 +505,16 @@ export function useElectronAgent({
         setIsProcessing(false);
       }
     },
-    [sessionId, workingDirectory, model, thinkingLevel, isProcessing, resolveImagePaths]
+    [
+      sessionId,
+      workingDirectory,
+      model,
+      thinkingLevel,
+      reasoningEffort,
+      isProcessing,
+      resolveImagePaths,
+      logExecutionConfig,
+    ]
   );
 
   // Stop current execution
@@ -546,6 +585,7 @@ export function useElectronAgent({
         }
 
         const imagePaths = await resolveImagePaths(api, images);
+        logExecutionConfig('queue');
 
         logger.info('Adding to server queue');
         const result = await api.agent.queueAdd(
@@ -553,7 +593,8 @@ export function useElectronAgent({
           messageContent,
           imagePaths,
           model,
-          thinkingLevel
+          thinkingLevel,
+          reasoningEffort
         );
 
         if (!result.success) {
@@ -564,7 +605,7 @@ export function useElectronAgent({
         setError(err instanceof Error ? err.message : 'Failed to add to queue');
       }
     },
-    [sessionId, model, thinkingLevel, resolveImagePaths]
+    [sessionId, model, thinkingLevel, reasoningEffort, resolveImagePaths, logExecutionConfig]
   );
 
   // Remove a prompt from the server queue

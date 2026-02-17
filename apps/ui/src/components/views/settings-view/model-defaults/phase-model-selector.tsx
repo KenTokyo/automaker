@@ -1048,7 +1048,9 @@ export function PhaseModelSelector({
               {REASONING_EFFORT_LEVELS.map((effort) => (
                 <button
                   key={effort}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     selectModel({
                       model: model.id as CodexModelId,
                       reasoningEffort: effort,
@@ -1167,7 +1169,9 @@ export function PhaseModelSelector({
                 {REASONING_EFFORT_LEVELS.map((effort) => (
                   <button
                     key={effort}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                       setExpandedCodexModel(null);
                       selectModel({
                         model: model.id as CodexModelId,
@@ -1485,7 +1489,9 @@ export function PhaseModelSelector({
               {THINKING_LEVELS.map((level) => (
                 <button
                   key={level}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     selectModel({
                       providerId: provider.id,
                       model: model.id,
@@ -1586,7 +1592,9 @@ export function PhaseModelSelector({
                 {THINKING_LEVELS.map((level) => (
                   <button
                     key={level}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                       setExpandedProviderModel(null);
                       selectModel({
                         providerId: provider.id,
@@ -1765,7 +1773,9 @@ export function PhaseModelSelector({
               {THINKING_LEVELS.map((level) => (
                 <button
                   key={level}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     selectModel({
                       model: model.id as ModelAlias,
                       thinkingLevel: level,
@@ -1883,7 +1893,9 @@ export function PhaseModelSelector({
                 {THINKING_LEVELS.map((level) => (
                   <button
                     key={level}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                       setExpandedClaudeModel(null);
                       selectModel({
                         model: model.id as ModelAlias,

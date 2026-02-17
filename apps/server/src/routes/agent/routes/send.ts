@@ -3,7 +3,7 @@
  */
 
 import type { Request, Response } from 'express';
-import type { ThinkingLevel } from '@automaker/types';
+import type { ThinkingLevel, ReasoningEffort } from '@automaker/types';
 import { AgentService } from '../../../services/agent-service.js';
 import { createLogger } from '@automaker/utils';
 import { getErrorMessage, logError } from '../common.js';
@@ -12,15 +12,25 @@ const logger = createLogger('Agent');
 export function createSendHandler(agentService: AgentService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { sessionId, message, workingDirectory, imagePaths, model, thinkingLevel } =
-        req.body as {
-          sessionId: string;
-          message: string;
-          workingDirectory?: string;
-          imagePaths?: string[];
-          model?: string;
-          thinkingLevel?: ThinkingLevel;
-        };
+      const {
+        sessionId,
+        message,
+        workingDirectory,
+        imagePaths,
+        model,
+        thinkingLevel,
+        reasoningEffort,
+      } = req.body as {
+        sessionId: string;
+        message: string;
+        workingDirectory?: string;
+        imagePaths?: string[];
+        model?: string;
+        thinkingLevel?: ThinkingLevel;
+        reasoningEffort?: ReasoningEffort;
+      };
+
+      const ultraModeActive = thinkingLevel === 'ultrathink' || reasoningEffort === 'xhigh';
 
       logger.debug('Received request:', {
         sessionId,
@@ -29,6 +39,8 @@ export function createSendHandler(agentService: AgentService) {
         imageCount: imagePaths?.length || 0,
         model,
         thinkingLevel,
+        reasoningEffort,
+        ultraModeActive,
       });
 
       if (!sessionId || !message) {
@@ -51,6 +63,7 @@ export function createSendHandler(agentService: AgentService) {
           imagePaths,
           model,
           thinkingLevel,
+          reasoningEffort,
         })
         .catch((error) => {
           logger.error('Background error in sendMessage():', error);

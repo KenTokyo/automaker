@@ -53,6 +53,7 @@ interface QueuedPrompt {
   imagePaths?: string[];
   model?: string;
   thinkingLevel?: ThinkingLevel;
+  reasoningEffort?: ReasoningEffort;
   addedAt: string;
 }
 
@@ -328,6 +329,17 @@ export class AgentService {
       // Use thinking level and reasoning effort from request, or fall back to session's stored values
       const effectiveThinkingLevel = thinkingLevel ?? session.thinkingLevel;
       const effectiveReasoningEffort = reasoningEffort ?? session.reasoningEffort;
+      const effectiveRequestedModel = model || session.model;
+      const ultraModeActive =
+        effectiveThinkingLevel === 'ultrathink' || effectiveReasoningEffort === 'xhigh';
+
+      this.logger.info('[AgentConfig] Effective execution settings', {
+        sessionId,
+        model: effectiveRequestedModel,
+        thinkingLevel: effectiveThinkingLevel ?? 'none',
+        reasoningEffort: effectiveReasoningEffort ?? 'none',
+        ultraModeActive,
+      });
 
       // When using a provider model, use the resolved Claude model (from mapsToClaudeModel)
       // e.g., "GLM-4.5-Air" -> "claude-haiku-4-5"
@@ -868,6 +880,7 @@ export class AgentService {
       imagePaths?: string[];
       model?: string;
       thinkingLevel?: ThinkingLevel;
+      reasoningEffort?: ReasoningEffort;
     }
   ): Promise<{ success: boolean; queuedPrompt?: QueuedPrompt; error?: string }> {
     const session = this.sessions.get(sessionId);
@@ -881,6 +894,7 @@ export class AgentService {
       imagePaths: prompt.imagePaths,
       model: prompt.model,
       thinkingLevel: prompt.thinkingLevel,
+      reasoningEffort: prompt.reasoningEffort,
       addedAt: new Date().toISOString(),
     };
 
@@ -1011,6 +1025,7 @@ export class AgentService {
         imagePaths: nextPrompt.imagePaths,
         model: nextPrompt.model,
         thinkingLevel: nextPrompt.thinkingLevel,
+        reasoningEffort: nextPrompt.reasoningEffort,
       });
     } catch (error) {
       this.logger.error('Failed to process queued prompt:', error);

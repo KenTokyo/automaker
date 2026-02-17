@@ -9,6 +9,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import { generateContextSummary } from '@/lib/copy-all-chat';
 import { useSessions } from '@/hooks/queries/use-sessions';
 import { useSessionQueryInvalidation } from '@/hooks/use-query-invalidation';
+import { createLogger } from '@automaker/utils/logger';
 
 // Extracted hooks
 import {
@@ -26,6 +27,7 @@ import { AgentInputArea } from './agent-view/input-area';
 const LG_BREAKPOINT = 1024;
 /** Breakpoint above which all three panels can coexist */
 const XL_BREAKPOINT = 1440;
+const logger = createLogger('AgentView');
 
 export function AgentView() {
   const {
@@ -68,6 +70,23 @@ export function AgentView() {
   const modelSelection = selectedAgentModel;
   const setModelSelection = setSelectedAgentModel;
 
+  useEffect(() => {
+    const ultraModeActive =
+      modelSelection.thinkingLevel === 'ultrathink' || modelSelection.reasoningEffort === 'xhigh';
+    logger.info('[ModelSelection]', {
+      model: modelSelection.model,
+      providerId: modelSelection.providerId ?? null,
+      thinkingLevel: modelSelection.thinkingLevel ?? 'none',
+      reasoningEffort: modelSelection.reasoningEffort ?? 'none',
+      ultraModeActive,
+    });
+  }, [
+    modelSelection.model,
+    modelSelection.providerId,
+    modelSelection.thinkingLevel,
+    modelSelection.reasoningEffort,
+  ]);
+
   const handleToolUse = useCallback((toolName: string) => {
     setCurrentTool(toolName);
     setTimeout(() => setCurrentTool(null), 2000);
@@ -108,6 +127,7 @@ export function AgentView() {
     workingDirectory: currentProject?.path,
     model: modelSelection.model,
     thinkingLevel: modelSelection.thinkingLevel,
+    reasoningEffort: modelSelection.reasoningEffort,
     onToolUse: handleToolUse,
   });
 

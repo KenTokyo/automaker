@@ -3,20 +3,35 @@
  */
 
 import type { Request, Response } from 'express';
-import type { ThinkingLevel } from '@automaker/types';
+import type { ThinkingLevel, ReasoningEffort } from '@automaker/types';
 import { AgentService } from '../../../services/agent-service.js';
+import { createLogger } from '@automaker/utils';
 import { getErrorMessage, logError } from '../common.js';
+const logger = createLogger('AgentQueue');
 
 export function createQueueAddHandler(agentService: AgentService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { sessionId, message, imagePaths, model, thinkingLevel } = req.body as {
-        sessionId: string;
-        message: string;
-        imagePaths?: string[];
-        model?: string;
-        thinkingLevel?: ThinkingLevel;
-      };
+      const { sessionId, message, imagePaths, model, thinkingLevel, reasoningEffort } =
+        req.body as {
+          sessionId: string;
+          message: string;
+          imagePaths?: string[];
+          model?: string;
+          thinkingLevel?: ThinkingLevel;
+          reasoningEffort?: ReasoningEffort;
+        };
+
+      const ultraModeActive = thinkingLevel === 'ultrathink' || reasoningEffort === 'xhigh';
+      logger.debug('Queue add request:', {
+        sessionId,
+        messageLength: message?.length ?? 0,
+        imageCount: imagePaths?.length ?? 0,
+        model,
+        thinkingLevel,
+        reasoningEffort,
+        ultraModeActive,
+      });
 
       if (!sessionId || !message) {
         res.status(400).json({
@@ -31,6 +46,7 @@ export function createQueueAddHandler(agentService: AgentService) {
         imagePaths,
         model,
         thinkingLevel,
+        reasoningEffort,
       });
       res.json(result);
     } catch (error) {
