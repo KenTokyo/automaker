@@ -133,7 +133,7 @@ import { getFeatureDir, ensureAutomakerDir } from '@automaker/platform';
 import { resolveModelString, DEFAULT_MODELS } from '@automaker/model-resolver';
 
 // Convert user input to model ID
-const modelId = resolveModelString('sonnet'); // → 'claude-sonnet-4-20250514'
+const modelId = resolveModelString('sonnet'); // → 'claude-sonnet-4-6'
 ```
 
 **Never import from:** `lib/model-resolver`
@@ -141,8 +141,8 @@ const modelId = resolveModelString('sonnet'); // → 'claude-sonnet-4-20250514'
 **Model aliases:**
 
 - `haiku` → `claude-haiku-4-5` (fast, simple tasks)
-- `sonnet` → `claude-sonnet-4-20250514` (balanced, recommended)
-- `opus` → `claude-opus-4-6-20250918` (maximum capability)
+- `sonnet` → `claude-sonnet-4-6` (balanced, recommended)
+- `opus` → `claude-opus-4-6` (maximum capability)
 
 ### @automaker/dependency-resolver
 

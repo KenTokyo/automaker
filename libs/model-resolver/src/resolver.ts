@@ -110,7 +110,7 @@ export function resolveModelString(
     return resolved;
   }
 
-  // Full Claude model string (e.g., claude-sonnet-4-5-20250929) - pass through
+  // Full Claude model string (e.g., claude-sonnet-4-6) - pass through
   if (canonicalKey.includes('claude-')) {
     console.log(`[ModelResolver] Using full Claude model string: ${canonicalKey}`);
     return canonicalKey;

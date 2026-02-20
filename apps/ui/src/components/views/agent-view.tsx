@@ -17,11 +17,21 @@ import {
   useFileAttachments,
   useAgentShortcuts,
   useAgentSession,
+  useAgentWorktreeActions,
 } from './agent-view/hooks';
 
 // Extracted components
 import { NoProjectState, AgentHeader, ChatArea, BrowserPanel } from './agent-view/components';
 import { AgentInputArea } from './agent-view/input-area';
+import {
+  ViewWorktreeChangesDialog,
+  PushToRemoteDialog,
+  MergeWorktreeDialog,
+} from '../views/board-view/dialogs';
+import { DevServerLogsPanel } from '../views/board-view/worktree-panel/components';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { TestLogsPanel } from '@/components/ui/test-logs-panel';
+import { Undo2 } from 'lucide-react';
 
 /** Tailwind lg breakpoint in pixels */
 const LG_BREAKPOINT = 1024;
@@ -162,6 +172,11 @@ export function AgentView() {
   useAgentShortcuts({
     currentProject,
     quickCreateSessionRef,
+  });
+
+  // Worktree actions for the Agent Header
+  const worktreeActions = useAgentWorktreeActions({
+    projectPath: currentProject?.path,
   });
 
   // Get agent prompts store
@@ -438,23 +453,57 @@ export function AgentView() {
     }
   }, [currentSessionId]);
 
-  // Show welcome message if no messages yet
-  const displayMessages =
-    messages.length === 0
-      ? [
-          {
-            id: 'welcome',
-            role: 'assistant' as const,
-            content:
-              "Hello! I'm the Automaker Agent. I can help you build software autonomously. I can read and modify files in this project, run commands, and execute tests. What would you like to create today?",
-            timestamp: new Date().toISOString(),
-          },
-        ]
-      : messages;
+  const displayMessages = messages;
 
   if (!currentProject) {
     return <NoProjectState />;
   }
+
+  // Build worktree actions props for the AgentHeader
+  const worktreeActionsProps = worktreeActions.mainWorktree
+    ? {
+        mainWorktree: worktreeActions.mainWorktree,
+        aheadCount: worktreeActions.aheadCount,
+        behindCount: worktreeActions.behindCount,
+        hasRemoteBranch: worktreeActions.hasRemoteBranch,
+        gitRepoStatus: worktreeActions.gitRepoStatus,
+        isStartingDevServer: worktreeActions.isStartingDevServer,
+        isDevServerRunning: worktreeActions.isDevServerRunning,
+        devServerInfo: worktreeActions.devServerInfo,
+        isPulling: worktreeActions.isPulling,
+        isPushing: worktreeActions.isPushing,
+        isAutoModeRunning: worktreeActions.isAutoModeRunning,
+        hasTestCommand: worktreeActions.hasTestCommand,
+        isStartingTests: worktreeActions.isStartingTests,
+        isTestRunning: worktreeActions.isTestRunning,
+        testSessionInfo: worktreeActions.testSessionInfo,
+        hasInitScript: worktreeActions.hasInitScript,
+        onOpenChange: worktreeActions.handleActionsDropdownOpenChange,
+        onPull: worktreeActions.handlePull,
+        onPush: worktreeActions.handlePush,
+        onPushNewBranch: worktreeActions.handlePushNewBranch,
+        onOpenInEditor: worktreeActions.handleOpenInEditor,
+        onOpenInIntegratedTerminal: worktreeActions.handleOpenInIntegratedTerminal,
+        onOpenInExternalTerminal: worktreeActions.handleOpenInExternalTerminal,
+        onViewChanges: worktreeActions.handleViewChanges,
+        onDiscardChanges: worktreeActions.handleDiscardChanges,
+        onCommit: worktreeActions.handleCommit,
+        onCreatePR: worktreeActions.handleCreatePR,
+        onAddressPRComments: worktreeActions.handleAddressPRComments,
+        onResolveConflicts: worktreeActions.handleResolveConflicts,
+        onDeleteWorktree: worktreeActions.handleDeleteWorktree,
+        onStartDevServer: worktreeActions.handleStartDevServer,
+        onStopDevServer: worktreeActions.handleStopDevServer,
+        onOpenDevServerUrl: worktreeActions.handleOpenDevServerUrl,
+        onViewDevServerLogs: worktreeActions.handleViewDevServerLogs,
+        onRunInitScript: worktreeActions.handleRunInitScript,
+        onToggleAutoMode: worktreeActions.handleToggleAutoMode,
+        onMerge: worktreeActions.handleMerge,
+        onStartTests: worktreeActions.handleStartTests,
+        onStopTests: worktreeActions.handleStopTests,
+        onViewTestLogs: worktreeActions.handleViewTestLogs,
+      }
+    : undefined;
 
   return (
     <div className="flex-1 flex overflow-hidden bg-background" data-testid="agent-view">
@@ -520,6 +569,7 @@ export function AgentView() {
                 showSessionManager={showSessionManager}
                 onToggleSessionManager={handleToggleSessionManager}
                 onClearChat={handleClearChat}
+                worktreeActions={worktreeActionsProps}
               />
 
               {/* Messages */}
@@ -651,6 +701,61 @@ export function AgentView() {
           )}
         </div>
       )}
+
+      {/* Worktree Action Dialogs */}
+      <ViewWorktreeChangesDialog
+        open={worktreeActions.viewChangesDialogOpen}
+        onOpenChange={worktreeActions.setViewChangesDialogOpen}
+        worktree={worktreeActions.viewChangesWorktree}
+        projectPath={currentProject.path}
+      />
+
+      <ConfirmDialog
+        open={worktreeActions.discardChangesDialogOpen}
+        onOpenChange={worktreeActions.setDiscardChangesDialogOpen}
+        onConfirm={worktreeActions.handleConfirmDiscardChanges}
+        title="Discard Changes"
+        description={`Are you sure you want to discard all changes in "${worktreeActions.discardChangesWorktree?.branch}"? This will reset staged changes, discard modifications to tracked files, and remove untracked files. This action cannot be undone.`}
+        icon={Undo2}
+        iconClassName="text-destructive"
+        confirmText="Discard Changes"
+        confirmVariant="destructive"
+      />
+
+      <DevServerLogsPanel
+        open={worktreeActions.logPanelOpen}
+        onClose={() => worktreeActions.setLogPanelOpen(false)}
+        worktree={worktreeActions.logPanelWorktree}
+        onStopDevServer={worktreeActions.handleStopDevServer}
+        onOpenDevServerUrl={worktreeActions.handleOpenDevServerUrl}
+      />
+
+      <PushToRemoteDialog
+        open={worktreeActions.pushToRemoteDialogOpen}
+        onOpenChange={worktreeActions.setPushToRemoteDialogOpen}
+        worktree={worktreeActions.pushToRemoteWorktree}
+        onConfirm={worktreeActions.handleConfirmPushToRemote}
+      />
+
+      <MergeWorktreeDialog
+        open={worktreeActions.mergeDialogOpen}
+        onOpenChange={worktreeActions.setMergeDialogOpen}
+        projectPath={currentProject.path}
+        worktree={worktreeActions.mergeWorktree}
+        onMerged={() => {}}
+      />
+
+      <TestLogsPanel
+        open={worktreeActions.testLogsPanelOpen}
+        onClose={() => worktreeActions.setTestLogsPanelOpen(false)}
+        worktreePath={worktreeActions.testLogsPanelWorktree?.path ?? null}
+        branch={worktreeActions.testLogsPanelWorktree?.branch}
+        onStopTests={
+          worktreeActions.testLogsPanelWorktree
+            ? () => worktreeActions.handleStopTests(worktreeActions.testLogsPanelWorktree!)
+            : undefined
+        }
+      />
     </div>
   );
 }

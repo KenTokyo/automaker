@@ -349,9 +349,9 @@ export class ClaudeProvider extends BaseProvider {
   getAvailableModels(): ModelDefinition[] {
     const models = [
       {
-        id: 'claude-opus-4-6-20250918',
+        id: 'claude-opus-4-6',
         name: 'Claude Opus 4.6',
-        modelString: 'claude-opus-4-6-20250918',
+        modelString: 'claude-opus-4-6',
         provider: 'anthropic',
         description: 'Most capable Claude model',
         contextWindow: 200000,
@@ -362,11 +362,23 @@ export class ClaudeProvider extends BaseProvider {
         default: true,
       },
       {
+        id: 'claude-sonnet-4-6',
+        name: 'Claude Sonnet 4.6',
+        modelString: 'claude-sonnet-4-6',
+        provider: 'anthropic',
+        description: 'Balanced performance and cost',
+        contextWindow: 200000,
+        maxOutputTokens: 16000,
+        supportsVision: true,
+        supportsTools: true,
+        tier: 'standard' as const,
+      },
+      {
         id: 'claude-sonnet-4-20250514',
         name: 'Claude Sonnet 4',
         modelString: 'claude-sonnet-4-20250514',
         provider: 'anthropic',
-        description: 'Balanced performance and cost',
+        description: 'Previous generation Sonnet',
         contextWindow: 200000,
         maxOutputTokens: 16000,
         supportsVision: true,

@@ -160,8 +160,8 @@ Project-specific rules are stored in `.automaker/context/` and automatically loa
 Use `resolveModelString()` from `@automaker/model-resolver` to convert model aliases:
 
 - `haiku` → `claude-haiku-4-5`
-- `sonnet` → `claude-sonnet-4-20250514`
-- `opus` → `claude-opus-4-6-20250918`
+- `sonnet` → `claude-sonnet-4-6`
+- `opus` → `claude-opus-4-6`
 
 ## Environment Variables
 

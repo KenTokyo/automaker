@@ -27,7 +27,7 @@ export interface AgentTaskInfo {
 /**
  * Default model used by the feature executor
  */
-export const DEFAULT_MODEL = 'claude-opus-4-6-20250918';
+export const DEFAULT_MODEL = 'claude-opus-4-6';
 
 /**
  * Formats a model name for display

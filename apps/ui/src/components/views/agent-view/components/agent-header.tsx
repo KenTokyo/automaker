@@ -25,6 +25,57 @@ import { getAuthenticatedImageUrl } from '@/lib/api-fetch';
 import { useAppStore } from '@/store/app-store';
 import type { Project } from '@/lib/electron';
 import { EditProjectDialog } from '@/components/layout/project-switcher/components/edit-project-dialog';
+import { WorktreeActionsDropdown } from '@/components/views/board-view/worktree-panel/components/worktree-actions-dropdown';
+import type {
+  WorktreeInfo,
+  GitRepoStatus,
+  DevServerInfo,
+  TestSessionInfo,
+  PRInfo,
+} from '@/components/views/board-view/worktree-panel/types';
+
+interface WorktreeActionsProps {
+  mainWorktree: WorktreeInfo;
+  aheadCount: number;
+  behindCount: number;
+  hasRemoteBranch: boolean;
+  gitRepoStatus: GitRepoStatus;
+  isStartingDevServer: boolean;
+  isDevServerRunning: boolean;
+  devServerInfo?: DevServerInfo;
+  isPulling: boolean;
+  isPushing: boolean;
+  isAutoModeRunning: boolean;
+  hasTestCommand: boolean;
+  isStartingTests: boolean;
+  isTestRunning: boolean;
+  testSessionInfo?: TestSessionInfo;
+  hasInitScript: boolean;
+  onOpenChange: (open: boolean) => void;
+  onPull: (worktree: WorktreeInfo) => void;
+  onPush: (worktree: WorktreeInfo) => void;
+  onPushNewBranch: (worktree: WorktreeInfo) => void;
+  onOpenInEditor: (worktree: WorktreeInfo, editorCommand?: string) => void;
+  onOpenInIntegratedTerminal: (worktree: WorktreeInfo, mode?: 'tab' | 'split') => void;
+  onOpenInExternalTerminal: (worktree: WorktreeInfo, terminalId?: string) => void;
+  onViewChanges: (worktree: WorktreeInfo) => void;
+  onDiscardChanges: (worktree: WorktreeInfo) => void;
+  onCommit: (worktree: WorktreeInfo) => void;
+  onCreatePR: (worktree: WorktreeInfo) => void;
+  onAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
+  onResolveConflicts: (worktree: WorktreeInfo) => void;
+  onDeleteWorktree: (worktree: WorktreeInfo) => void;
+  onStartDevServer: (worktree: WorktreeInfo) => void;
+  onStopDevServer: (worktree: WorktreeInfo) => void;
+  onOpenDevServerUrl: (worktree: WorktreeInfo) => void;
+  onViewDevServerLogs: (worktree: WorktreeInfo) => void;
+  onRunInitScript: (worktree: WorktreeInfo) => void;
+  onToggleAutoMode: (worktree: WorktreeInfo) => void;
+  onMerge: (worktree: WorktreeInfo) => void;
+  onStartTests: (worktree: WorktreeInfo) => void;
+  onStopTests: (worktree: WorktreeInfo) => void;
+  onViewTestLogs: (worktree: WorktreeInfo) => void;
+}
 
 interface AgentHeaderProps {
   currentProject: Project;
@@ -38,6 +89,7 @@ interface AgentHeaderProps {
   showSessionManager: boolean;
   onToggleSessionManager: () => void;
   onClearChat: () => void;
+  worktreeActions?: WorktreeActionsProps;
 }
 
 function getProjectIcon(project: Project): LucideIcon {
@@ -59,6 +111,7 @@ export function AgentHeader({
   showSessionManager,
   onToggleSessionManager,
   onClearChat,
+  worktreeActions,
 }: AgentHeaderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -375,6 +428,53 @@ export function AgentHeader({
 
         {/* Status indicators & actions */}
         <div className="flex items-center gap-3">
+          {/* Worktree Actions Dropdown */}
+          {worktreeActions && (
+            <WorktreeActionsDropdown
+              worktree={worktreeActions.mainWorktree}
+              isSelected={true}
+              standalone={true}
+              aheadCount={worktreeActions.aheadCount}
+              behindCount={worktreeActions.behindCount}
+              hasRemoteBranch={worktreeActions.hasRemoteBranch}
+              isPulling={worktreeActions.isPulling}
+              isPushing={worktreeActions.isPushing}
+              isStartingDevServer={worktreeActions.isStartingDevServer}
+              isDevServerRunning={worktreeActions.isDevServerRunning}
+              devServerInfo={worktreeActions.devServerInfo}
+              gitRepoStatus={worktreeActions.gitRepoStatus}
+              isAutoModeRunning={worktreeActions.isAutoModeRunning}
+              hasTestCommand={worktreeActions.hasTestCommand}
+              isStartingTests={worktreeActions.isStartingTests}
+              isTestRunning={worktreeActions.isTestRunning}
+              testSessionInfo={worktreeActions.testSessionInfo}
+              onOpenChange={worktreeActions.onOpenChange}
+              onPull={worktreeActions.onPull}
+              onPush={worktreeActions.onPush}
+              onPushNewBranch={worktreeActions.onPushNewBranch}
+              onOpenInEditor={worktreeActions.onOpenInEditor}
+              onOpenInIntegratedTerminal={worktreeActions.onOpenInIntegratedTerminal}
+              onOpenInExternalTerminal={worktreeActions.onOpenInExternalTerminal}
+              onViewChanges={worktreeActions.onViewChanges}
+              onDiscardChanges={worktreeActions.onDiscardChanges}
+              onCommit={worktreeActions.onCommit}
+              onCreatePR={worktreeActions.onCreatePR}
+              onAddressPRComments={worktreeActions.onAddressPRComments}
+              onResolveConflicts={worktreeActions.onResolveConflicts}
+              onDeleteWorktree={worktreeActions.onDeleteWorktree}
+              onStartDevServer={worktreeActions.onStartDevServer}
+              onStopDevServer={worktreeActions.onStopDevServer}
+              onOpenDevServerUrl={worktreeActions.onOpenDevServerUrl}
+              onViewDevServerLogs={worktreeActions.onViewDevServerLogs}
+              onRunInitScript={worktreeActions.onRunInitScript}
+              onToggleAutoMode={worktreeActions.onToggleAutoMode}
+              onMerge={worktreeActions.onMerge}
+              onStartTests={worktreeActions.onStartTests}
+              onStopTests={worktreeActions.onStopTests}
+              onViewTestLogs={worktreeActions.onViewTestLogs}
+              hasInitScript={worktreeActions.hasInitScript}
+            />
+          )}
           {/* Settings Popover */}
           <Popover>
             <PopoverTrigger asChild>

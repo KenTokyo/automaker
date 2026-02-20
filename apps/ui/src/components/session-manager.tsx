@@ -20,7 +20,10 @@ import {
   CheckSquare,
   Square,
   FileText,
+  AArrowDown,
+  AArrowUp,
 } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
@@ -467,6 +470,8 @@ export function SessionManager({
 
   const docsOpen = useAppStore((s) => s.docsOpen);
   const setDocsOpen = useAppStore((s) => s.setDocsOpen);
+  const sessionFontSize = useAppStore((s) => s.sessionFontSize);
+  const setSessionFontSize = useAppStore((s) => s.setSessionFontSize);
 
   return (
     <Card className="h-full flex flex-col rounded-none">
@@ -581,6 +586,23 @@ export function SessionManager({
                 sessionCounts={sessionCountByProject}
               />
             </div>
+
+            {/* Font Size Slider */}
+            <div className="flex items-center gap-2 mt-2">
+              <AArrowDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <Slider
+                value={[sessionFontSize]}
+                onValueChange={([v]) => setSessionFontSize(v)}
+                min={10}
+                max={18}
+                step={1}
+                className="flex-1"
+              />
+              <AArrowUp className="w-4.5 h-4.5 text-muted-foreground shrink-0" />
+              <span className="text-xs text-muted-foreground w-7 text-right tabular-nums">
+                {sessionFontSize}
+              </span>
+            </div>
           </CardHeader>
 
           <CardContent className="flex-1 overflow-y-auto space-y-2" data-testid="session-list">
@@ -684,7 +706,7 @@ export function SessionManager({
                 <div
                   key={session.id}
                   className={cn(
-                    'p-3 border rounded-lg cursor-pointer transition-colors hover:bg-accent/50',
+                    'border rounded-lg cursor-pointer transition-colors hover:bg-accent/50',
                     currentSessionId === session.id && 'bg-primary/10 border-primary',
                     session.isArchived && 'opacity-60',
                     isMultiselectMode &&
@@ -692,6 +714,8 @@ export function SessionManager({
                       'bg-primary/20 border-primary'
                   )}
                   style={{
+                    fontSize: `${sessionFontSize}px`,
+                    padding: `${Math.max(4, sessionFontSize * 0.6)}px ${Math.max(6, sessionFontSize * 0.75)}px`,
                     borderLeftWidth: sessionBadgeColor ? '3px' : undefined,
                     borderLeftColor: sessionBadgeColor || undefined,
                   }}
@@ -761,38 +785,58 @@ export function SessionManager({
                         </div>
                       ) : (
                         <>
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-1.5 mb-0.5">
                             {/* Show loading indicator if this session is running (either current session thinking or any session in runningSessions) */}
                             {(currentSessionId === session.id && isCurrentSessionThinking) ||
                             runningSessions.has(session.id) ? (
                               <Spinner size="sm" className="shrink-0" />
                             ) : (
-                              <MessageSquare className="w-4 h-4 text-muted-foreground shrink-0" />
+                              <MessageSquare
+                                style={{
+                                  width: `${sessionFontSize}px`,
+                                  height: `${sessionFontSize}px`,
+                                }}
+                                className="text-muted-foreground shrink-0"
+                              />
                             )}
-                            <h3 className="font-medium truncate">{session.name}</h3>
+                            <h3 className="font-medium truncate" style={{ fontSize: 'inherit' }}>
+                              {session.name}
+                            </h3>
                             {((currentSessionId === session.id && isCurrentSessionThinking) ||
                               runningSessions.has(session.id)) && (
-                              <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                              <span
+                                className="text-primary bg-primary/10 px-1.5 py-0.5 rounded-full"
+                                style={{ fontSize: `${sessionFontSize - 4}px` }}
+                              >
                                 thinking...
                               </span>
                             )}
                           </div>
                           {session.description && (
-                            <p className="text-sm text-foreground/80 line-clamp-3 whitespace-pre-line">
+                            <p
+                              className="text-foreground/80 line-clamp-3 whitespace-pre-line"
+                              style={{ fontSize: `${sessionFontSize - 2}px` }}
+                            >
                               {session.description}
                             </p>
                           )}
                           {!session.description && session.preview && (
-                            <p className="text-xs text-muted-foreground truncate">
+                            <p
+                              className="text-muted-foreground truncate"
+                              style={{ fontSize: `${sessionFontSize - 4}px` }}
+                            >
                               {session.preview}
                             </p>
                           )}
-                          <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            <span className="text-xs text-muted-foreground">
+                          <div
+                            className="flex items-center gap-2 mt-1 flex-wrap"
+                            style={{ fontSize: `${sessionFontSize - 4}px` }}
+                          >
+                            <span className="text-muted-foreground">
                               {session.messageCount} messages
                             </span>
-                            <span className="text-xs text-muted-foreground">·</span>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-muted-foreground">·</span>
+                            <span className="text-muted-foreground">
                               {new Date(session.updatedAt).toLocaleDateString()}
                             </span>
                             {session.projectPath && (
@@ -817,7 +861,7 @@ export function SessionManager({
 
                     {/* Actions - hidden in multiselect mode */}
                     {!isMultiselectMode && !session.isArchived && (
-                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
                         <Button
                           size="sm"
                           variant="ghost"
@@ -825,54 +869,99 @@ export function SessionManager({
                             setEditingSessionId(session.id);
                             setEditingName(session.name);
                           }}
-                          className="h-7 w-7 p-0"
+                          className="p-0"
+                          style={{
+                            width: `${sessionFontSize + 6}px`,
+                            height: `${sessionFontSize + 6}px`,
+                          }}
                           title="Rename session"
                         >
-                          <Edit2 className="w-3 h-3" />
+                          <Edit2
+                            style={{
+                              width: `${sessionFontSize - 2}px`,
+                              height: `${sessionFontSize - 2}px`,
+                            }}
+                          />
                         </Button>
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => handleArchiveSession(session.id)}
-                          className="h-7 w-7 p-0"
+                          className="p-0"
+                          style={{
+                            width: `${sessionFontSize + 6}px`,
+                            height: `${sessionFontSize + 6}px`,
+                          }}
                           data-testid={`archive-session-${session.id}`}
                           title="Archive session"
                         >
-                          <Archive className="w-3 h-3" />
+                          <Archive
+                            style={{
+                              width: `${sessionFontSize - 2}px`,
+                              height: `${sessionFontSize - 2}px`,
+                            }}
+                          />
                         </Button>
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => handleDeleteSession(session)}
-                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          className="p-0 text-destructive hover:text-destructive"
+                          style={{
+                            width: `${sessionFontSize + 6}px`,
+                            height: `${sessionFontSize + 6}px`,
+                          }}
                           data-testid={`delete-session-${session.id}`}
                           title="Delete session"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2
+                            style={{
+                              width: `${sessionFontSize - 2}px`,
+                              height: `${sessionFontSize - 2}px`,
+                            }}
+                          />
                         </Button>
                       </div>
                     )}
 
                     {!isMultiselectMode && session.isArchived && (
-                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => handleUnarchiveSession(session.id)}
-                          className="h-7 w-7 p-0"
+                          className="p-0"
+                          style={{
+                            width: `${sessionFontSize + 6}px`,
+                            height: `${sessionFontSize + 6}px`,
+                          }}
                           title="Restore session"
                         >
-                          <ArchiveRestore className="w-3 h-3" />
+                          <ArchiveRestore
+                            style={{
+                              width: `${sessionFontSize - 2}px`,
+                              height: `${sessionFontSize - 2}px`,
+                            }}
+                          />
                         </Button>
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => handleDeleteSession(session)}
-                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          className="p-0 text-destructive hover:text-destructive"
+                          style={{
+                            width: `${sessionFontSize + 6}px`,
+                            height: `${sessionFontSize + 6}px`,
+                          }}
                           data-testid={`delete-archived-session-${session.id}`}
                           title="Delete session"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2
+                            style={{
+                              width: `${sessionFontSize - 2}px`,
+                              height: `${sessionFontSize - 2}px`,
+                            }}
+                          />
                         </Button>
                       </div>
                     )}

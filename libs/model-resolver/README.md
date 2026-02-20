@@ -24,21 +24,21 @@ import { CLAUDE_MODEL_MAP } from '@automaker/types';
 
 // Resolve model string
 const model = resolveModelString('sonnet');
-// Returns: 'claude-sonnet-4-20250514'
+// Returns: 'claude-sonnet-4-6'
 
 const model2 = resolveModelString('haiku');
 // Returns: 'claude-haiku-4-5'
 
 const model3 = resolveModelString('opus');
-// Returns: 'claude-opus-4-6-20250918'
+// Returns: 'claude-opus-4-6'
 
 // Use with custom default
-const model4 = resolveModelString(undefined, 'claude-sonnet-4-20250514');
-// Returns: 'claude-sonnet-4-20250514' (default)
+const model4 = resolveModelString(undefined, 'claude-sonnet-4-6');
+// Returns: 'claude-sonnet-4-6' (default)
 
 // Direct model ID passthrough
-const model5 = resolveModelString('claude-opus-4-6-20250918');
-// Returns: 'claude-opus-4-6-20250918' (unchanged)
+const model5 = resolveModelString('claude-opus-4-6');
+// Returns: 'claude-opus-4-6' (unchanged)
 ```
 
 ### Get Effective Model
@@ -52,7 +52,7 @@ import { getEffectiveModel } from '@automaker/model-resolver';
 const model = getEffectiveModel({
   requestedModel: 'sonnet',
   featureModel: undefined,
-  defaultModel: 'claude-sonnet-4-20250514',
+  defaultModel: 'claude-sonnet-4-6',
 });
 ```
 
@@ -65,14 +65,14 @@ import { DEFAULT_MODELS } from '@automaker/model-resolver';
 import { CLAUDE_MODEL_MAP } from '@automaker/types';
 
 // Default models for different contexts
-console.log(DEFAULT_MODELS.claude); // 'claude-sonnet-4-20250514'
-console.log(DEFAULT_MODELS.autoMode); // 'claude-sonnet-4-20250514'
-console.log(DEFAULT_MODELS.chat); // 'claude-sonnet-4-20250514'
+console.log(DEFAULT_MODELS.claude); // 'claude-sonnet-4-6'
+console.log(DEFAULT_MODELS.autoMode); // 'claude-sonnet-4-6'
+console.log(DEFAULT_MODELS.chat); // 'claude-sonnet-4-6'
 
 // Model alias mappings
 console.log(CLAUDE_MODEL_MAP.haiku); // 'claude-haiku-4-5'
-console.log(CLAUDE_MODEL_MAP.sonnet); // 'claude-sonnet-4-20250514'
-console.log(CLAUDE_MODEL_MAP.opus); // 'claude-opus-4-6-20250918'
+console.log(CLAUDE_MODEL_MAP.sonnet); // 'claude-sonnet-4-6'
+console.log(CLAUDE_MODEL_MAP.opus); // 'claude-opus-4-6'
 ```
 
 ## Usage Example
@@ -103,7 +103,7 @@ const feature: Feature = {
 };
 
 prepareFeatureExecution(feature);
-// Output: Executing feature with model: claude-opus-4-6-20250918
+// Output: Executing feature with model: claude-opus-4-6
 ```
 
 ## Supported Models
@@ -111,8 +111,8 @@ prepareFeatureExecution(feature);
 ### Current Model Aliases
 
 - `haiku` → `claude-haiku-4-5`
-- `sonnet` → `claude-sonnet-4-20250514`
-- `opus` → `claude-opus-4-6-20250918`
+- `sonnet` → `claude-sonnet-4-6`
+- `opus` → `claude-opus-4-6`
 
 ### Model Selection Guide
 
@@ -131,5 +131,5 @@ prepareFeatureExecution(feature);
 ## Notes
 
 - Model strings that don't match aliases are passed through unchanged
-- This allows direct use of specific model versions like `claude-sonnet-4-20250514`
+- This allows direct use of specific model versions like `claude-sonnet-4-6`
 - Always falls back to a sensible default if no model is specified

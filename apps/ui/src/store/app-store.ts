@@ -506,6 +506,8 @@ const initialState: AppState = {
   editorTheme: JSON.parse(getItem('automaker:editorTheme') || 'null') || DEFAULT_EDITOR_THEME,
   // Session History Limit
   maxSessionsPerProject: parseInt(getItem('automaker:maxSessionsPerProject') || '15', 10),
+  // Session Panel Font Size
+  sessionFontSize: parseInt(getItem('automaker:sessionFontSize') || '14', 10),
   // Docs Auto-Save
   docsAutoSave: getItem('automaker:docsAutoSave') !== 'false', // default true
   docsAutoSaveDelay: parseInt(getItem('automaker:docsAutoSaveDelay') || '3000', 10),
@@ -2922,6 +2924,13 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     const clamped = Math.max(0, Math.min(100, max));
     set({ maxSessionsPerProject: clamped });
     setItem('automaker:maxSessionsPerProject', String(clamped));
+  },
+
+  // Session Panel Font Size actions
+  setSessionFontSize: (size) => {
+    const clamped = Math.max(10, Math.min(18, size));
+    set({ sessionFontSize: clamped });
+    setItem('automaker:sessionFontSize', String(clamped));
   },
 
   // Docs Auto-Save actions

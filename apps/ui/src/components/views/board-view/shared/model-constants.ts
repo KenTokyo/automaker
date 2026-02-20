@@ -32,21 +32,21 @@ export type ModelOption = {
 export const CLAUDE_MODELS: ModelOption[] = [
   {
     id: 'claude-haiku', // Canonical prefixed ID
-    label: 'Claude Haiku',
+    label: 'Claude Haiku 4.5',
     description: 'Fast and efficient for simple tasks.',
     badge: 'Speed',
     provider: 'claude',
   },
   {
     id: 'claude-sonnet', // Canonical prefixed ID
-    label: 'Claude Sonnet',
+    label: 'Claude Sonnet 4.6',
     description: 'Balanced performance with strong reasoning.',
     badge: 'Balanced',
     provider: 'claude',
   },
   {
     id: 'claude-opus', // Canonical prefixed ID
-    label: 'Claude Opus',
+    label: 'Claude Opus 4.6',
     description: 'Most capable model for complex work.',
     badge: 'Premium',
     provider: 'claude',

@@ -21,6 +21,7 @@ import {
   getSelectedVariant,
   codexModelHasThinking,
   CODEX_MODEL_CONFIG_MAP,
+  CLAUDE_CANONICAL_MAP,
 } from '@automaker/types';
 import {
   CLAUDE_MODELS,
@@ -1694,6 +1695,9 @@ export function PhaseModelSelector({
     const currentThinking = isSelected
       ? selectedThinkingLevel
       : preferredSelection.thinkingLevel || 'none';
+    const apiModelString = (
+      CLAUDE_CANONICAL_MAP[model.id as keyof typeof CLAUDE_CANONICAL_MAP] || ''
+    ).replace(/-\d{8}$/, '');
 
     // On mobile, keep one-click model selection and show inline thinking only via settings button
     if (isMobile) {
@@ -1712,9 +1716,16 @@ export function PhaseModelSelector({
                 )}
               />
               <div className="flex flex-col truncate">
-                <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
-                  {model.label}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
+                    {model.label}
+                  </span>
+                  {apiModelString && (
+                    <span className="text-[10px] text-muted-foreground/50 font-mono">
+                      {apiModelString}
+                    </span>
+                  )}
+                </div>
                 <span className="truncate text-xs text-muted-foreground">
                   {isSelected && currentThinking !== 'none'
                     ? `Thinking: ${THINKING_LEVEL_LABELS[currentThinking]}`
@@ -1825,9 +1836,16 @@ export function PhaseModelSelector({
             )}
           />
           <div className="flex flex-col truncate">
-            <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
-              {model.label}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
+                {model.label}
+              </span>
+              {apiModelString && (
+                <span className="text-[10px] text-muted-foreground/50 font-mono">
+                  {apiModelString}
+                </span>
+              )}
+            </div>
             <span className="truncate text-xs text-muted-foreground">
               {isSelected && currentThinking !== 'none'
                 ? `Thinking: ${THINKING_LEVEL_LABELS[currentThinking]}`
@@ -2136,13 +2154,13 @@ export function PhaseModelSelector({
       aria-expanded={open}
       disabled={disabled}
       className={cn(
-        'h-11 gap-1 text-xs font-medium rounded-xl border-border px-2.5',
+        'h-9 gap-1 text-xs font-medium rounded-xl border-border px-2',
         triggerClassName
       )}
       data-testid="model-selector"
     >
-      {currentModel?.icon && <currentModel.icon className="h-4 w-4 text-muted-foreground/70" />}
-      <span className="truncate text-sm">
+      {currentModel?.icon && <currentModel.icon className="h-3.5 w-3.5 text-muted-foreground/70" />}
+      <span className="truncate text-xs">
         {currentModel?.label?.replace('Claude ', '') || 'Select model...'}
       </span>
       <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />

@@ -54,8 +54,8 @@ describe('provider-factory.ts', () => {
 
   describe('getProviderForModel', () => {
     describe('Claude models (claude-* prefix)', () => {
-      it('should return ClaudeProvider for claude-opus-4-6-20250918', () => {
-        const provider = ProviderFactory.getProviderForModel('claude-opus-4-6-20250918');
+      it('should return ClaudeProvider for claude-opus-4-6', () => {
+        const provider = ProviderFactory.getProviderForModel('claude-opus-4-6');
         expect(provider).toBeInstanceOf(ClaudeProvider);
       });
 

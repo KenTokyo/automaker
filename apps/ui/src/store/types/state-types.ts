@@ -368,6 +368,9 @@ export interface AppState {
   // Session History Limit
   maxSessionsPerProject: number;
 
+  // Session Panel Font Size (10-18px, default 14)
+  sessionFontSize: number;
+
   // Browser Panel State
   browserPanelOpen: boolean;
   browserTabsByProject: Record<string, BrowserTab[]>;
@@ -848,6 +851,9 @@ export interface AppActions {
 
   // Session Limit actions
   setMaxSessionsPerProject: (max: number) => void;
+
+  // Session Panel Font Size actions
+  setSessionFontSize: (size: number) => void;
 
   // Browser Panel actions
   setBrowserPanelOpen: (open: boolean) => void;
