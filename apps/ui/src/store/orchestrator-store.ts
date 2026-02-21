@@ -18,6 +18,11 @@ const ORCHESTRATOR_AUTO_SEND_KEY = 'automaker:orchestrator-auto-send';
 const DEFAULT_KEYWORD = 'NEXT_PHASE_READY';
 const DEFAULT_MAX_ITERATIONS = 100;
 
+interface OrchestratorMessageWrapper {
+  preMessage: string;
+  postMessage: string;
+}
+
 interface OrchestratorState {
   // Whether orchestrator mode is enabled
   isEnabled: boolean;
@@ -42,6 +47,8 @@ interface OrchestratorState {
   clearPendingContent: () => void;
   setAutoSendEnabled: (enabled: boolean) => void;
   shouldTrigger: (lastMessage: string) => boolean;
+  /** Returns pre/post messages to wrap user content, or null if orchestrator is disabled */
+  getMessageWrapper: () => OrchestratorMessageWrapper | null;
 }
 
 function loadEnabled(): boolean {
@@ -158,5 +165,34 @@ export const useOrchestratorStore = create<OrchestratorState>((set, get) => ({
     const { isEnabled, triggerKeyword } = get();
     if (!isEnabled) return false;
     return lastMessage.includes(triggerKeyword);
+  },
+
+  getMessageWrapper: () => {
+    const { isEnabled, currentIteration, maxIterations } = get();
+    if (!isEnabled) return null;
+
+    const preMessage = `🔄 ORCHESTRATOR MODE ACTIVE:
+- You are working on a multi-phase project
+- After completing a phase, check if more phases are pending in the plan
+- If another phase is pending:
+  * End your response with: NEXT_PHASE_READY
+  * Include a summary of what was completed
+  * Include context needed for the next phase
+  * Specify which phase is next
+- If all phases are complete:
+  * End your response with: ALL_PHASES_COMPLETE
+- Orchestrator run ID: orch-run-${Date.now().toString(36)}
+- Current iteration: ${currentIteration + 1}/${maxIterations}
+- Do NOT include NEXT_PHASE_READY if no more phases exist`;
+
+    const postMessage = `⚠️ CRITICAL REMINDER - ORCHESTRATOR MODE:
+- NEXT_PHASE_READY must ONLY appear at the VERY END of your response
+- NEVER place NEXT_PHASE_READY in the middle of your response
+- NEVER place NEXT_PHASE_READY anywhere except the absolute last line
+- If you have more to say, say it BEFORE NEXT_PHASE_READY
+- The ONLY correct position for NEXT_PHASE_READY is at the END
+- Current iteration: ${currentIteration + 1}/${maxIterations}`;
+
+    return { preMessage, postMessage };
   },
 }));

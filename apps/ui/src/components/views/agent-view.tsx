@@ -188,12 +188,20 @@ export function AgentView() {
     startProcessing: timeLimiterStartProcessing,
     stopProcessing: timeLimiterStopProcessing,
     resetTimer: timeLimiterResetTimer,
+    setCurrentModel: timeLimiterSetCurrentModel,
     getElapsedSeconds,
     isTimeExceeded,
     pendingCopiedContent,
     setPendingCopiedContent,
     clearPendingContent,
   } = useTimeLimiterStore();
+
+  // Sync the current model to the time limiter store so it uses model-specific time limits
+  useEffect(() => {
+    if (modelSelection.model) {
+      timeLimiterSetCurrentModel(modelSelection.model);
+    }
+  }, [modelSelection.model, timeLimiterSetCurrentModel]);
 
   // Track elapsed seconds for display
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -294,6 +302,7 @@ export function AgentView() {
     pendingOrchestratorContent,
     clearPendingContent: clearOrchestratorPendingContent,
     autoSendEnabled: orchestratorAutoSend,
+    getMessageWrapper: getOrchestratorMessageWrapper,
   } = useOrchestratorStore();
 
   // Track previous isProcessing to detect complete events (true → false)
@@ -388,6 +397,17 @@ export function AgentView() {
         messageContent = agentPromptsText + '\n\n---\n\n' + messageInput;
       }
 
+      // Wrap with orchestrator pre/post messages if enabled
+      const orchestratorWrapper = getOrchestratorMessageWrapper();
+      if (orchestratorWrapper) {
+        messageContent =
+          orchestratorWrapper.preMessage +
+          '\n\n' +
+          messageContent +
+          '\n\n' +
+          orchestratorWrapper.postMessage;
+      }
+
       const messageImages = selectedImages;
       const messageTextFiles = selectedTextFiles;
 
@@ -403,7 +423,15 @@ export function AgentView() {
         await sendMessage(messageContent, messageImages, messageTextFiles);
       }
     },
-    [input, fileAttachments, isProcessing, sendMessage, addToServerQueue, getSelectedPromptsText]
+    [
+      input,
+      fileAttachments,
+      isProcessing,
+      sendMessage,
+      addToServerQueue,
+      getSelectedPromptsText,
+      getOrchestratorMessageWrapper,
+    ]
   );
 
   const handleClearChat = async () => {

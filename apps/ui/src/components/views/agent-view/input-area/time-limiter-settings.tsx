@@ -3,10 +3,12 @@
  *
  * A dropdown component for configuring the session time limit.
  * When the time limit is exceeded, the chat is copied and a new session is started.
+ *
+ * Time limits are model-specific: each model remembers its own configured time limit.
  */
 
 import { memo, useState, useEffect } from 'react';
-import { Timer, Settings, Clock } from 'lucide-react';
+import { Timer, Settings, Clock, Cpu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,12 +30,13 @@ export const TimeLimiterSettings = memo(function TimeLimiterSettings({
   disabled,
   elapsedSeconds = 0,
 }: TimeLimiterSettingsProps) {
-  const { timeLimitSeconds, isEnabled, setTimeLimit, setEnabled } = useTimeLimiterStore();
+  const { timeLimitSeconds, isEnabled, currentModelId, setTimeLimit, setEnabled } =
+    useTimeLimiterStore();
 
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState(timeLimitSeconds.toString());
 
-  // Sync input value with store
+  // Sync input value with store (e.g. when model changes and time limit is restored)
   useEffect(() => {
     setInputValue(timeLimitSeconds.toString());
   }, [timeLimitSeconds]);
@@ -68,6 +71,14 @@ export const TimeLimiterSettings = memo(function TimeLimiterSettings({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Format model ID for display (e.g. "claude-opus" -> "Claude Opus")
+  const formatModelName = (modelId: string): string => {
+    return modelId
+      .split('-')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  };
+
   // Calculate remaining time
   const remainingSeconds = Math.max(0, timeLimitSeconds - elapsedSeconds);
   const isWarning = isEnabled && remainingSeconds < 60 && remainingSeconds > 0;
@@ -88,7 +99,7 @@ export const TimeLimiterSettings = memo(function TimeLimiterSettings({
           )}
           title={
             isEnabled
-              ? `Time Limit: ${formatTime(remainingSeconds)} remaining`
+              ? `Time Limit: ${formatTime(remainingSeconds)} remaining${currentModelId ? ` (${currentModelId})` : ''}`
               : 'Time Limiter (disabled)'
           }
         >
@@ -124,6 +135,17 @@ export const TimeLimiterSettings = memo(function TimeLimiterSettings({
             </div>
             <Switch id="time-limiter-enabled" checked={isEnabled} onCheckedChange={setEnabled} />
           </div>
+
+          {/* Current Model Indicator */}
+          {currentModelId && (
+            <div className="flex items-center gap-2 px-2 py-1.5 bg-muted/50 rounded-lg">
+              <Cpu className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <span className="text-xs text-muted-foreground">
+                Setting for:{' '}
+                <strong className="text-foreground">{formatModelName(currentModelId)}</strong>
+              </span>
+            </div>
+          )}
 
           {/* Time Limit Input */}
           <div className="space-y-2">
