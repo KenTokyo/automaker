@@ -309,6 +309,7 @@ export function AgentView() {
   // Track previous isProcessing to detect complete events (true → false)
   const wasProcessingRef = useRef(false);
   const assistantCountAtProcessingStartRef = useRef(0);
+  const orchestratorSourceSessionIdRef = useRef<string | null>(null);
 
   // Detect when processing finishes and check for orchestrator trigger
   useEffect(() => {
@@ -342,8 +343,14 @@ export function AgentView() {
     const canContinue = orchestratorIncrementIteration();
     if (!canContinue) return;
 
+    // Remember source session so content is only injected/sent after switching sessions.
+    orchestratorSourceSessionIdRef.current = currentSessionId;
+
     // Store the last AI message as pending content for the new chat
     setOrchestratorPendingContent(lastAssistantMessage.content);
+    if (orchestratorAutoSend) {
+      orchestratorSetAutoSendStatus('waiting');
+    }
 
     // Create a new session
     if (quickCreateSessionRef.current) {
@@ -358,6 +365,8 @@ export function AgentView() {
     orchestratorShouldTrigger,
     orchestratorIncrementIteration,
     setOrchestratorPendingContent,
+    orchestratorAutoSend,
+    orchestratorSetAutoSendStatus,
   ]);
 
   // Guard ref to prevent double auto-sends
@@ -366,59 +375,49 @@ export function AgentView() {
   // Handle pending orchestrator content in new session
   useEffect(() => {
     if (!pendingOrchestratorContent || !currentSessionId) return;
-    if (orchestratorAutoSendInProgressRef.current) return;
-
     const content = pendingOrchestratorContent;
-    clearOrchestratorPendingContent();
+    const sourceSessionId = orchestratorSourceSessionIdRef.current;
 
-    if (!orchestratorAutoSend) {
-      // Manual mode: just paste into textarea
-      setInput(content);
+    // Never inject pending content back into the source/origin session.
+    // Wait until SessionManager actually switched to the newly created session.
+    if (sourceSessionId && sourceSessionId === currentSessionId) {
+      if (orchestratorAutoSend) {
+        orchestratorSetAutoSendStatus('waiting');
+      }
       return;
     }
 
-    // Auto-send mode: wait for session readiness, then send directly
+    if (!orchestratorAutoSend) {
+      // Manual mode: paste into input of the new session and keep it visible.
+      setInput(content);
+      clearOrchestratorPendingContent();
+      orchestratorSetAutoSendStatus('idle');
+      orchestratorSourceSessionIdRef.current = null;
+      return;
+    }
+
+    // Auto-send mode: reactively wait until session is connected and idle.
+    if (!isConnected || isProcessing) {
+      orchestratorSetAutoSendStatus('waiting');
+      return;
+    }
+
+    if (orchestratorAutoSendInProgressRef.current) return;
+
     orchestratorAutoSendInProgressRef.current = true;
-    orchestratorSetAutoSendStatus('waiting');
+    orchestratorSetAutoSendStatus('sending');
+    clearOrchestratorPendingContent();
 
-    const AUTO_SEND_TIMEOUT_MS = 10_000;
-    const POLL_INTERVAL_MS = 150;
-    let elapsed = 0;
-    let cancelled = false;
-
-    const poll = setInterval(() => {
-      if (cancelled) {
-        clearInterval(poll);
-        return;
-      }
-      elapsed += POLL_INTERVAL_MS;
-
-      // Check readiness: connected and not processing
-      if (isConnected && !isProcessing) {
-        clearInterval(poll);
-        orchestratorAutoSendInProgressRef.current = false;
-        orchestratorSetAutoSendStatus('sending');
-        sendMessage(content).finally(() => {
-          orchestratorSetAutoSendStatus('idle');
-        });
-        return;
-      }
-
-      // Timeout: fall back to textarea
-      if (elapsed >= AUTO_SEND_TIMEOUT_MS) {
-        clearInterval(poll);
+    sendMessage(content)
+      .catch((error) => {
+        logger.error('[Orchestrator] Auto-send failed, falling back to textarea', error);
+        setInput(content);
+      })
+      .finally(() => {
         orchestratorAutoSendInProgressRef.current = false;
         orchestratorSetAutoSendStatus('idle');
-        logger.warn('[Orchestrator] Auto-send timed out, falling back to textarea');
-        setInput(content);
-      }
-    }, POLL_INTERVAL_MS);
-
-    return () => {
-      cancelled = true;
-      clearInterval(poll);
-      orchestratorAutoSendInProgressRef.current = false;
-    };
+        orchestratorSourceSessionIdRef.current = null;
+      });
   }, [
     pendingOrchestratorContent,
     currentSessionId,

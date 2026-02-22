@@ -252,6 +252,10 @@ export function useElectronAgent({
 
     let mounted = true;
 
+    // Reset connection status immediately when switching sessions.
+    // This prevents transient stale "connected" state from the previous session.
+    setIsConnected(false);
+
     const initialize = async () => {
       // Reset error state when switching sessions
       setError(null);
