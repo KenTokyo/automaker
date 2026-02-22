@@ -29,6 +29,7 @@ export function createIndexHandler(agentService: AgentService) {
             updatedAt: s.updatedAt,
             isArchived: s.archived || false,
             tags: s.tags || [],
+            orchestratorRunId: s.orchestratorRunId,
             messageCount: messages.length,
             preview,
           };

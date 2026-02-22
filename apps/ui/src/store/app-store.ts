@@ -216,6 +216,7 @@ export { defaultBackgroundSettings, defaultTerminalState, MAX_INIT_OUTPUT_LINES 
 // Browser Panel storage keys (custom extension, not in upstream modules)
 export const BROWSER_TABS_STORAGE_KEY = 'automaker:browser-tabs-by-project';
 export const ACTIVE_BROWSER_TAB_STORAGE_KEY = 'automaker:active-browser-tab-by-project';
+export const EXPANDED_ORCHESTRATOR_RUNS_STORAGE_KEY = 'automaker:expanded-orchestrator-runs';
 
 type BrowserTabsByProject = Record<string, BrowserTab[]>;
 type ActiveBrowserTabByProject = Record<string, string>;
@@ -339,6 +340,25 @@ function getStoredSelectedAgentModel(): PhaseModelEntry {
   return migratePhaseModelEntry(parsed as PhaseModelEntry);
 }
 
+function getStoredExpandedOrchestratorRuns(): Record<string, boolean> {
+  const stored = getJSON<unknown>(EXPANDED_ORCHESTRATOR_RUNS_STORAGE_KEY);
+  if (!isObjectRecord(stored)) return {};
+
+  const parsed: Record<string, boolean> = {};
+  for (const [runId, expanded] of Object.entries(stored)) {
+    if (
+      typeof runId === 'string' &&
+      runId.length > 0 &&
+      typeof expanded === 'boolean' &&
+      expanded
+    ) {
+      parsed[runId] = true;
+    }
+  }
+
+  return parsed;
+}
+
 function persistBrowserPanelState(
   browserTabsByProject: BrowserTabsByProject,
   activeBrowserTabByProject: ActiveBrowserTabByProject
@@ -405,6 +425,7 @@ const initialState: AppState = {
   chatSessions: [],
   currentChatSession: null,
   chatHistoryOpen: false,
+  expandedOrchestratorRuns: getStoredExpandedOrchestratorRuns(),
   autoModeByWorktree: {},
   autoModeActivityLog: [],
   maxConcurrency: DEFAULT_MAX_CONCURRENCY,
@@ -1153,6 +1174,40 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     })),
   setChatHistoryOpen: (open) => set({ chatHistoryOpen: open }),
   toggleChatHistory: () => set((state) => ({ chatHistoryOpen: !state.chatHistoryOpen })),
+  toggleOrchestratorRunExpanded: (runId) => {
+    const normalizedRunId = runId.trim();
+    if (!normalizedRunId) return;
+
+    set((state) => {
+      const currentlyExpanded = !!state.expandedOrchestratorRuns[normalizedRunId];
+      const nextExpandedRuns = { ...state.expandedOrchestratorRuns };
+
+      if (currentlyExpanded) {
+        delete nextExpandedRuns[normalizedRunId];
+      } else {
+        nextExpandedRuns[normalizedRunId] = true;
+      }
+
+      setJSON(EXPANDED_ORCHESTRATOR_RUNS_STORAGE_KEY, nextExpandedRuns);
+      return { expandedOrchestratorRuns: nextExpandedRuns };
+    });
+  },
+  setOrchestratorRunExpanded: (runId, expanded) => {
+    const normalizedRunId = runId.trim();
+    if (!normalizedRunId) return;
+
+    set((state) => {
+      const nextExpandedRuns = { ...state.expandedOrchestratorRuns };
+      if (expanded) {
+        nextExpandedRuns[normalizedRunId] = true;
+      } else {
+        delete nextExpandedRuns[normalizedRunId];
+      }
+
+      setJSON(EXPANDED_ORCHESTRATOR_RUNS_STORAGE_KEY, nextExpandedRuns);
+      return { expandedOrchestratorRuns: nextExpandedRuns };
+    });
+  },
 
   // Auto Mode actions (per-worktree)
   getWorktreeKey: (projectId: string, branchName: string | null) =>

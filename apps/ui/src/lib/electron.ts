@@ -812,7 +812,8 @@ export interface ElectronAPI {
     create: (
       name: string,
       projectPath: string,
-      workingDirectory?: string
+      workingDirectory?: string,
+      orchestratorRunId?: string
     ) => Promise<{
       success: boolean;
       session?: {
@@ -820,6 +821,7 @@ export interface ElectronAPI {
         name: string;
         projectPath: string;
         workingDirectory?: string;
+        orchestratorRunId?: string;
         createdAt: string;
         updatedAt: string;
       };

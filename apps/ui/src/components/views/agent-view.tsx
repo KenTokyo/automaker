@@ -303,6 +303,7 @@ export function AgentView() {
     clearPendingContent: clearOrchestratorPendingContent,
     autoSendEnabled: orchestratorAutoSend,
     getMessageWrapper: getOrchestratorMessageWrapper,
+    setAutoSendStatus: orchestratorSetAutoSendStatus,
   } = useOrchestratorStore();
 
   // Track previous isProcessing to detect complete events (true → false)
@@ -359,24 +360,65 @@ export function AgentView() {
     setOrchestratorPendingContent,
   ]);
 
+  // Guard ref to prevent double auto-sends
+  const orchestratorAutoSendInProgressRef = useRef(false);
+
   // Handle pending orchestrator content in new session
   useEffect(() => {
-    if (!pendingOrchestratorContent || !currentSessionId || !isConnected || isProcessing) return;
+    if (!pendingOrchestratorContent || !currentSessionId) return;
+    if (orchestratorAutoSendInProgressRef.current) return;
 
     const content = pendingOrchestratorContent;
     clearOrchestratorPendingContent();
 
-    if (orchestratorAutoSend) {
-      // Auto-send: set input and trigger send immediately
+    if (!orchestratorAutoSend) {
+      // Manual mode: just paste into textarea
       setInput(content);
-      // Use setTimeout to ensure input state is set before sending
-      setTimeout(() => {
-        sendMessage(content);
-      }, 100);
-    } else {
-      // Just paste into input
-      setInput(content);
+      return;
     }
+
+    // Auto-send mode: wait for session readiness, then send directly
+    orchestratorAutoSendInProgressRef.current = true;
+    orchestratorSetAutoSendStatus('waiting');
+
+    const AUTO_SEND_TIMEOUT_MS = 10_000;
+    const POLL_INTERVAL_MS = 150;
+    let elapsed = 0;
+    let cancelled = false;
+
+    const poll = setInterval(() => {
+      if (cancelled) {
+        clearInterval(poll);
+        return;
+      }
+      elapsed += POLL_INTERVAL_MS;
+
+      // Check readiness: connected and not processing
+      if (isConnected && !isProcessing) {
+        clearInterval(poll);
+        orchestratorAutoSendInProgressRef.current = false;
+        orchestratorSetAutoSendStatus('sending');
+        sendMessage(content).finally(() => {
+          orchestratorSetAutoSendStatus('idle');
+        });
+        return;
+      }
+
+      // Timeout: fall back to textarea
+      if (elapsed >= AUTO_SEND_TIMEOUT_MS) {
+        clearInterval(poll);
+        orchestratorAutoSendInProgressRef.current = false;
+        orchestratorSetAutoSendStatus('idle');
+        logger.warn('[Orchestrator] Auto-send timed out, falling back to textarea');
+        setInput(content);
+      }
+    }, POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(poll);
+      orchestratorAutoSendInProgressRef.current = false;
+    };
   }, [
     pendingOrchestratorContent,
     currentSessionId,
@@ -385,6 +427,7 @@ export function AgentView() {
     clearOrchestratorPendingContent,
     orchestratorAutoSend,
     sendMessage,
+    orchestratorSetAutoSendStatus,
   ]);
 
   // Handle send message

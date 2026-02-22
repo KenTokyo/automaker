@@ -112,6 +112,7 @@ export interface AppState {
   chatSessions: ChatSession[];
   currentChatSession: ChatSession | null;
   chatHistoryOpen: boolean;
+  expandedOrchestratorRuns: Record<string, boolean>; // Persisted expand state for orchestrator run groups
 
   // Auto Mode (per-worktree state, keyed by "${projectId}::${branchName ?? '__main__'}")
   autoModeByWorktree: Record<
@@ -466,6 +467,8 @@ export interface AppActions {
   deleteChatSession: (sessionId: string) => void;
   setChatHistoryOpen: (open: boolean) => void;
   toggleChatHistory: () => void;
+  toggleOrchestratorRunExpanded: (runId: string) => void;
+  setOrchestratorRunExpanded: (runId: string, expanded: boolean) => void;
 
   // Auto Mode actions (per-worktree)
   setAutoModeRunning: (

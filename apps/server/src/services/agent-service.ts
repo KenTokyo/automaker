@@ -80,6 +80,7 @@ interface SessionMetadata {
   archived?: boolean;
   tags?: string[];
   model?: string;
+  orchestratorRunId?: string;
   sdkSessionId?: string; // Claude SDK session ID for conversation continuity
 }
 
@@ -796,7 +797,8 @@ export class AgentService {
     name: string,
     projectPath?: string,
     workingDirectory?: string,
-    model?: string
+    model?: string,
+    orchestratorRunId?: string
   ): Promise<SessionMetadata> {
     const sessionId = this.generateId();
     const metadata = await this.loadMetadata();
@@ -821,6 +823,7 @@ export class AgentService {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       model,
+      orchestratorRunId,
     };
 
     metadata[sessionId] = session;

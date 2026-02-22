@@ -16,6 +16,7 @@ export { useMessageQueue } from './use-message-queue';
 export { useOSDetection, type OperatingSystem, type OSDetectionResult } from './use-os-detection';
 export { useResponsiveKanban } from './use-responsive-kanban';
 export { useScrollTracking } from './use-scroll-tracking';
+export { useSessionGrouping, buildDisplayEntries } from './use-session-grouping';
 export { useSettingsMigration } from './use-settings-migration';
 export {
   useTestRunners,

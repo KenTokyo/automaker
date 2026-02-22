@@ -7,13 +7,14 @@
  */
 
 import { create } from 'zustand';
-import { setItem, getItem } from '@/lib/storage';
+import { setItem, getItem, removeItem } from '@/lib/storage';
 
 // Storage keys
 const ORCHESTRATOR_ENABLED_KEY = 'automaker:orchestrator-enabled';
 const ORCHESTRATOR_KEYWORD_KEY = 'automaker:orchestrator-keyword';
 const ORCHESTRATOR_MAX_ITERATIONS_KEY = 'automaker:orchestrator-max-iterations';
 const ORCHESTRATOR_AUTO_SEND_KEY = 'automaker:orchestrator-auto-send';
+const ORCHESTRATOR_RUN_ID_KEY = 'automaker:orchestrator-run-id';
 
 const DEFAULT_KEYWORD = 'NEXT_PHASE_READY';
 const DEFAULT_MAX_ITERATIONS = 100;
@@ -22,6 +23,9 @@ interface OrchestratorMessageWrapper {
   preMessage: string;
   postMessage: string;
 }
+
+/** Whether the auto-send mechanism is currently waiting for session readiness */
+export type OrchestratorAutoSendStatus = 'idle' | 'waiting' | 'sending';
 
 interface OrchestratorState {
   // Whether orchestrator mode is enabled
@@ -36,6 +40,10 @@ interface OrchestratorState {
   pendingOrchestratorContent: string | null;
   // Whether to auto-send the content in the new chat
   autoSendEnabled: boolean;
+  // Stable run ID generated once per orchestrator activation
+  orchestratorRunId: string | null;
+  // Auto-send status for UI display
+  autoSendStatus: OrchestratorAutoSendStatus;
 
   // Actions
   setEnabled: (enabled: boolean) => void;
@@ -46,6 +54,7 @@ interface OrchestratorState {
   setPendingContent: (content: string | null) => void;
   clearPendingContent: () => void;
   setAutoSendEnabled: (enabled: boolean) => void;
+  setAutoSendStatus: (status: OrchestratorAutoSendStatus) => void;
   shouldTrigger: (lastMessage: string) => boolean;
   /** Returns pre/post messages to wrap user content, or null if orchestrator is disabled */
   getMessageWrapper: () => OrchestratorMessageWrapper | null;
@@ -86,6 +95,21 @@ function loadAutoSend(): boolean {
   return true; // Default enabled
 }
 
+function loadRunId(): string | null {
+  const stored = getItem(ORCHESTRATOR_RUN_ID_KEY);
+  if (stored && stored.trim().length > 0) {
+    return stored;
+  }
+  return null;
+}
+
+/** Generate a stable run ID (called once per orchestrator activation) */
+function generateRunId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).slice(2, 8);
+  return `orch-run-${timestamp}-${random}`;
+}
+
 function saveEnabled(enabled: boolean): void {
   setItem(ORCHESTRATOR_ENABLED_KEY, enabled.toString());
 }
@@ -102,20 +126,40 @@ function saveAutoSend(enabled: boolean): void {
   setItem(ORCHESTRATOR_AUTO_SEND_KEY, enabled.toString());
 }
 
+function saveRunId(runId: string | null): void {
+  if (runId) {
+    setItem(ORCHESTRATOR_RUN_ID_KEY, runId);
+    return;
+  }
+  removeItem(ORCHESTRATOR_RUN_ID_KEY);
+}
+
+const initialEnabled = loadEnabled();
+const initialRunId = initialEnabled ? (loadRunId() ?? generateRunId()) : null;
+if (initialRunId) {
+  saveRunId(initialRunId);
+}
+
 export const useOrchestratorStore = create<OrchestratorState>((set, get) => ({
-  isEnabled: loadEnabled(),
+  isEnabled: initialEnabled,
   triggerKeyword: loadKeyword(),
   maxIterations: loadMaxIterations(),
   currentIteration: 0,
   pendingOrchestratorContent: null,
   autoSendEnabled: loadAutoSend(),
+  orchestratorRunId: initialRunId,
+  autoSendStatus: 'idle' as OrchestratorAutoSendStatus,
 
   setEnabled: (enabled) => {
+    const runId = enabled ? generateRunId() : null;
     set({
       isEnabled: enabled,
       currentIteration: 0, // Reset iteration on toggle
+      orchestratorRunId: runId,
+      autoSendStatus: 'idle',
     });
     saveEnabled(enabled);
+    saveRunId(runId);
   },
 
   setTriggerKeyword: (keyword) => {
@@ -136,8 +180,14 @@ export const useOrchestratorStore = create<OrchestratorState>((set, get) => ({
     const next = currentIteration + 1;
     if (next >= maxIterations) {
       // Max reached - disable orchestrator
-      set({ currentIteration: next, isEnabled: false });
+      set({
+        currentIteration: next,
+        isEnabled: false,
+        orchestratorRunId: null,
+        autoSendStatus: 'idle',
+      });
       saveEnabled(false);
+      saveRunId(null);
       return false; // Signal: max reached
     }
     set({ currentIteration: next });
@@ -161,6 +211,10 @@ export const useOrchestratorStore = create<OrchestratorState>((set, get) => ({
     saveAutoSend(enabled);
   },
 
+  setAutoSendStatus: (status) => {
+    set({ autoSendStatus: status });
+  },
+
   shouldTrigger: (lastMessage) => {
     const { isEnabled, triggerKeyword } = get();
     if (!isEnabled) return false;
@@ -168,8 +222,15 @@ export const useOrchestratorStore = create<OrchestratorState>((set, get) => ({
   },
 
   getMessageWrapper: () => {
-    const { isEnabled, currentIteration, maxIterations } = get();
+    const { isEnabled, currentIteration, maxIterations, orchestratorRunId } = get();
     if (!isEnabled) return null;
+
+    let runId = orchestratorRunId;
+    if (!runId) {
+      runId = generateRunId();
+      set({ orchestratorRunId: runId });
+      saveRunId(runId);
+    }
 
     const preMessage = `🔄 ORCHESTRATOR MODE ACTIVE:
 - You are working on a multi-phase project
@@ -181,7 +242,7 @@ export const useOrchestratorStore = create<OrchestratorState>((set, get) => ({
   * Specify which phase is next
 - If all phases are complete:
   * End your response with: ALL_PHASES_COMPLETE
-- Orchestrator run ID: orch-run-${Date.now().toString(36)}
+- Orchestrator run ID: ${runId}
 - Current iteration: ${currentIteration + 1}/${maxIterations}
 - Do NOT include NEXT_PHASE_READY if no more phases exist`;
 

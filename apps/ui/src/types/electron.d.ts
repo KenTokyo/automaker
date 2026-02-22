@@ -78,6 +78,7 @@ export interface SessionListItem {
   isArchived: boolean;
   isDirty?: boolean; // Indicates session has completed work that needs review
   tags: string[];
+  orchestratorRunId?: string;
   preview: string;
 }
 
@@ -135,7 +136,8 @@ export interface SessionsAPI {
   create: (
     name: string,
     projectPath: string,
-    workingDirectory?: string
+    workingDirectory?: string,
+    orchestratorRunId?: string
   ) => Promise<{
     success: boolean;
     sessionId?: string;

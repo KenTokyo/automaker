@@ -7,7 +7,7 @@
  */
 
 import { memo, useState, useEffect } from 'react';
-import { Repeat, Settings } from 'lucide-react';
+import { Repeat, Settings, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,6 +33,8 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
     maxIterations,
     currentIteration,
     autoSendEnabled,
+    orchestratorRunId,
+    autoSendStatus,
     setEnabled,
     setTriggerKeyword,
     setMaxIterations,
@@ -87,15 +89,26 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
           disabled={disabled}
           className={cn(
             'h-11 rounded-xl border-border shrink-0',
-            isEnabled ? 'border-purple-500/50 text-purple-600 w-auto min-w-11 px-2 gap-1.5' : 'w-11'
+            isEnabled
+              ? 'border-purple-500/50 text-purple-600 w-auto min-w-11 px-2 gap-1.5'
+              : 'w-11',
+            autoSendStatus !== 'idle' && 'animate-pulse'
           )}
           title={
             isEnabled
-              ? `Orchestrator: ${currentIteration}/${maxIterations}`
+              ? autoSendStatus === 'waiting'
+                ? 'Orchestrator: Waiting for session...'
+                : autoSendStatus === 'sending'
+                  ? 'Orchestrator: Auto-sending...'
+                  : `Orchestrator: ${currentIteration}/${maxIterations}`
               : 'Orchestrator (disabled)'
           }
         >
-          <Repeat className="w-4 h-4" />
+          {autoSendStatus !== 'idle' ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Repeat className="w-4 h-4" />
+          )}
           {isEnabled && (
             <span className="text-xs font-medium tabular-nums">
               {currentIteration}/{maxIterations}
@@ -193,16 +206,35 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
           </div>
 
           {/* Current Status */}
-          {isEnabled && currentIteration > 0 && (
-            <div className="pt-2 border-t border-border">
-              <div className="flex items-center gap-2 text-sm">
-                <Repeat className="w-4 h-4 text-purple-600" />
-                <span>
-                  Iteration: <strong>{currentIteration}</strong> / {maxIterations}
-                </span>
+          {isEnabled &&
+            (currentIteration > 0 || autoSendStatus !== 'idle' || orchestratorRunId) && (
+              <div className="pt-2 border-t border-border space-y-1.5">
+                {currentIteration > 0 && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Repeat className="w-4 h-4 text-purple-600" />
+                    <span>
+                      Iteration: <strong>{currentIteration}</strong> / {maxIterations}
+                    </span>
+                  </div>
+                )}
+                {autoSendStatus !== 'idle' && (
+                  <div className="flex items-center gap-2 text-sm text-purple-600">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span className="text-xs">
+                      {autoSendStatus === 'waiting' ? 'Waiting for session...' : 'Auto-sending...'}
+                    </span>
+                  </div>
+                )}
+                {orchestratorRunId && (
+                  <p
+                    className="text-[10px] text-muted-foreground font-mono truncate"
+                    title={orchestratorRunId}
+                  >
+                    Run: {orchestratorRunId}
+                  </p>
+                )}
               </div>
-            </div>
-          )}
+            )}
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

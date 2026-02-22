@@ -2586,7 +2586,8 @@ export class HttpApiClient implements ElectronAPI {
     create: (
       name: string,
       projectPath: string,
-      workingDirectory?: string
+      workingDirectory?: string,
+      orchestratorRunId?: string
     ): Promise<{
       success: boolean;
       session?: {
@@ -2594,11 +2595,12 @@ export class HttpApiClient implements ElectronAPI {
         name: string;
         projectPath: string;
         workingDirectory?: string;
+        orchestratorRunId?: string;
         createdAt: string;
         updatedAt: string;
       };
       error?: string;
-    }> => this.post('/api/sessions', { name, projectPath, workingDirectory }),
+    }> => this.post('/api/sessions', { name, projectPath, workingDirectory, orchestratorRunId }),
 
     update: (
       sessionId: string,
