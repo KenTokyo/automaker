@@ -307,19 +307,32 @@ export function AgentView() {
 
   // Track previous isProcessing to detect complete events (true → false)
   const wasProcessingRef = useRef(false);
+  const assistantCountAtProcessingStartRef = useRef(0);
 
   // Detect when processing finishes and check for orchestrator trigger
   useEffect(() => {
     const wasProcessing = wasProcessingRef.current;
+    const assistantMessages = messages.filter((message) => message.role === 'assistant');
+
+    if (!wasProcessing && isProcessing) {
+      assistantCountAtProcessingStartRef.current = assistantMessages.length;
+    }
+
     wasProcessingRef.current = isProcessing;
 
     // Only trigger when processing transitions from true → false
     if (!wasProcessing || isProcessing) return;
     if (!orchestratorEnabled || !currentSessionId || !isConnected) return;
 
-    // Find the last assistant message
-    const lastAssistantMessage = [...messages].reverse().find((m) => m.role === 'assistant');
-    if (!lastAssistantMessage) return;
+    // Ignore stale completion events that did not produce a new assistant message.
+    if (assistantMessages.length <= assistantCountAtProcessingStartRef.current) {
+      logger.info(
+        '[Orchestrator] Ignoring completion event because no new assistant message was produced'
+      );
+      return;
+    }
+
+    const lastAssistantMessage = assistantMessages[assistantMessages.length - 1];
 
     // Check if the trigger keyword is present
     if (!orchestratorShouldTrigger(lastAssistantMessage.content)) return;

@@ -29,6 +29,52 @@ export interface ParsedSessionInfo {
   cleanedContent: string;
 }
 
+function extractTitle(infoBlock: string): string | null {
+  const titleMatch = infoBlock.match(/^\s*(?:\*\*)?TITLE(?:\*\*)?\s*:\s*(.+?)(?:\n|$)/im);
+  if (!titleMatch) {
+    return null;
+  }
+
+  const cleanedTitle = titleMatch[1]
+    .trim()
+    .replace(/^\*\*\s*/, '')
+    .replace(/\s*\*\*$/, '')
+    .trim();
+  return cleanedTitle.substring(0, 60);
+}
+
+function extractDescription(infoBlock: string): string | null {
+  const descMatch = infoBlock.match(/^\s*(?:\*\*)?DESCRIPTION(?:\*\*)?\s*:\s*([\s\S]*?)$/im);
+  if (!descMatch) {
+    return null;
+  }
+
+  let desc = descMatch[1]
+    .trim()
+    .replace(/^\*\*\s*/, '')
+    .replace(/\s*\*\*$/, '')
+    .trim();
+  if (desc.length > 300) {
+    desc = `${desc.substring(0, 300)}...`;
+  }
+  return desc.length > 0 ? desc : null;
+}
+
+function buildCleanedContent(
+  content: string,
+  blockStart: number,
+  blockEndExclusive: number
+): string {
+  const prefix = content.slice(0, blockStart).trimEnd();
+  const suffix = content.slice(blockEndExclusive).trimStart();
+
+  if (prefix && suffix) {
+    return `${prefix}\n\n${suffix}`;
+  }
+
+  return (prefix || suffix).trim();
+}
+
 /**
  * Parses the session title and description from Claude's first response.
  * Extracts the [SESSION_INFO] block and returns the cleaned content without it.
@@ -43,39 +89,60 @@ export function parseSessionInfo(content: string): ParsedSessionInfo {
     cleanedContent: content,
   };
 
-  // Match the SESSION_INFO block
-  const sessionInfoRegex = /\[SESSION_INFO\]\s*([\s\S]*?)\s*\[\/SESSION_INFO\]/i;
-  const match = content.match(sessionInfoRegex);
-
-  if (!match) {
+  // Strict match with explicit opening and closing tag.
+  const strictSessionInfoRegex = /\[SESSION_INFO\]\s*([\s\S]*?)\s*\[\/SESSION_INFO\]/i;
+  const strictMatch = content.match(strictSessionInfoRegex);
+  if (strictMatch && strictMatch.index !== undefined) {
+    const infoBlock = strictMatch[1];
+    result.title = extractTitle(infoBlock);
+    result.description = extractDescription(infoBlock);
+    result.cleanedContent = content.replace(strictSessionInfoRegex, '').trim();
+    result.cleanedContent = result.cleanedContent.replace(/^\n+/, '');
     return result;
   }
 
-  const infoBlock = match[1];
-
-  // Extract title
-  const titleMatch = infoBlock.match(/TITLE:\s*(.+?)(?:\n|$)/i);
-  if (titleMatch) {
-    result.title = titleMatch[1].trim().substring(0, 60); // Limit to 60 chars
+  // Fallback: handle incomplete blocks that include [SESSION_INFO] but omit [/SESSION_INFO].
+  const openTagMatch = /\[SESSION_INFO\]/i.exec(content);
+  if (!openTagMatch || openTagMatch.index === undefined) {
+    return result;
   }
 
-  // Extract description - everything after DESCRIPTION: until end of block
-  const descMatch = infoBlock.match(/DESCRIPTION:\s*([\s\S]*?)$/i);
-  if (descMatch) {
-    // Clean up the description - normalize whitespace but preserve line breaks
-    let desc = descMatch[1].trim();
-    // Limit to roughly 4 lines (about 300 chars)
-    if (desc.length > 300) {
-      desc = desc.substring(0, 300) + '...';
+  const blockStart = openTagMatch.index;
+  const contentAfterOpenTag = content.slice(blockStart + openTagMatch[0].length);
+  const closingTagMatch = /\[\/SESSION_INFO\]/i.exec(contentAfterOpenTag);
+
+  let infoBlock = '';
+  let blockEndExclusive = content.length;
+
+  if (closingTagMatch && closingTagMatch.index !== undefined) {
+    infoBlock = contentAfterOpenTag.slice(0, closingTagMatch.index);
+    blockEndExclusive =
+      blockStart + openTagMatch[0].length + closingTagMatch.index + closingTagMatch[0].length;
+  } else {
+    // Heuristic: keep SESSION_INFO hidden only until the first paragraph break.
+    const hasStructuredFields = /(?:^|\n)\s*(?:\*\*)?(TITLE|DESCRIPTION)(?:\*\*)?\s*:/i.test(
+      contentAfterOpenTag
+    );
+    if (!hasStructuredFields) {
+      return result;
     }
-    result.description = desc;
+
+    const paragraphBreakMatch = /\n\s*\n/.exec(contentAfterOpenTag);
+    const inferredEnd = paragraphBreakMatch?.index ?? contentAfterOpenTag.length;
+    infoBlock = contentAfterOpenTag.slice(0, inferredEnd);
+    blockEndExclusive = blockStart + openTagMatch[0].length + inferredEnd;
   }
 
-  // Remove the SESSION_INFO block from the content
-  result.cleanedContent = content.replace(sessionInfoRegex, '').trim();
+  const title = extractTitle(infoBlock);
+  const description = extractDescription(infoBlock);
 
-  // Also remove any leading newlines that might remain
-  result.cleanedContent = result.cleanedContent.replace(/^\n+/, '');
+  if (!title && !description) {
+    return result;
+  }
+
+  result.title = title;
+  result.description = description;
+  result.cleanedContent = buildCleanedContent(content, blockStart, blockEndExclusive);
 
   return result;
 }

@@ -328,40 +328,44 @@ export function useElectronAgent({
 
         case 'message':
           // User message added
-          setMessages((prev) => [...prev, event.message]);
+          setMessages((prev) => {
+            if (prev.some((msg) => msg.id === event.message.id)) {
+              return prev;
+            }
+            return [...prev, event.message];
+          });
           break;
 
         case 'stream':
           // Assistant message streaming
-          if (event.isComplete) {
-            // Final update
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === event.messageId ? { ...msg, content: event.content } : msg
-              )
-            );
-            currentMessageRef.current = null;
-          } else {
-            // Streaming update
-            setMessages((prev) => {
-              const existingIndex = prev.findIndex((m) => m.id === event.messageId);
-              if (existingIndex >= 0) {
-                // Update existing message
-                return prev.map((msg) =>
-                  msg.id === event.messageId ? { ...msg, content: event.content } : msg
-                );
-              } else {
-                // Create new message
-                const newMessage: Message = {
-                  id: event.messageId,
-                  role: 'assistant',
-                  content: event.content,
-                  timestamp: new Date().toISOString(),
-                };
-                currentMessageRef.current = newMessage;
-                return [...prev, newMessage];
+          setMessages((prev) => {
+            const existingIndex = prev.findIndex((m) => m.id === event.messageId);
+            if (existingIndex >= 0) {
+              const existingMessage = prev[existingIndex];
+              if (existingMessage.content === event.content) {
+                return prev;
               }
-            });
+
+              const nextMessages = [...prev];
+              nextMessages[existingIndex] = {
+                ...existingMessage,
+                content: event.content,
+              };
+              return nextMessages;
+            }
+
+            const newMessage: Message = {
+              id: event.messageId,
+              role: 'assistant',
+              content: event.content,
+              timestamp: new Date().toISOString(),
+            };
+            currentMessageRef.current = newMessage;
+            return [...prev, newMessage];
+          });
+
+          if (event.isComplete) {
+            currentMessageRef.current = null;
           }
           break;
 
@@ -380,13 +384,21 @@ export function useElectronAgent({
             pendingToolCallsRef.current.length > 0 ? [...pendingToolCallsRef.current] : undefined;
           pendingToolCallsRef.current = [];
           if (event.messageId) {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === event.messageId
-                  ? { ...msg, content: event.content, toolCalls: completedToolCalls }
-                  : msg
-              )
-            );
+            setMessages((prev) => {
+              const existingIndex = prev.findIndex((msg) => msg.id === event.messageId);
+              if (existingIndex < 0) {
+                return prev;
+              }
+
+              const existingMessage = prev[existingIndex];
+              const nextMessages = [...prev];
+              nextMessages[existingIndex] = {
+                ...existingMessage,
+                content: event.content,
+                toolCalls: completedToolCalls,
+              };
+              return nextMessages;
+            });
           }
           break;
         }

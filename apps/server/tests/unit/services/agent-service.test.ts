@@ -187,6 +187,85 @@ describe('agent-service.ts', () => {
       expect(mockEvents.emit).toHaveBeenCalled();
     });
 
+    it('emits complete only once after the provider stream finishes', async () => {
+      const mockProvider = {
+        getName: () => 'gemini',
+        executeQuery: async function* () {
+          yield { type: 'result', subtype: 'success' };
+          yield { type: 'result', subtype: 'success' };
+          yield {
+            type: 'assistant',
+            message: {
+              role: 'assistant',
+              content: [{ type: 'text', text: 'Final streamed answer' }],
+            },
+          };
+          yield { type: 'result', subtype: 'success' };
+        },
+      };
+
+      vi.mocked(ProviderFactory.getProviderForModel).mockReturnValue(mockProvider as any);
+      vi.mocked(promptBuilder.buildPromptWithImages).mockResolvedValue({
+        content: 'Hello',
+        hasImages: false,
+      });
+
+      await service.sendMessage({
+        sessionId: 'session-1',
+        message: 'Hello',
+      });
+
+      const emittedEvents = mockEvents.emit.mock.calls
+        .filter(([eventName]) => eventName === 'agent:stream')
+        .map(([, payload]) => payload as { type?: string; content?: string });
+
+      const completeEvents = emittedEvents.filter((event) => event.type === 'complete');
+      const streamEventIndexes = emittedEvents
+        .map((event, index) => ({ event, index }))
+        .filter(({ event }) => event.type === 'stream')
+        .map(({ index }) => index);
+      const completeIndex = emittedEvents.findIndex((event) => event.type === 'complete');
+
+      expect(completeEvents).toHaveLength(1);
+      expect(streamEventIndexes.length).toBeGreaterThan(0);
+      expect(completeIndex).toBeGreaterThan(streamEventIndexes[streamEventIndexes.length - 1]);
+      expect(completeEvents[0]?.content).toBe('Final streamed answer');
+    });
+
+    it('creates an assistant message when provider only returns a result payload', async () => {
+      const mockProvider = {
+        getName: () => 'gemini',
+        executeQuery: async function* () {
+          yield {
+            type: 'result',
+            subtype: 'success',
+            result: 'Result-only response',
+          };
+        },
+      };
+
+      vi.mocked(ProviderFactory.getProviderForModel).mockReturnValue(mockProvider as any);
+      vi.mocked(promptBuilder.buildPromptWithImages).mockResolvedValue({
+        content: 'Hello',
+        hasImages: false,
+      });
+
+      await service.sendMessage({
+        sessionId: 'session-1',
+        message: 'Hello',
+      });
+
+      const emittedEvents = mockEvents.emit.mock.calls
+        .filter(([eventName]) => eventName === 'agent:stream')
+        .map(([, payload]) => payload as { type?: string; content?: string });
+
+      const streamEvent = emittedEvents.find((event) => event.type === 'stream');
+      const completeEvent = emittedEvents.find((event) => event.type === 'complete');
+
+      expect(streamEvent?.content).toBe('Result-only response');
+      expect(completeEvent?.content).toBe('Result-only response');
+    });
+
     it('should handle images in message', async () => {
       const mockProvider = {
         getName: () => 'claude',

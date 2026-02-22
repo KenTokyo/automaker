@@ -543,6 +543,7 @@ export class AgentService {
               const parsed = parseSessionInfo(resultContent);
               if (parsed.title || parsed.description) {
                 resultContent = parsed.cleanedContent;
+                sessionInfoParsed = true;
                 // Update session metadata if not already done during streaming
                 const metadataUpdates: Partial<SessionMetadata> = {};
                 if (parsed.title) metadataUpdates.name = parsed.title;
@@ -560,18 +561,27 @@ export class AgentService {
               resultContent = parsed.cleanedContent;
             }
 
-            if (currentAssistantMessage) {
-              currentAssistantMessage.content = resultContent;
-              responseText = resultContent;
-            }
-          }
+            if (!currentAssistantMessage) {
+              currentAssistantMessage = {
+                id: this.generateId(),
+                role: 'assistant',
+                content: resultContent,
+                timestamp: new Date().toISOString(),
+              };
+              session.messages.push(currentAssistantMessage);
 
-          this.emitAgentEvent(sessionId, {
-            type: 'complete',
-            messageId: currentAssistantMessage?.id,
-            content: responseText,
-            toolUses,
-          });
+              this.emitAgentEvent(sessionId, {
+                type: 'stream',
+                messageId: currentAssistantMessage.id,
+                content: resultContent,
+                isComplete: false,
+              });
+            } else {
+              currentAssistantMessage.content = resultContent;
+            }
+
+            responseText = resultContent;
+          }
         } else if (msg.type === 'error') {
           // Some providers (like Codex CLI/SaaS or Cursor CLI) surface failures as
           // streamed error messages instead of throwing. Handle these here so the
@@ -626,6 +636,15 @@ export class AgentService {
 
       session.isRunning = false;
       session.abortController = null;
+
+      // Emit a single terminal completion event after the provider stream ends.
+      // Some providers can emit multiple "result" events during one execution.
+      this.emitAgentEvent(sessionId, {
+        type: 'complete',
+        messageId: currentAssistantMessage?.id,
+        content: currentAssistantMessage?.content ?? responseText,
+        toolUses,
+      });
 
       // Process next item in queue after completion
       setImmediate(() => this.processNextInQueue(sessionId));
