@@ -54,12 +54,6 @@ export function SessionManager({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<SessionListItem | null>(null);
   const [isDeleteAllArchivedDialogOpen, setIsDeleteAllArchivedDialogOpen] = useState(false);
-  const orchestratorEnabled = useOrchestratorStore((state) => state.isEnabled);
-  const orchestratorRunId = useOrchestratorStore((state) => state.orchestratorRunId);
-  const pendingOrchestratorContent = useOrchestratorStore(
-    (state) => state.pendingOrchestratorContent
-  );
-  const startNewOrchestratorRun = useOrchestratorStore((state) => state.startNewRun);
   const [isMultiselectMode, setIsMultiselectMode] = useState(false);
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
 
@@ -137,17 +131,18 @@ export function SessionManager({
   }, [sessions, runningSessions.size, isCurrentSessionThinking, checkRunningSessions]);
 
   const resolveOrchestratorRunIdForSessionCreation = (): string | undefined => {
-    if (!orchestratorEnabled) {
+    const orchestratorState = useOrchestratorStore.getState();
+    if (!orchestratorState.isEnabled) {
       return undefined;
     }
 
     // Auto-continued orchestrator phases must keep the existing run ID.
-    if (pendingOrchestratorContent) {
-      return orchestratorRunId ?? startNewOrchestratorRun() ?? undefined;
+    if (orchestratorState.pendingOrchestratorContent) {
+      return orchestratorState.orchestratorRunId ?? orchestratorState.startNewRun() ?? undefined;
     }
 
     // Manual "new chat" starts a fresh orchestrator run and block in history.
-    return startNewOrchestratorRun() ?? undefined;
+    return orchestratorState.startNewRun() ?? undefined;
   };
 
   const handleCreateSession = async () => {
@@ -200,14 +195,7 @@ export function SessionManager({
         onQuickCreateRef.current = null;
       }
     };
-  }, [
-    onQuickCreateRef,
-    projectPath,
-    orchestratorEnabled,
-    orchestratorRunId,
-    pendingOrchestratorContent,
-    startNewOrchestratorRun,
-  ]);
+  }, [onQuickCreateRef, projectPath]);
 
   const handleRenameSession = async (sessionId: string) => {
     const api = getElectronAPI();
