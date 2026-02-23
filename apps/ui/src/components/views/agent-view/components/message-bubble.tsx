@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { getCopyableMessageContent } from '@/lib/message-copy';
 import { Markdown } from '@/components/ui/markdown';
 import type { ImageAttachment } from '@/store/app-store';
 import { useAppStore } from '@/store/app-store';
@@ -167,7 +168,8 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
 /** Direct copy-to-clipboard button (single click) */
 function CopyButton({ content, isUserMessage }: { content: string; isUserMessage?: boolean }) {
   const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(content).then(
+    const sanitizedContent = getCopyableMessageContent(content);
+    navigator.clipboard.writeText(sanitizedContent).then(
       () => toast.success('Copied to clipboard'),
       () => toast.error('Failed to copy')
     );
