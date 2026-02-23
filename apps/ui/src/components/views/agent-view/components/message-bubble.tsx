@@ -47,6 +47,8 @@ export const MessageBubble = memo(function MessageBubble({
   const hasContent = message.content.trim().length > 0;
   const showCopyButton = hasContent;
   const showInsertDocs = message.role === 'assistant' && !isError && hasContent;
+  const normalizedAssistantContent =
+    message.role === 'assistant' ? message.content.replace(/\\n/g, '\n') : message.content;
 
   return (
     <div
@@ -62,14 +64,14 @@ export const MessageBubble = memo(function MessageBubble({
           isError
             ? 'bg-red-500/10 ring-1 ring-red-500/20'
             : message.role === 'assistant'
-              ? 'bg-primary/10 ring-1 ring-primary/20'
+              ? 'bg-secondary ring-1 ring-border'
               : 'bg-muted ring-1 ring-border'
         )}
       >
         {isError ? (
           <AlertCircle className="w-4 h-4 text-red-500" />
         ) : message.role === 'assistant' ? (
-          <Bot className="w-4 h-4 text-primary" />
+          <Bot className="w-4 h-4 text-foreground/80" />
         ) : (
           <User className="w-4 h-4 text-muted-foreground" />
         )}
@@ -82,7 +84,7 @@ export const MessageBubble = memo(function MessageBubble({
           isError
             ? 'bg-red-500/10 border border-red-500/30'
             : message.role === 'user'
-              ? 'bg-primary text-primary-foreground'
+              ? 'bg-secondary text-foreground border border-border'
               : 'bg-card border border-border'
         )}
       >
@@ -93,10 +95,10 @@ export const MessageBubble = memo(function MessageBubble({
                 'prose-p:leading-relaxed prose-headings:text-foreground prose-strong:text-foreground prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded',
                 isError
                   ? 'text-red-600 dark:text-red-400 prose-code:text-red-600 dark:prose-code:text-red-400 prose-code:bg-red-500/10'
-                  : 'text-foreground prose-code:text-primary prose-code:bg-muted'
+                  : 'text-foreground prose-code:text-foreground prose-code:bg-muted/80 [&_p]:whitespace-pre-wrap [&_li]:whitespace-pre-wrap'
               )}
             >
-              {message.content}
+              {normalizedAssistantContent}
             </Markdown>
           </div>
         ) : (
@@ -115,7 +117,7 @@ export const MessageBubble = memo(function MessageBubble({
             {message.images.map((image, index) => (
               <div
                 key={`path-${image.id || index}`}
-                className="text-xs text-primary-foreground/90 font-mono whitespace-pre-wrap break-all rounded-md bg-primary-foreground/10 px-2 py-1"
+                className="text-xs text-foreground/80 font-mono whitespace-pre-wrap break-all rounded-md bg-muted/60 px-2 py-1 border border-border/60"
               >
                 {`Bild ${index + 1}: ${image.savedPath || image.filename || `Image ${index + 1}`}`}
               </div>
@@ -129,7 +131,7 @@ export const MessageBubble = memo(function MessageBubble({
                 return (
                   <div
                     key={image.id || `img-${index}`}
-                    className="relative group rounded-lg overflow-hidden border border-primary-foreground/20 bg-primary-foreground/10"
+                    className="relative group rounded-lg overflow-hidden border border-border/70 bg-muted/40"
                   >
                     <img
                       src={dataUrl}
@@ -154,7 +156,7 @@ export const MessageBubble = memo(function MessageBubble({
               isError
                 ? 'text-red-500/70'
                 : message.role === 'user'
-                  ? 'text-primary-foreground/70'
+                  ? 'text-foreground/60'
                   : 'text-muted-foreground'
             )}
           >
@@ -196,7 +198,7 @@ function CopyButton({ content, isUserMessage }: { content: string; isUserMessage
             className={cn(
               'opacity-0 group-hover/msg:opacity-100 focus:opacity-100 transition-opacity inline-flex items-center gap-1 text-[10px]',
               isUserMessage
-                ? 'text-primary-foreground/70 hover:text-primary-foreground'
+                ? 'text-foreground/60 hover:text-foreground'
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >

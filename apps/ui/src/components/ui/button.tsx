@@ -11,7 +11,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md hover:shadow-primary/25',
+          'border border-border bg-secondary text-foreground shadow-xs hover:bg-accent/80 hover:border-border',
         destructive:
           'bg-destructive text-white shadow-sm hover:bg-destructive/90 hover:shadow-md hover:shadow-destructive/25 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60',
         outline:
@@ -38,7 +38,7 @@ const buttonVariants = cva(
 );
 
 /** Button variants that have colored backgrounds requiring foreground spinner color */
-const COLORED_BACKGROUND_VARIANTS = new Set<string>(['default', 'destructive']);
+const COLORED_BACKGROUND_VARIANTS = new Set<string>(['destructive']);
 
 /** Get spinner variant based on button variant - use foreground for colored backgrounds */
 function getSpinnerVariant(
