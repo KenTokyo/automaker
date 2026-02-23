@@ -40,7 +40,7 @@ interface OrchestratorState {
   pendingOrchestratorContent: string | null;
   // Whether to auto-send the content in the new chat
   autoSendEnabled: boolean;
-  // Stable run ID generated once per orchestrator activation
+  // Active run ID for the current orchestrator workflow
   orchestratorRunId: string | null;
   // Auto-send status for UI display
   autoSendStatus: OrchestratorAutoSendStatus;
@@ -55,6 +55,7 @@ interface OrchestratorState {
   clearPendingContent: () => void;
   setAutoSendEnabled: (enabled: boolean) => void;
   setAutoSendStatus: (status: OrchestratorAutoSendStatus) => void;
+  startNewRun: () => string | null;
   shouldTrigger: (lastMessage: string) => boolean;
   /** Returns pre/post messages to wrap user content, or null if orchestrator is disabled */
   getMessageWrapper: () => OrchestratorMessageWrapper | null;
@@ -213,6 +214,22 @@ export const useOrchestratorStore = create<OrchestratorState>((set, get) => ({
 
   setAutoSendStatus: (status) => {
     set({ autoSendStatus: status });
+  },
+
+  startNewRun: () => {
+    if (!get().isEnabled) {
+      return null;
+    }
+
+    const runId = generateRunId();
+    set({
+      orchestratorRunId: runId,
+      currentIteration: 0,
+      pendingOrchestratorContent: null,
+      autoSendStatus: 'idle',
+    });
+    saveRunId(runId);
+    return runId;
   },
 
   shouldTrigger: (lastMessage) => {

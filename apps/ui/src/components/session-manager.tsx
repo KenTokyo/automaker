@@ -23,67 +23,9 @@ import { SessionManagerHeader } from '@/components/session-manager/session-manag
 import { SessionListControls } from '@/components/session-manager/session-list-controls';
 import { SessionListItemRow } from '@/components/session-manager/session-list-item';
 import { OrchestratorRunHeader } from '@/components/session-manager/orchestrator-run-header';
+import { generateRandomSessionName } from '@/components/session-manager/session-name-generator';
 
 const logger = createLogger('SessionManager');
-const adjectives = [
-  'Swift',
-  'Bright',
-  'Clever',
-  'Dynamic',
-  'Eager',
-  'Focused',
-  'Gentle',
-  'Happy',
-  'Inventive',
-  'Jolly',
-  'Keen',
-  'Lively',
-  'Mighty',
-  'Noble',
-  'Optimal',
-  'Peaceful',
-  'Quick',
-  'Radiant',
-  'Smart',
-  'Tranquil',
-  'Unique',
-  'Vibrant',
-  'Wise',
-  'Zealous',
-];
-
-const nouns = [
-  'Agent',
-  'Builder',
-  'Coder',
-  'Developer',
-  'Explorer',
-  'Forge',
-  'Garden',
-  'Helper',
-  'Innovator',
-  'Journey',
-  'Kernel',
-  'Lighthouse',
-  'Mission',
-  'Navigator',
-  'Oracle',
-  'Project',
-  'Quest',
-  'Runner',
-  'Spark',
-  'Task',
-  'Unicorn',
-  'Voyage',
-  'Workshop',
-];
-
-function generateRandomSessionName(): string {
-  const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
-  const noun = nouns[Math.floor(Math.random() * nouns.length)];
-  const number = Math.floor(Math.random() * 100);
-  return `${adjective} ${noun} ${number}`;
-}
 
 interface SessionManagerProps {
   currentSessionId: string | null;
@@ -114,8 +56,10 @@ export function SessionManager({
   const [isDeleteAllArchivedDialogOpen, setIsDeleteAllArchivedDialogOpen] = useState(false);
   const orchestratorEnabled = useOrchestratorStore((state) => state.isEnabled);
   const orchestratorRunId = useOrchestratorStore((state) => state.orchestratorRunId);
-  const activeOrchestratorRunId =
-    orchestratorEnabled && orchestratorRunId ? orchestratorRunId : undefined;
+  const pendingOrchestratorContent = useOrchestratorStore(
+    (state) => state.pendingOrchestratorContent
+  );
+  const startNewOrchestratorRun = useOrchestratorStore((state) => state.startNewRun);
   const [isMultiselectMode, setIsMultiselectMode] = useState(false);
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
 
@@ -192,16 +136,31 @@ export function SessionManager({
     return () => clearInterval(interval);
   }, [sessions, runningSessions.size, isCurrentSessionThinking, checkRunningSessions]);
 
+  const resolveOrchestratorRunIdForSessionCreation = (): string | undefined => {
+    if (!orchestratorEnabled) {
+      return undefined;
+    }
+
+    // Auto-continued orchestrator phases must keep the existing run ID.
+    if (pendingOrchestratorContent) {
+      return orchestratorRunId ?? startNewOrchestratorRun() ?? undefined;
+    }
+
+    // Manual "new chat" starts a fresh orchestrator run and block in history.
+    return startNewOrchestratorRun() ?? undefined;
+  };
+
   const handleCreateSession = async () => {
     const api = getElectronAPI();
     if (!api?.sessions) return;
 
+    const runIdForSession = resolveOrchestratorRunIdForSessionCreation();
     const sessionName = newSessionName.trim() || generateRandomSessionName();
     const result = await api.sessions.create(
       sessionName,
       projectPath,
       projectPath,
-      activeOrchestratorRunId
+      runIdForSession
     );
 
     if (result.success && result.session?.id) {
@@ -216,12 +175,13 @@ export function SessionManager({
     const api = getElectronAPI();
     if (!api?.sessions) return;
 
+    const runIdForSession = resolveOrchestratorRunIdForSessionCreation();
     const sessionName = generateRandomSessionName();
     const result = await api.sessions.create(
       sessionName,
       projectPath,
       projectPath,
-      activeOrchestratorRunId
+      runIdForSession
     );
 
     if (result.success && result.session?.id) {
@@ -240,7 +200,14 @@ export function SessionManager({
         onQuickCreateRef.current = null;
       }
     };
-  }, [onQuickCreateRef, projectPath, activeOrchestratorRunId]);
+  }, [
+    onQuickCreateRef,
+    projectPath,
+    orchestratorEnabled,
+    orchestratorRunId,
+    pendingOrchestratorContent,
+    startNewOrchestratorRun,
+  ]);
 
   const handleRenameSession = async (sessionId: string) => {
     const api = getElectronAPI();
@@ -475,20 +442,20 @@ export function SessionManager({
   };
 
   return (
-    <Card className="flex h-full flex-col rounded-none">
-      <div className="px-3 pt-3">
+    <Card className="flex h-full flex-col gap-0 rounded-none py-2">
+      <div className="px-2 pt-2">
         <Tabs
           value={docsOpen ? 'docs' : 'sessions'}
           onValueChange={(value) => setDocsOpen(value === 'docs')}
-          className="w-full"
+          className="w-full gap-1"
         >
-          <TabsList className="w-full">
-            <TabsTrigger value="sessions" className="flex-1">
-              <MessageSquare className="mr-1.5 h-4 w-4" />
+          <TabsList className="h-8 w-full rounded-md p-0.5">
+            <TabsTrigger value="sessions" className="h-6 flex-1 gap-1 px-2 text-xs font-semibold">
+              <MessageSquare className="mr-0.5 h-3.5 w-3.5" />
               Sessions
             </TabsTrigger>
-            <TabsTrigger value="docs" className="flex-1">
-              <FileText className="mr-1.5 h-4 w-4" />
+            <TabsTrigger value="docs" className="h-6 flex-1 gap-1 px-2 text-xs font-semibold">
+              <FileText className="mr-0.5 h-3.5 w-3.5" />
               Docs
             </TabsTrigger>
           </TabsList>
@@ -530,7 +497,7 @@ export function SessionManager({
           />
 
           <CardContent
-            className="flex-1 space-y-2 overflow-y-auto pr-1 scroll-smooth"
+            className="flex-1 space-y-1.5 overflow-y-auto px-3 pb-2 pr-1 scroll-smooth"
             data-testid="session-list"
           >
             <SessionListControls
@@ -601,7 +568,7 @@ export function SessionManager({
               return (
                 <div
                   key={`orchestrator-${displayEntry.group.runId}`}
-                  className="space-y-2 animate-in fade-in slide-in-from-bottom-1 duration-200"
+                  className="space-y-1.5 animate-in fade-in slide-in-from-bottom-1 duration-200"
                 >
                   <OrchestratorRunHeader
                     group={displayEntry.group}
@@ -618,14 +585,14 @@ export function SessionManager({
 
                   <div
                     className={cn(
-                      'ml-4 grid transition-[grid-template-rows,opacity,margin] duration-300 ease-out',
+                      'ml-2 grid transition-[grid-template-rows,opacity,margin] duration-300 ease-out',
                       displayEntry.group.isExpanded
                         ? 'mt-1 grid-rows-[1fr] opacity-100'
                         : 'mt-0 grid-rows-[0fr] opacity-0 pointer-events-none'
                     )}
                   >
                     <div className="min-h-0 overflow-hidden">
-                      <div className="space-y-2 border-l border-dashed border-muted-foreground/30 pl-3">
+                      <div className="space-y-1.5 border-l border-dashed border-muted-foreground/30 pl-2">
                         {displayEntry.group.sessions.map((session, index) => (
                           <SessionListItemRow
                             key={session.id}
