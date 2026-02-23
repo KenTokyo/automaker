@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import {
   Bot,
   User,
@@ -8,10 +8,13 @@ import {
   FileInput,
   ClipboardPaste,
   Copy,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getCopyableMessageContent } from '@/lib/message-copy';
+import { splitOrchestratorMessage } from '@/lib/orchestrator-message';
 import { Markdown } from '@/components/ui/markdown';
 import type { ImageAttachment } from '@/store/app-store';
 import { useAppStore } from '@/store/app-store';
@@ -22,6 +25,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Message {
@@ -44,11 +48,21 @@ export const MessageBubble = memo(function MessageBubble({
   chatFontSize,
 }: MessageBubbleProps) {
   const isError = message.isError && message.role === 'assistant';
-  const hasContent = message.content.trim().length > 0;
-  const showCopyButton = hasContent;
-  const showInsertDocs = message.role === 'assistant' && !isError && hasContent;
-  const normalizedAssistantContent =
+  const normalizedMessageContent =
     message.role === 'assistant' ? message.content.replace(/\\n/g, '\n') : message.content;
+  const { preMessage, mainMessage, postMessage } = useMemo(
+    () => splitOrchestratorMessage(normalizedMessageContent),
+    [normalizedMessageContent]
+  );
+  const hasContent = normalizedMessageContent.trim().length > 0;
+  const showCopyButton = hasContent;
+  const showInsertDocs = message.role === 'assistant' && !isError && mainMessage.length > 0;
+  const markdownClassName = cn(
+    'prose-p:leading-relaxed prose-headings:text-foreground prose-strong:text-foreground prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded [&_p]:whitespace-pre-wrap [&_li]:whitespace-pre-wrap',
+    isError
+      ? 'text-red-600 dark:text-red-400 prose-code:text-red-600 dark:prose-code:text-red-400 prose-code:bg-red-500/10'
+      : 'text-foreground prose-code:text-foreground prose-code:bg-muted/80'
+  );
 
   return (
     <div
@@ -88,27 +102,15 @@ export const MessageBubble = memo(function MessageBubble({
               : 'bg-card border border-border'
         )}
       >
-        {message.role === 'assistant' ? (
-          <div style={{ fontSize: `${chatFontSize}px` }}>
-            <Markdown
-              className={cn(
-                'prose-p:leading-relaxed prose-headings:text-foreground prose-strong:text-foreground prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded',
-                isError
-                  ? 'text-red-600 dark:text-red-400 prose-code:text-red-600 dark:prose-code:text-red-400 prose-code:bg-red-500/10'
-                  : 'text-foreground prose-code:text-foreground prose-code:bg-muted/80 [&_p]:whitespace-pre-wrap [&_li]:whitespace-pre-wrap'
-              )}
-            >
-              {normalizedAssistantContent}
-            </Markdown>
-          </div>
-        ) : (
-          <p
-            className="whitespace-pre-wrap leading-relaxed"
-            style={{ fontSize: `${chatFontSize}px` }}
-          >
-            {message.content}
-          </p>
-        )}
+        <div style={{ fontSize: `${chatFontSize}px` }}>
+          {preMessage && (
+            <OrchestratorContentDropdown title="Orchestrator Text Preview" content={preMessage} />
+          )}
+          {mainMessage && <Markdown className={markdownClassName}>{mainMessage}</Markdown>}
+          {postMessage && (
+            <OrchestratorContentDropdown title="Orchestrator Text After" content={postMessage} />
+          )}
+        </div>
 
         {/* Display attached images for user messages */}
         {message.role === 'user' && message.images && message.images.length > 0 && (
@@ -177,6 +179,37 @@ export const MessageBubble = memo(function MessageBubble({
     </div>
   );
 });
+
+function OrchestratorContentDropdown({ title, content }: { title: string; content: string }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="mb-2 rounded-lg border border-border/70 bg-muted/40"
+    >
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center gap-1.5 px-2.5 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          {open ? (
+            <ChevronDown className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5" />
+          )}
+          <span>{title}</span>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="px-2.5 pb-2.5">
+        <Markdown className="text-xs [&_p]:my-1 [&_li]:my-0 [&_ul]:my-1 [&_ol]:my-1">
+          {content}
+        </Markdown>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
 
 /** Direct copy-to-clipboard button (single click) */
 function CopyButton({ content, isUserMessage }: { content: string; isUserMessage?: boolean }) {
