@@ -6,10 +6,12 @@ import { useOrchestratorStore } from '@/store/orchestrator-store';
 import { useElectronAgent } from '@/hooks/use-electron-agent';
 import { SessionManager } from '@/components/session-manager';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { generateContextSummary } from '@/lib/copy-all-chat';
+import { copyToClipboard, generateChatSummary, generateContextSummary } from '@/lib/copy-all-chat';
+import { getHttpApiClient } from '@/lib/http-api-client';
 import { useSessions } from '@/hooks/queries/use-sessions';
 import { useSessionQueryInvalidation } from '@/hooks/use-query-invalidation';
 import { createLogger } from '@automaker/utils/logger';
+import { toast } from 'sonner';
 
 // Extracted hooks
 import {
@@ -48,6 +50,9 @@ export function AgentView() {
     setSelectedAgentModel,
     browserPanelOpen,
     setBrowserPanelOpen,
+    currentDocPath,
+    setCurrentDocPath,
+    setDocsOpen,
   } = useAppStore();
   const [input, setInput] = useState('');
   const [currentTool, setCurrentTool] = useState<string | null>(null);
@@ -119,6 +124,8 @@ export function AgentView() {
   // Session name for Save-to-Docs feature
   const { data: allSessions = [] } = useSessions(true);
   const currentSessionName = allSessions.find((s) => s.id === currentSessionId)?.name ?? null;
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [isSavingToDoc, setIsSavingToDoc] = useState(false);
 
   // Use the Electron agent hook (only if we have a session)
   const {
@@ -494,6 +501,69 @@ export function AgentView() {
     await clearHistory();
   };
 
+  const handleCopyAll = useCallback(async () => {
+    if (messages.length === 0) return;
+    const summary = generateChatSummary(messages);
+    const success = await copyToClipboard(summary.formattedChat);
+    if (success) {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    }
+  }, [messages]);
+
+  const handleSaveAsNewDoc = useCallback(async () => {
+    if (!currentProject?.path || messages.length === 0 || isSavingToDoc) return;
+    setIsSavingToDoc(true);
+    try {
+      const api = getHttpApiClient();
+      const summary = generateChatSummary(messages);
+      const safeName = (currentSessionName || 'Chat')
+        .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 100);
+      const docName = `${safeName}-Verlauf.md`;
+      const newDoc = await api.docs.create({
+        projectPath: currentProject.path,
+        name: docName,
+        content: summary.formattedChat,
+      });
+      toast.success(`Verlauf gespeichert: ${docName}`);
+      setDocsOpen(true);
+      setCurrentDocPath(newDoc.path);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Fehler beim Speichern';
+      toast.error(msg);
+    } finally {
+      setIsSavingToDoc(false);
+    }
+  }, [currentProject, messages, isSavingToDoc, currentSessionName, setDocsOpen, setCurrentDocPath]);
+
+  const handleAppendChatToCurrent = useCallback(async () => {
+    if (!currentProject?.path || !currentDocPath || messages.length === 0 || isSavingToDoc) return;
+    setIsSavingToDoc(true);
+    try {
+      const api = getHttpApiClient();
+      const summary = generateChatSummary(messages);
+      const docContent = await api.docs.read(currentProject.path, currentDocPath);
+      const existing = docContent.content || '';
+      const separator = existing.trim().length > 0 ? '\n\n---\n\n' : '';
+      await api.docs.update({
+        projectPath: currentProject.path,
+        filePath: currentDocPath,
+        content: existing + separator + summary.formattedChat,
+      });
+      toast.success('Verlauf zum Dokument hinzugefuegt');
+      setDocsOpen(true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Fehler beim Anhaengen';
+      toast.error(msg);
+    } finally {
+      setIsSavingToDoc(false);
+    }
+  }, [currentProject, currentDocPath, messages, isSavingToDoc, setDocsOpen]);
+
   const handleShowSessionManager = useCallback(() => {
     setShowSessionManager(true);
   }, []);
@@ -652,6 +722,14 @@ export function AgentView() {
                 showSessionManager={showSessionManager}
                 onToggleSessionManager={handleToggleSessionManager}
                 onClearChat={handleClearChat}
+                onCopyAll={handleCopyAll}
+                copySuccess={copySuccess}
+                canCopyAll={messages.length > 0 && isConnected}
+                canSaveToDocs={Boolean(currentProject?.path) && messages.length > 0 && isConnected}
+                hasCurrentDocPath={Boolean(currentDocPath)}
+                isSavingToDoc={isSavingToDoc}
+                onSaveAsNewDoc={handleSaveAsNewDoc}
+                onAppendChatToCurrent={handleAppendChatToCurrent}
                 worktreeActions={worktreeActionsProps}
               />
 
@@ -679,9 +757,7 @@ export function AgentView() {
                   isProcessing={isProcessing}
                   isConnected={isConnected}
                   projectPath={currentProject?.path || null}
-                  messages={messages}
                   elapsedSeconds={elapsedSeconds}
-                  sessionName={currentSessionName}
                   selectedImages={fileAttachments.selectedImages}
                   selectedTextFiles={fileAttachments.selectedTextFiles}
                   showImageDropZone={fileAttachments.showImageDropZone}
@@ -732,6 +808,14 @@ export function AgentView() {
             showSessionManager={showSessionManager}
             onToggleSessionManager={handleToggleSessionManager}
             onClearChat={handleClearChat}
+            onCopyAll={handleCopyAll}
+            copySuccess={copySuccess}
+            canCopyAll={messages.length > 0 && isConnected}
+            canSaveToDocs={Boolean(currentProject?.path) && messages.length > 0 && isConnected}
+            hasCurrentDocPath={Boolean(currentDocPath)}
+            isSavingToDoc={isSavingToDoc}
+            onSaveAsNewDoc={handleSaveAsNewDoc}
+            onAppendChatToCurrent={handleAppendChatToCurrent}
           />
 
           {/* Messages */}
@@ -758,9 +842,7 @@ export function AgentView() {
               isProcessing={isProcessing}
               isConnected={isConnected}
               projectPath={currentProject?.path || null}
-              messages={messages}
               elapsedSeconds={elapsedSeconds}
-              sessionName={currentSessionName}
               selectedImages={fileAttachments.selectedImages}
               selectedTextFiles={fileAttachments.selectedTextFiles}
               showImageDropZone={fileAttachments.showImageDropZone}

@@ -1,7 +1,6 @@
 import { ImageDropZone } from '@/components/ui/image-drop-zone';
 import type { ImageAttachment, TextFileAttachment } from '@/store/app-store';
 import type { PhaseModelEntry } from '@automaker/types';
-import type { Message } from '@/types/electron';
 import { FilePreview } from './file-preview';
 import { QueueDisplay } from './queue-display';
 import { InputControls } from './input-controls';
@@ -26,12 +25,8 @@ interface AgentInputAreaProps {
   isConnected: boolean;
   /** Current project path for agent prompts */
   projectPath: string | null;
-  /** Chat messages for Copy-All feature */
-  messages?: Message[];
   /** Elapsed seconds for time limiter display */
   elapsedSeconds?: number;
-  /** Current session name for Save-to-Docs feature */
-  sessionName?: string | null;
   // File attachments
   selectedImages: ImageAttachment[];
   selectedTextFiles: TextFileAttachment[];
@@ -69,9 +64,7 @@ export function AgentInputArea({
   isProcessing,
   isConnected,
   projectPath,
-  messages = [],
   elapsedSeconds = 0,
-  sessionName,
   selectedImages,
   selectedTextFiles,
   showImageDropZone,
@@ -146,9 +139,7 @@ export function AgentInputArea({
         isDragOver={isDragOver}
         showImageDropZone={showImageDropZone}
         projectPath={projectPath}
-        messages={messages}
         elapsedSeconds={elapsedSeconds}
-        sessionName={sessionName}
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}
         onDragOver={onDragOver}

@@ -1,39 +1,16 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
-import {
-  Send,
-  Paperclip,
-  Square,
-  ListOrdered,
-  Copy,
-  Check,
-  Mic,
-  MicOff,
-  FileText,
-  FilePlus,
-  FileInput,
-  Plus,
-} from 'lucide-react';
-import { toast } from 'sonner';
+import { Send, Paperclip, Square, ListOrdered, Mic, MicOff, FileText, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { AgentModelSelector } from '../shared/agent-model-selector';
 import { AgentPromptsSelector } from './agent-prompts-selector';
 import { TimeLimiterSettings } from './time-limiter-settings';
 import { OrchestratorSettings } from './orchestrator-settings';
-import { generateChatSummary, copyToClipboard } from '@/lib/copy-all-chat';
-import { getHttpApiClient } from '@/lib/http-api-client';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 import { useAppStore } from '@/store/app-store';
 import type { PhaseModelEntry } from '@automaker/types';
-import type { Message } from '@/types/electron';
 
 interface InputControlsProps {
   input: string;
@@ -53,12 +30,8 @@ interface InputControlsProps {
   showImageDropZone: boolean;
   /** Current project path for agent prompts */
   projectPath: string | null;
-  /** Chat messages for Copy-All feature */
-  messages?: Message[];
   /** Elapsed seconds for time limiter display */
   elapsedSeconds?: number;
-  /** Current session name for Save-to-Docs feature */
-  sessionName?: string | null;
   // Drag handlers
   onDragEnter: (e: React.DragEvent) => void;
   onDragLeave: (e: React.DragEvent) => void;
@@ -91,9 +64,7 @@ export function InputControls({
   isDragOver,
   showImageDropZone,
   projectPath,
-  messages = [],
   elapsedSeconds = 0,
-  sessionName,
   onDragEnter,
   onDragLeave,
   onDragOver,
@@ -110,7 +81,6 @@ export function InputControls({
   const lastTextareaHeightRef = useRef<number>(TEXTAREA_MIN_HEIGHT);
   const [draftInput, setDraftInput] = useState(input);
   const draftInputRef = useRef(input);
-  const [copySuccess, setCopySuccess] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
   onSendRef.current = onSend;
 
@@ -280,77 +250,6 @@ export function InputControls({
     },
     [inputRef, scheduleTextareaResize, syncInputToParent]
   );
-
-  // Handle Copy-All button click
-  const handleCopyAll = useCallback(async () => {
-    if (messages.length === 0) return;
-
-    const summary = generateChatSummary(messages);
-    const success = await copyToClipboard(summary.formattedChat);
-
-    if (success) {
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
-    }
-  }, [messages]);
-
-  // Save Chat to Docs
-  const [isSavingToDoc, setIsSavingToDoc] = useState(false);
-  const currentDocPath = useAppStore((s) => s.currentDocPath);
-  const setCurrentDocPath = useAppStore((s) => s.setCurrentDocPath);
-
-  const handleSaveAsNewDoc = useCallback(async () => {
-    if (!projectPath || messages.length === 0 || isSavingToDoc) return;
-    setIsSavingToDoc(true);
-    try {
-      const api = getHttpApiClient();
-      const summary = generateChatSummary(messages);
-      const safeName = (sessionName || 'Chat')
-        .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-        .slice(0, 100);
-      const docName = `${safeName}-Verlauf.md`;
-      const newDoc = await api.docs.create({
-        projectPath,
-        name: docName,
-        content: summary.formattedChat,
-      });
-      toast.success(`Verlauf gespeichert: ${docName}`);
-      setDocsOpen(true);
-      setCurrentDocPath(newDoc.path);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Fehler beim Speichern';
-      toast.error(msg);
-    } finally {
-      setIsSavingToDoc(false);
-    }
-  }, [projectPath, messages, sessionName, isSavingToDoc, setDocsOpen, setCurrentDocPath]);
-
-  const handleAppendChatToCurrent = useCallback(async () => {
-    if (!projectPath || !currentDocPath || messages.length === 0 || isSavingToDoc) return;
-    setIsSavingToDoc(true);
-    try {
-      const api = getHttpApiClient();
-      const summary = generateChatSummary(messages);
-      const docContent = await api.docs.read(projectPath, currentDocPath);
-      const existing = docContent.content || '';
-      const separator = existing.trim().length > 0 ? '\n\n---\n\n' : '';
-      await api.docs.update({
-        projectPath,
-        filePath: currentDocPath,
-        content: existing + separator + summary.formattedChat,
-      });
-      toast.success('Verlauf zum Dokument hinzugefuegt');
-      setDocsOpen(true);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Fehler beim Anhaengen';
-      toast.error(msg);
-    } finally {
-      setIsSavingToDoc(false);
-    }
-  }, [projectPath, currentDocPath, messages, isSavingToDoc, setDocsOpen]);
 
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -557,50 +456,6 @@ export function InputControls({
 
           {/* Orchestrator Settings */}
           <OrchestratorSettings disabled={!isConnected} />
-
-          {/* Copy-All Button */}
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleCopyAll}
-            disabled={!isConnected || messages.length === 0}
-            className={cn(
-              'h-9 w-9 rounded-lg border-border shrink-0',
-              copySuccess && 'border-green-500/50 text-green-600'
-            )}
-            title="Copy entire chat history"
-          >
-            {copySuccess ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-          </Button>
-
-          {/* Save Chat to Docs */}
-          {projectPath && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  disabled={!isConnected || messages.length === 0 || isSavingToDoc}
-                  className="h-9 w-9 rounded-lg border-border shrink-0"
-                  title="Chat als Dokument speichern"
-                >
-                  <FilePlus className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                <DropdownMenuItem onClick={handleSaveAsNewDoc} disabled={isSavingToDoc}>
-                  <FilePlus className="w-3.5 h-3.5 mr-2" />
-                  Neues Verlauf-Dokument
-                </DropdownMenuItem>
-                {currentDocPath && (
-                  <DropdownMenuItem onClick={handleAppendChatToCurrent} disabled={isSavingToDoc}>
-                    <FileInput className="w-3.5 h-3.5 mr-2" />
-                    An aktuelles Dokument anhaengen
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
 
           <div className="mx-1 h-5 w-px bg-border shrink-0" />
 
