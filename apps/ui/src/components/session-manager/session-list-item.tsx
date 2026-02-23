@@ -57,9 +57,9 @@ export function SessionListItemRow({
   getProject,
   phaseIndex,
 }: SessionListItemRowProps) {
+  const isCurrentSession = currentSessionId === session.id;
   const isRunning =
-    (currentSessionId === session.id && isCurrentSessionThinking) ||
-    runningSessions.has(session.id);
+    (isCurrentSession && isCurrentSessionThinking) || runningSessions.has(session.id);
 
   const project = getProject(session.projectPath);
   const sessionBadgeColor = getBadgeColor(session.projectPath);
@@ -69,10 +69,16 @@ export function SessionListItemRow({
   return (
     <div
       className={cn(
-        'cursor-pointer rounded-lg border transition-colors hover:bg-accent/50',
-        currentSessionId === session.id && 'border-primary bg-primary/10',
+        'group relative cursor-pointer rounded-lg border',
+        'animate-in fade-in slide-in-from-left-1 duration-200',
+        'transition-[transform,box-shadow,background-color,border-color,opacity] duration-200 ease-out',
+        'hover:-translate-y-[1px] hover:bg-accent/60 hover:shadow-sm active:translate-y-0 active:scale-[0.99]',
+        isCurrentSession &&
+          'border-primary bg-primary/10 shadow-[0_8px_20px_-16px_hsl(var(--primary))]',
         session.isArchived && 'opacity-60',
-        isMultiselectMode && isSelected && 'border-primary bg-primary/20',
+        isMultiselectMode &&
+          isSelected &&
+          'border-primary bg-primary/20 shadow-[0_8px_18px_-16px_hsl(var(--primary))]',
         isPhaseItem && 'bg-muted/20'
       )}
       style={{
@@ -81,6 +87,7 @@ export function SessionListItemRow({
         borderLeftWidth: sessionBadgeColor ? '3px' : undefined,
         borderLeftColor: sessionBadgeColor || undefined,
       }}
+      data-active={isCurrentSession ? 'true' : undefined}
       onClick={() => {
         if (isMultiselectMode) {
           onToggleSelection(session.id);
@@ -174,7 +181,13 @@ export function SessionListItemRow({
 
               {session.description && (
                 <p
-                  className="line-clamp-3 whitespace-pre-line text-foreground/80"
+                  className={cn(
+                    'overflow-hidden whitespace-pre-line text-foreground/80',
+                    'transition-[max-height,color] duration-300 ease-out',
+                    isCurrentSession
+                      ? 'line-clamp-none max-h-40 text-foreground'
+                      : 'line-clamp-2 max-h-14 group-hover:line-clamp-4 group-hover:max-h-28 group-hover:text-foreground/95'
+                  )}
                   style={{ fontSize: `${Math.max(10, sessionFontSize - 2)}px` }}
                 >
                   {session.description}
@@ -183,7 +196,7 @@ export function SessionListItemRow({
 
               {!session.description && session.preview && (
                 <p
-                  className="truncate text-muted-foreground"
+                  className="truncate text-muted-foreground transition-colors duration-200 group-hover:text-foreground/80"
                   style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
                 >
                   {session.preview}
@@ -221,12 +234,15 @@ export function SessionListItemRow({
         </div>
 
         {!isMultiselectMode && !session.isArchived && (
-          <div className="flex gap-0.5" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="flex gap-0.5 opacity-80 transition-opacity duration-200 group-hover:opacity-100"
+            onClick={(event) => event.stopPropagation()}
+          >
             <Button
               size="sm"
               variant="ghost"
               onClick={() => onStartEditing(session.id, session.name)}
-              className="p-0"
+              className="p-0 transition-transform duration-200 hover:scale-105"
               style={{
                 width: `${sessionFontSize + 6}px`,
                 height: `${sessionFontSize + 6}px`,
@@ -245,7 +261,7 @@ export function SessionListItemRow({
               size="sm"
               variant="ghost"
               onClick={() => onArchiveSession(session.id)}
-              className="p-0"
+              className="p-0 transition-transform duration-200 hover:scale-105"
               style={{
                 width: `${sessionFontSize + 6}px`,
                 height: `${sessionFontSize + 6}px`,
@@ -265,7 +281,7 @@ export function SessionListItemRow({
               size="sm"
               variant="ghost"
               onClick={() => onDeleteSession(session)}
-              className="p-0 text-destructive hover:text-destructive"
+              className="p-0 text-destructive transition-transform duration-200 hover:scale-105 hover:text-destructive"
               style={{
                 width: `${sessionFontSize + 6}px`,
                 height: `${sessionFontSize + 6}px`,
@@ -284,12 +300,15 @@ export function SessionListItemRow({
         )}
 
         {!isMultiselectMode && session.isArchived && (
-          <div className="flex gap-0.5" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="flex gap-0.5 opacity-80 transition-opacity duration-200 group-hover:opacity-100"
+            onClick={(event) => event.stopPropagation()}
+          >
             <Button
               size="sm"
               variant="ghost"
               onClick={() => onUnarchiveSession(session.id)}
-              className="p-0"
+              className="p-0 transition-transform duration-200 hover:scale-105"
               style={{
                 width: `${sessionFontSize + 6}px`,
                 height: `${sessionFontSize + 6}px`,
@@ -308,7 +327,7 @@ export function SessionListItemRow({
               size="sm"
               variant="ghost"
               onClick={() => onDeleteSession(session)}
-              className="p-0 text-destructive hover:text-destructive"
+              className="p-0 text-destructive transition-transform duration-200 hover:scale-105 hover:text-destructive"
               style={{
                 width: `${sessionFontSize + 6}px`,
                 height: `${sessionFontSize + 6}px`,

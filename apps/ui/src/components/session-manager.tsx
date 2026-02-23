@@ -529,7 +529,10 @@ export function SessionManager({
             onSessionFontSizeChange={setSessionFontSize}
           />
 
-          <CardContent className="flex-1 space-y-2 overflow-y-auto" data-testid="session-list">
+          <CardContent
+            className="flex-1 space-y-2 overflow-y-auto pr-1 scroll-smooth"
+            data-testid="session-list"
+          >
             <SessionListControls
               activeTab={activeTab}
               archivedSessionCount={archivedSessions.length}
@@ -596,7 +599,10 @@ export function SessionManager({
                 sessionIds.length > 0 && selectedCount === sessionIds.length;
 
               return (
-                <div key={`orchestrator-${displayEntry.group.runId}`} className="space-y-2">
+                <div
+                  key={`orchestrator-${displayEntry.group.runId}`}
+                  className="space-y-2 animate-in fade-in slide-in-from-bottom-1 duration-200"
+                >
                   <OrchestratorRunHeader
                     group={displayEntry.group}
                     isExpanded={displayEntry.group.isExpanded}
@@ -612,44 +618,51 @@ export function SessionManager({
 
                   <div
                     className={cn(
-                      'space-y-2 border-l border-dashed border-muted-foreground/30 pl-3',
-                      'ml-4',
-                      !displayEntry.group.isExpanded && 'hidden'
+                      'ml-4 grid transition-[grid-template-rows,opacity,margin] duration-300 ease-out',
+                      displayEntry.group.isExpanded
+                        ? 'mt-1 grid-rows-[1fr] opacity-100'
+                        : 'mt-0 grid-rows-[0fr] opacity-0 pointer-events-none'
                     )}
                   >
-                    {displayEntry.group.sessions.map((session, index) => (
-                      <SessionListItemRow
-                        key={session.id}
-                        session={session}
-                        currentSessionId={currentSessionId}
-                        isCurrentSessionThinking={isCurrentSessionThinking}
-                        runningSessions={runningSessions}
-                        sessionFontSize={Math.max(10, sessionFontSize - 1)}
-                        isMultiselectMode={isMultiselectMode}
-                        isSelected={selectedSessionIds.has(session.id)}
-                        editingSessionId={editingSessionId}
-                        editingName={editingName}
-                        onEditingNameChange={setEditingName}
-                        onStartEditing={(sessionId, currentName) => {
-                          setEditingSessionId(sessionId);
-                          setEditingName(currentName);
-                        }}
-                        onStopEditing={() => {
-                          setEditingSessionId(null);
-                          setEditingName('');
-                        }}
-                        onRenameSession={(sessionId) => void handleRenameSession(sessionId)}
-                        onArchiveSession={(sessionId) => void handleArchiveSession(sessionId)}
-                        onUnarchiveSession={(sessionId) => void handleUnarchiveSession(sessionId)}
-                        onDeleteSession={handleDeleteSession}
-                        onSelectSession={onSelectSession}
-                        onToggleSelection={toggleSessionSelection}
-                        getProjectName={getProjectName}
-                        getBadgeColor={getBadgeColor}
-                        getProject={getProject}
-                        phaseIndex={index + 1}
-                      />
-                    ))}
+                    <div className="min-h-0 overflow-hidden">
+                      <div className="space-y-2 border-l border-dashed border-muted-foreground/30 pl-3">
+                        {displayEntry.group.sessions.map((session, index) => (
+                          <SessionListItemRow
+                            key={session.id}
+                            session={session}
+                            currentSessionId={currentSessionId}
+                            isCurrentSessionThinking={isCurrentSessionThinking}
+                            runningSessions={runningSessions}
+                            sessionFontSize={Math.max(10, sessionFontSize - 1)}
+                            isMultiselectMode={isMultiselectMode}
+                            isSelected={selectedSessionIds.has(session.id)}
+                            editingSessionId={editingSessionId}
+                            editingName={editingName}
+                            onEditingNameChange={setEditingName}
+                            onStartEditing={(sessionId, currentName) => {
+                              setEditingSessionId(sessionId);
+                              setEditingName(currentName);
+                            }}
+                            onStopEditing={() => {
+                              setEditingSessionId(null);
+                              setEditingName('');
+                            }}
+                            onRenameSession={(sessionId) => void handleRenameSession(sessionId)}
+                            onArchiveSession={(sessionId) => void handleArchiveSession(sessionId)}
+                            onUnarchiveSession={(sessionId) =>
+                              void handleUnarchiveSession(sessionId)
+                            }
+                            onDeleteSession={handleDeleteSession}
+                            onSelectSession={onSelectSession}
+                            onToggleSelection={toggleSessionSelection}
+                            getProjectName={getProjectName}
+                            getBadgeColor={getBadgeColor}
+                            getProject={getProject}
+                            phaseIndex={index + 1}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
               );

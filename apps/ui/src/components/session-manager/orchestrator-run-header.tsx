@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
 import type { OrchestratorRunGroup } from '@/hooks/use-session-grouping';
@@ -68,8 +68,11 @@ export function OrchestratorRunHeader({
       onClick={onToggle}
       aria-expanded={isMultiselectMode ? undefined : isExpanded}
       className={cn(
+        'group',
         'w-full rounded-lg border border-border/70 border-l-2 border-l-primary/50',
-        'bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/50',
+        'bg-muted/30 px-3 py-2 text-left',
+        'transition-[background-color,border-color,transform,box-shadow] duration-200 ease-out',
+        'hover:-translate-y-[1px] hover:bg-muted/50 hover:shadow-sm active:translate-y-0 active:scale-[0.995]',
         isCurrentGroup && 'border-primary bg-primary/10',
         isMultiselectMode && allSessionsSelected && 'border-primary bg-primary/20'
       )}
@@ -77,7 +80,13 @@ export function OrchestratorRunHeader({
     >
       <div className="flex items-start gap-2">
         <div className="pt-0.5 text-muted-foreground">
-          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          <ChevronRight
+            className={cn(
+              'h-4 w-4 transition-transform duration-200',
+              isExpanded && 'rotate-90',
+              isMultiselectMode ? 'opacity-70' : 'group-hover:text-foreground'
+            )}
+          />
         </div>
 
         <div className="min-w-0 flex-1" style={{ fontSize: `${sessionFontSize}px` }}>

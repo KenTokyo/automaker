@@ -164,6 +164,7 @@ export function SidebarNavigation({
                 className={cn(
                   'group flex items-center w-full px-3 py-1.5 mb-1 rounded-md',
                   'transition-all duration-200 ease-out',
+                  'hover:translate-x-0.5',
                   isCollapsible
                     ? [
                         'cursor-pointer',
@@ -252,7 +253,14 @@ export function SidebarNavigation({
 
             {/* Nav Items - show when section is expanded, or when sidebar is collapsed and section doesn't use dropdown */}
             {!isCollapsed && (
-              <div className="space-y-1">
+              <div
+                className={cn(
+                  'space-y-1',
+                  section.label &&
+                    sidebarOpen &&
+                    'animate-in fade-in slide-in-from-top-1 duration-200'
+                )}
+              >
                 {section.items.map((item) => {
                   const isActive = isActiveRoute(item.id);
                   const Icon = item.icon;
@@ -266,7 +274,8 @@ export function SidebarNavigation({
                       }}
                       className={cn(
                         'group flex items-center w-full px-3 py-2 rounded-lg relative overflow-hidden titlebar-no-drag',
-                        'transition-all duration-200 ease-out',
+                        'transition-[transform,box-shadow,background-color,border-color,color] duration-200 ease-out',
+                        'hover:translate-x-0.5 active:translate-x-0 active:scale-[0.99]',
                         isActive
                           ? [
                               // Active: Premium gradient with glow
@@ -286,6 +295,22 @@ export function SidebarNavigation({
                       title={!sidebarOpen ? item.label : undefined}
                       data-testid={`nav-${item.id}`}
                     >
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          'pointer-events-none absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-brand-500/80 transition-all duration-200',
+                          isActive
+                            ? 'scale-y-100 opacity-100'
+                            : 'scale-y-50 opacity-0 group-hover:scale-y-75 group-hover:opacity-60'
+                        )}
+                      />
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          'pointer-events-none absolute inset-0 rounded-lg bg-gradient-to-r from-brand-500/8 via-transparent to-transparent transition-opacity duration-200',
+                          isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                        )}
+                      />
                       <div className="relative">
                         {item.isLoading ? (
                           <Spinner
@@ -300,8 +325,8 @@ export function SidebarNavigation({
                             className={cn(
                               'w-[18px] h-[18px] shrink-0 transition-all duration-200',
                               isActive
-                                ? 'text-brand-500 drop-shadow-sm'
-                                : 'group-hover:text-brand-400'
+                                ? 'scale-105 text-brand-500 drop-shadow-sm'
+                                : 'group-hover:scale-105 group-hover:text-brand-400'
                             )}
                           />
                         )}
@@ -321,7 +346,8 @@ export function SidebarNavigation({
                       </div>
                       <span
                         className={cn(
-                          'ml-3 text-sm flex-1 text-left',
+                          'ml-3 flex-1 text-left text-sm transition-[transform,color] duration-200',
+                          isActive && 'translate-x-0.5',
                           sidebarOpen ? 'block' : 'hidden'
                         )}
                       >
