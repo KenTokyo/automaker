@@ -75,10 +75,16 @@ export const useNotificationsStore = create<NotificationsState & NotificationsAc
     setUnreadCount: (count) => set({ unreadCount: count }),
 
     addNotification: (notification) =>
-      set((state) => ({
-        notifications: [notification, ...state.notifications],
-        unreadCount: notification.read ? state.unreadCount : state.unreadCount + 1,
-      })),
+      set((state) => {
+        if (state.notifications.some((existing) => existing.id === notification.id)) {
+          return state;
+        }
+
+        return {
+          notifications: [notification, ...state.notifications],
+          unreadCount: notification.read ? state.unreadCount : state.unreadCount + 1,
+        };
+      }),
 
     markAsRead: (notificationId) =>
       set((state) => {

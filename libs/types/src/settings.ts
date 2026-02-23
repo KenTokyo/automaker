@@ -1052,6 +1052,12 @@ export interface GlobalSettings {
   // Audio Preferences
   /** Mute completion notification sound */
   muteDoneSound: boolean;
+  /** Notification sound volume as decimal from 0.0 to 1.0 */
+  notificationSoundVolume: number;
+  /** Sound file ID for regular notifications (built-in filename or custom:<absolute path>) */
+  notificationSoundFile: string;
+  /** Sound file ID for all-phases-complete style notifications */
+  allPhasesCompleteSoundFile: string;
 
   // Splash Screen
   /** Disable the splash screen overlay on app startup */
@@ -1551,6 +1557,9 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   defaultRequirePlanApproval: false,
   defaultFeatureModel: { model: 'claude-opus' }, // Use canonical ID
   muteDoneSound: false,
+  notificationSoundVolume: 0.5,
+  notificationSoundFile: 'notification.mp3',
+  allPhasesCompleteSoundFile: 'notification.mp3',
   disableSplashScreen: false,
   serverLogLevel: 'info',
   enableRequestLogging: true,

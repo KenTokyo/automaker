@@ -11,6 +11,7 @@ import {
 } from '@/lib/electron';
 import type { LinkedPRInfo, PhaseModelEntry, ModelId } from '@automaker/types';
 import { useAppStore } from '@/store/app-store';
+import { playNotificationSound } from '@/lib/notification-sounds';
 import { toast } from 'sonner';
 import { isValidationStale } from '../utils';
 import { useValidateIssue, useMarkValidationViewed } from '@/hooks/mutations';
@@ -30,12 +31,17 @@ export function useIssueValidation({
   onValidationResultChange,
   onShowValidationDialogChange,
 }: UseIssueValidationOptions) {
-  const { currentProject, phaseModels, muteDoneSound } = useAppStore();
+  const {
+    currentProject,
+    phaseModels,
+    muteDoneSound,
+    notificationSoundFile,
+    notificationSoundVolume,
+  } = useAppStore();
   const [validatingIssues, setValidatingIssues] = useState<Set<number>>(new Set());
   const [cachedValidations, setCachedValidations] = useState<Map<number, StoredValidation>>(
     new Map()
   );
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // React Query mutations
   const validateIssueMutation = useValidateIssue(currentProject?.path ?? '');
@@ -160,18 +166,11 @@ export function useIssueValidation({
           });
 
           // Play audio notification (if not muted)
-          if (!muteDoneSound) {
-            try {
-              if (!audioRef.current) {
-                audioRef.current = new Audio('/sounds/ding.mp3');
-              }
-              audioRef.current.play().catch(() => {
-                // Audio play might fail due to browser restrictions
-              });
-            } catch {
-              // Ignore audio errors
-            }
-          }
+          void playNotificationSound({
+            soundFile: notificationSoundFile,
+            volume: notificationSoundVolume,
+            muted: muteDoneSound,
+          });
 
           // If validation dialog is open for this issue, update the result
           if (
@@ -203,17 +202,14 @@ export function useIssueValidation({
 
     const unsubscribe = api.github.onValidationEvent(handleValidationEvent);
     return () => unsubscribe();
-  }, [currentProject?.path, muteDoneSound, onValidationResultChange, onShowValidationDialogChange]);
-
-  // Cleanup audio element on unmount to prevent memory leaks
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, []);
+  }, [
+    currentProject?.path,
+    muteDoneSound,
+    notificationSoundFile,
+    notificationSoundVolume,
+    onValidationResultChange,
+    onShowValidationDialogChange,
+  ]);
 
   const handleValidateIssue = useCallback(
     async (

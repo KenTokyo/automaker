@@ -51,6 +51,12 @@ export function SettingsView() {
     setUseWorktrees,
     muteDoneSound,
     setMuteDoneSound,
+    notificationSoundVolume,
+    setNotificationSoundVolume,
+    notificationSoundFile,
+    setNotificationSoundFile,
+    allPhasesCompleteSoundFile,
+    setAllPhasesCompleteSoundFile,
     currentProject,
     defaultPlanningMode,
     setDefaultPlanningMode,
@@ -156,7 +162,17 @@ export function SettingsView() {
         );
       case 'audio':
         return (
-          <AudioSection muteDoneSound={muteDoneSound} onMuteDoneSoundChange={setMuteDoneSound} />
+          <AudioSection
+            muteDoneSound={muteDoneSound}
+            notificationSoundVolume={notificationSoundVolume}
+            notificationSoundFile={notificationSoundFile}
+            allPhasesCompleteSoundFile={allPhasesCompleteSoundFile}
+            projectPath={currentProject?.path ?? null}
+            onMuteDoneSoundChange={setMuteDoneSound}
+            onNotificationSoundVolumeChange={setNotificationSoundVolume}
+            onNotificationSoundFileChange={setNotificationSoundFile}
+            onAllPhasesCompleteSoundFileChange={setAllPhasesCompleteSoundFile}
+          />
         );
       case 'event-hooks':
         return <EventHooksSection />;

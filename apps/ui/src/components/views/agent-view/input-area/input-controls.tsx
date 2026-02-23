@@ -381,89 +381,93 @@ export function InputControls({
   };
 
   return (
-    <>
-      {/* Text Input and Controls */}
-      <div
-        className={cn(
-          'flex flex-col gap-2 transition-all duration-200 rounded-xl p-1',
-          isDragOver && 'bg-primary/5 ring-2 ring-primary/30'
+    <div
+      className={cn(
+        'flex flex-col gap-1.5 transition-all duration-200 rounded-lg p-1',
+        isDragOver && 'bg-primary/5 ring-2 ring-primary/30'
+      )}
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
+      {/* Textarea - full width on mobile */}
+      <div className="relative w-full">
+        <Textarea
+          ref={inputRef}
+          placeholder={
+            isDragOver
+              ? 'Drop your files here...'
+              : isProcessing
+                ? 'Type to queue another prompt...'
+                : 'Describe what you want to build...'
+          }
+          value={
+            draftInput + (interimTranscript ? (draftInput ? ' ' : '') + interimTranscript : '')
+          }
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          onBlur={() => syncInputToParent(draftInput, true)}
+          onPaste={onPaste}
+          disabled={!isConnected}
+          data-testid="agent-input"
+          rows={1}
+          className={cn(
+            'w-full bg-background border-border rounded-lg pl-3 pr-3 sm:pr-16 text-sm resize-none py-2',
+            !accentColor && 'focus:ring-2 focus:ring-primary/20 focus:border-primary/50',
+            'min-h-[44px]',
+            hasFiles && !accentColor && 'border-primary/30',
+            isDragOver && 'border-primary bg-primary/5',
+            isListening && 'border-red-500/50 ring-2 ring-red-500/20'
+          )}
+          style={
+            accentColor && !isDragOver && !isListening
+              ? {
+                  borderColor: accentColor + '40',
+                  boxShadow: `0 0 0 1px ${accentColor}20`,
+                }
+              : undefined
+          }
+          onFocus={(e) => {
+            if (accentColor && !isDragOver && !isListening) {
+              e.currentTarget.style.borderColor = accentColor + '70';
+              e.currentTarget.style.boxShadow = `0 0 0 2px ${accentColor}30`;
+            }
+          }}
+          onBlurCapture={(e) => {
+            if (accentColor && !isDragOver && !isListening) {
+              e.currentTarget.style.borderColor = accentColor + '40';
+              e.currentTarget.style.boxShadow = `0 0 0 1px ${accentColor}20`;
+            }
+          }}
+        />
+        {hasFiles && !isDragOver && (
+          <div className="hidden sm:block absolute right-3 top-1/2 -translate-y-1/2 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full font-medium">
+            files attached
+          </div>
         )}
-        onDragEnter={onDragEnter}
-        onDragLeave={onDragLeave}
-        onDragOver={onDragOver}
-        onDrop={onDrop}
-      >
-        {/* Textarea - full width on mobile */}
-        <div className="relative w-full">
-          <Textarea
-            ref={inputRef}
-            placeholder={
-              isDragOver
-                ? 'Drop your files here...'
-                : isProcessing
-                  ? 'Type to queue another prompt...'
-                  : 'Describe what you want to build...'
-            }
-            value={
-              draftInput + (interimTranscript ? (draftInput ? ' ' : '') + interimTranscript : '')
-            }
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            onBlur={() => syncInputToParent(draftInput, true)}
-            onPaste={onPaste}
-            disabled={!isConnected}
-            data-testid="agent-input"
-            rows={1}
-            className={cn(
-              'w-full bg-background border-border rounded-xl pl-4 pr-4 sm:pr-20 text-sm resize-none py-2.5',
-              !accentColor && 'focus:ring-2 focus:ring-primary/20 focus:border-primary/50',
-              'min-h-[44px]',
-              hasFiles && !accentColor && 'border-primary/30',
-              isDragOver && 'border-primary bg-primary/5',
-              isListening && 'border-red-500/50 ring-2 ring-red-500/20'
-            )}
-            style={
-              accentColor && !isDragOver && !isListening
-                ? {
-                    borderColor: accentColor + '40',
-                    boxShadow: `0 0 0 1px ${accentColor}20`,
-                  }
-                : undefined
-            }
-            onFocus={(e) => {
-              if (accentColor && !isDragOver && !isListening) {
-                e.currentTarget.style.borderColor = accentColor + '70';
-                e.currentTarget.style.boxShadow = `0 0 0 2px ${accentColor}30`;
-              }
-            }}
-            onBlurCapture={(e) => {
-              if (accentColor && !isDragOver && !isListening) {
-                e.currentTarget.style.borderColor = accentColor + '40';
-                e.currentTarget.style.boxShadow = `0 0 0 1px ${accentColor}20`;
-              }
-            }}
-          />
-          {hasFiles && !isDragOver && (
-            <div className="hidden sm:block absolute right-3 top-1/2 -translate-y-1/2 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full font-medium">
-              files attached
-            </div>
-          )}
-          {isDragOver && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-xs text-primary font-medium">
-              <Paperclip className="w-3 h-3" />
-              Drop here
-            </div>
-          )}
-        </div>
+        {isDragOver && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-xs text-primary font-medium">
+            <Paperclip className="w-3 h-3" />
+            Drop here
+          </div>
+        )}
+      </div>
 
-        {/* Controls row - responsive layout */}
-        <div className="flex items-center gap-2 flex-wrap">
+      {/* Controls row - compact single line (scrolls on small widths) */}
+      <div className="overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-max items-center gap-1.5 whitespace-nowrap">
           {/* Model Selector */}
-          <AgentModelSelector
-            value={modelSelection}
-            onChange={onModelSelect}
-            disabled={!isConnected}
-          />
+          <div className="shrink-0">
+            <AgentModelSelector
+              value={modelSelection}
+              onChange={onModelSelect}
+              disabled={!isConnected}
+            />
+          </div>
+
+          {/* Agent Prompts Selector */}
+          <AgentPromptsSelector projectPath={projectPath} disabled={!isConnected} />
 
           {/* Microphone Button */}
           {isSpeechSupported && (
@@ -473,7 +477,7 @@ export function InputControls({
               onClick={toggleListening}
               disabled={!isConnected}
               className={cn(
-                'h-11 w-11 rounded-xl border-border shrink-0',
+                'h-9 w-9 rounded-lg border-border shrink-0',
                 isListening && 'bg-red-500/10 text-red-600 border-red-500/30 animate-pulse'
               )}
               title={isListening ? 'Stop recording' : 'Start voice input'}
@@ -489,7 +493,7 @@ export function InputControls({
             onClick={onToggleImageDropZone}
             disabled={!isConnected}
             className={cn(
-              'h-11 w-11 rounded-xl border-border shrink-0',
+              'h-9 w-9 rounded-lg border-border shrink-0',
               showImageDropZone && 'bg-primary/10 text-primary border-primary/30',
               hasFiles && 'border-primary/30 text-primary'
             )}
@@ -498,9 +502,6 @@ export function InputControls({
             <Paperclip className="w-4 h-4" />
           </Button>
 
-          {/* Agent Prompts Selector */}
-          <AgentPromptsSelector projectPath={projectPath} disabled={!isConnected} />
-
           {/* Docs Quick Access */}
           <Popover open={docsPopoverOpen} onOpenChange={setDocsPopoverOpen}>
             <PopoverTrigger asChild>
@@ -508,7 +509,7 @@ export function InputControls({
                 variant="outline"
                 size="icon"
                 disabled={!isConnected}
-                className="h-11 w-11 rounded-xl border-border shrink-0"
+                className="h-9 w-9 rounded-lg border-border shrink-0"
                 title="Insert doc path"
               >
                 <FileText className="w-4 h-4" />
@@ -564,7 +565,7 @@ export function InputControls({
             onClick={handleCopyAll}
             disabled={!isConnected || messages.length === 0}
             className={cn(
-              'h-11 w-11 rounded-xl border-border shrink-0',
+              'h-9 w-9 rounded-lg border-border shrink-0',
               copySuccess && 'border-green-500/50 text-green-600'
             )}
             title="Copy entire chat history"
@@ -580,7 +581,7 @@ export function InputControls({
                   variant="outline"
                   size="icon"
                   disabled={!isConnected || messages.length === 0 || isSavingToDoc}
-                  className="h-11 w-11 rounded-xl border-border shrink-0"
+                  className="h-9 w-9 rounded-lg border-border shrink-0"
                   title="Chat als Dokument speichern"
                 >
                   <FilePlus className="w-4 h-4" />
@@ -601,15 +602,14 @@ export function InputControls({
             </DropdownMenu>
           )}
 
-          {/* Spacer to push action buttons to the right */}
-          <div className="flex-1" />
+          <div className="mx-1 h-5 w-px bg-border shrink-0" />
 
           {/* Stop Button (only when processing) */}
           {isProcessing && (
             <Button
               onClick={onStop}
               disabled={!isConnected}
-              className="h-11 px-4 rounded-xl shrink-0"
+              className="h-9 px-3 rounded-lg shrink-0"
               variant="destructive"
               data-testid="stop-agent"
               title="Stop generation"
@@ -622,7 +622,7 @@ export function InputControls({
           <Button
             onClick={triggerSend}
             disabled={!canSend}
-            className="h-11 px-4 rounded-xl shrink-0"
+            className="h-9 px-3 rounded-lg shrink-0"
             variant={isProcessing ? 'outline' : 'default'}
             data-testid="send-message"
             title={isProcessing ? 'Add to queue' : 'Send message'}
@@ -631,14 +631,6 @@ export function InputControls({
           </Button>
         </div>
       </div>
-
-      {/* Keyboard hint */}
-      <p className="text-[11px] text-muted-foreground mt-2 text-center hidden sm:block">
-        Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-medium">Enter</kbd> to
-        send,{' '}
-        <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-medium">Shift+Enter</kbd>{' '}
-        for new line
-      </p>
-    </>
+    </div>
   );
 }

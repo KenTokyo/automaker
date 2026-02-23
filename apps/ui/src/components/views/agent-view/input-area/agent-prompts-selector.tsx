@@ -280,7 +280,7 @@ export const AgentPromptsSelector = memo(function AgentPromptsSelector({
             size="sm"
             disabled={disabled}
             className={cn(
-              'h-11 px-3 rounded-xl border-border gap-1.5',
+              'h-9 px-2.5 rounded-lg border-border gap-1.5',
               selectedCount > 0 && 'border-primary/30 text-primary bg-primary/5'
             )}
           >

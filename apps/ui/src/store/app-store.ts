@@ -441,6 +441,9 @@ const initialState: AppState = {
   worktreesByProject: {},
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   muteDoneSound: false,
+  notificationSoundVolume: 0.5,
+  notificationSoundFile: 'notification.mp3',
+  allPhasesCompleteSoundFile: 'notification.mp3',
   disableSplashScreen: false,
   serverLogLevel: 'info',
   enableRequestLogging: true,
@@ -1427,6 +1430,10 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
   // Audio Settings actions
   setMuteDoneSound: (muted) => set({ muteDoneSound: muted }),
+  setNotificationSoundVolume: (volume) =>
+    set({ notificationSoundVolume: Math.max(0, Math.min(1, volume)) }),
+  setNotificationSoundFile: (soundFile) => set({ notificationSoundFile: soundFile }),
+  setAllPhasesCompleteSoundFile: (soundFile) => set({ allPhasesCompleteSoundFile: soundFile }),
 
   // Splash Screen actions
   setDisableSplashScreen: (disabled) => set({ disableSplashScreen: disabled }),

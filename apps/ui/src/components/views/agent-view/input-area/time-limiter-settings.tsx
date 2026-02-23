@@ -92,7 +92,7 @@ export const TimeLimiterSettings = memo(function TimeLimiterSettings({
           size="icon"
           disabled={disabled}
           className={cn(
-            'h-11 w-11 rounded-xl border-border shrink-0',
+            'h-9 w-9 rounded-lg border-border shrink-0',
             isEnabled && 'border-primary/30',
             isWarning && 'border-yellow-500/50 text-yellow-600',
             isExpired && 'border-red-500/50 text-red-600 animate-pulse'

@@ -2286,6 +2286,19 @@ export class HttpApiClient implements ElectronAPI {
       directories?: Array<{ name: string; path: string }>;
       error?: string;
     }> => this.get('/api/workspace/directories'),
+
+    scanSounds: (
+      projectPath?: string
+    ): Promise<{
+      success: boolean;
+      sounds?: Array<{ name: string; path: string }>;
+      error?: string;
+    }> =>
+      this.get(
+        projectPath
+          ? `/api/workspace/sounds?projectPath=${encodeURIComponent(projectPath)}`
+          : '/api/workspace/sounds'
+      ),
   };
 
   // Agent API
@@ -2433,6 +2446,9 @@ export class HttpApiClient implements ElectronAPI {
         defaultPlanningMode: string;
         defaultRequirePlanApproval: boolean;
         muteDoneSound: boolean;
+        notificationSoundVolume?: number;
+        notificationSoundFile?: string;
+        allPhasesCompleteSoundFile?: string;
         enhancementModel: string;
         keyboardShortcuts: Record<string, string>;
         projects: unknown[];

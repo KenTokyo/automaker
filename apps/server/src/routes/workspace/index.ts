@@ -6,12 +6,15 @@
 import { Router } from 'express';
 import { createConfigHandler } from './routes/config.js';
 import { createDirectoriesHandler } from './routes/directories.js';
+import { createSoundFileHandler, createSoundsHandler } from './routes/sounds.js';
 
 export function createWorkspaceRoutes(): Router {
   const router = Router();
 
   router.get('/config', createConfigHandler());
   router.get('/directories', createDirectoriesHandler());
+  router.get('/sounds', createSoundsHandler());
+  router.get('/sounds/file', createSoundFileHandler());
 
   return router;
 }

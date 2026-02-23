@@ -162,6 +162,9 @@ export interface AppState {
 
   // Audio Settings
   muteDoneSound: boolean; // When true, mute the notification sound when agents complete (default: false)
+  notificationSoundVolume: number; // Notification volume from 0.0 to 1.0 (default: 0.5)
+  notificationSoundFile: string; // Regular notification sound (built-in filename or custom:<absolute path>)
+  allPhasesCompleteSoundFile: string; // Sound used for all-phases-complete style notifications
 
   // Splash Screen Settings
   disableSplashScreen: boolean; // When true, skip showing the splash screen overlay on startup
@@ -548,6 +551,9 @@ export interface AppActions {
 
   // Audio Settings actions
   setMuteDoneSound: (muted: boolean) => void;
+  setNotificationSoundVolume: (volume: number) => void;
+  setNotificationSoundFile: (soundFile: string) => void;
+  setAllPhasesCompleteSoundFile: (soundFile: string) => void;
 
   // Splash Screen actions
   setDisableSplashScreen: (disabled: boolean) => void;

@@ -114,12 +114,6 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
         // Reload features when a feature is completed
         logger.info('Feature completed, reloading features...');
         loadFeatures();
-        // Play ding sound when feature is done (unless muted)
-        const { muteDoneSound } = useAppStore.getState();
-        if (!muteDoneSound) {
-          const audio = new Audio('/sounds/ding.mp3');
-          audio.play().catch((err) => logger.warn('Could not play ding sound:', err));
-        }
       } else if (event.type === 'auto_mode_error') {
         // Remove from running tasks
         if (event.featureId) {

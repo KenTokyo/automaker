@@ -4,8 +4,10 @@
 
 import { useEffect } from 'react';
 import { useNotificationsStore } from '@/store/notifications-store';
+import { useAppStore } from '@/store/app-store';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { pathsEqual } from '@/lib/utils';
+import { playNotificationSound, selectSoundFileForNotification } from '@/lib/notification-sounds';
 import type { Notification } from '@automaker/types';
 
 /**
@@ -14,6 +16,10 @@ import type { Notification } from '@automaker/types';
  */
 export function useNotificationEvents(projectPath: string | null) {
   const addNotification = useNotificationsStore((s) => s.addNotification);
+  const muteDoneSound = useAppStore((s) => s.muteDoneSound);
+  const notificationSoundVolume = useAppStore((s) => s.notificationSoundVolume);
+  const notificationSoundFile = useAppStore((s) => s.notificationSoundFile);
+  const allPhasesCompleteSoundFile = useAppStore((s) => s.allPhasesCompleteSoundFile);
 
   useEffect(() => {
     if (!projectPath) return;
@@ -24,11 +30,36 @@ export function useNotificationEvents(projectPath: string | null) {
       // Only handle notifications for the current project
       if (!pathsEqual(notification.projectPath, projectPath)) return;
 
+      // Ignore duplicates when multiple views subscribe to this hook.
+      const existing = useNotificationsStore
+        .getState()
+        .notifications.some((entry) => entry.id === notification.id);
+      if (existing) return;
+
       addNotification(notification);
+
+      const soundFile = selectSoundFileForNotification(
+        notification,
+        notificationSoundFile,
+        allPhasesCompleteSoundFile
+      );
+
+      void playNotificationSound({
+        soundFile,
+        volume: notificationSoundVolume,
+        muted: muteDoneSound,
+      });
     });
 
     return unsubscribe;
-  }, [projectPath, addNotification]);
+  }, [
+    projectPath,
+    addNotification,
+    muteDoneSound,
+    notificationSoundVolume,
+    notificationSoundFile,
+    allPhasesCompleteSoundFile,
+  ]);
 }
 
 /**

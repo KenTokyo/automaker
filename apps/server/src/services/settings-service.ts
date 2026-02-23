@@ -968,6 +968,15 @@ export class SettingsService {
           (appState.defaultPlanningMode as GlobalSettings['defaultPlanningMode']) || 'skip',
         defaultRequirePlanApproval: (appState.defaultRequirePlanApproval as boolean) || false,
         muteDoneSound: (appState.muteDoneSound as boolean) || false,
+        notificationSoundVolume:
+          (appState.notificationSoundVolume as number) ??
+          DEFAULT_GLOBAL_SETTINGS.notificationSoundVolume,
+        notificationSoundFile:
+          (appState.notificationSoundFile as string) ??
+          DEFAULT_GLOBAL_SETTINGS.notificationSoundFile,
+        allPhasesCompleteSoundFile:
+          (appState.allPhasesCompleteSoundFile as string) ??
+          DEFAULT_GLOBAL_SETTINGS.allPhasesCompleteSoundFile,
         enhancementModel:
           (appState.enhancementModel as GlobalSettings['enhancementModel']) || 'sonnet',
         keyboardShortcuts:

@@ -96,7 +96,7 @@ export function AgentInputArea({
   const hasFiles = selectedImages.length > 0 || selectedTextFiles.length > 0;
 
   return (
-    <div className="border-t border-border p-4 bg-card/50 backdrop-blur-sm flex-shrink-0 max-h-[50vh] overflow-y-auto">
+    <div className="border-t border-border p-2.5 bg-card/50 backdrop-blur-sm flex-shrink-0 max-h-[42vh] overflow-y-auto">
       {/* Image Drop Zone (when visible) */}
       {showImageDropZone && (
         <ImageDropZone
