@@ -20,6 +20,7 @@ interface MessageListProps {
   messagesContainerRef: React.RefObject<HTMLDivElement | null>;
   onScroll: () => void;
   chatBackgroundColor?: string;
+  chatFontSize: number;
 }
 
 export const MessageList = memo(function MessageList({
@@ -28,6 +29,7 @@ export const MessageList = memo(function MessageList({
   messagesContainerRef,
   onScroll,
   chatBackgroundColor,
+  chatFontSize,
 }: MessageListProps) {
   return (
     <div
@@ -45,7 +47,7 @@ export const MessageList = memo(function MessageList({
               <ToolCallGroup toolCalls={message.toolCalls} />
             </div>
           )}
-          <MessageBubble message={message} />
+          <MessageBubble message={message} chatFontSize={chatFontSize} />
         </div>
       ))}
 

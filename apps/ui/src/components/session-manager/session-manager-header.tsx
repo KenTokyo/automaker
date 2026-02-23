@@ -14,6 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Slider } from '@/components/ui/slider';
 import { SessionSearchInput } from '@/components/session-manager/session-search-input';
 import { ProjectFilterDropdown } from '@/components/session-manager/project-filter-dropdown';
+import { SessionTimeFilterDropdown } from '@/components/session-manager/session-time-filter-dropdown';
 
 interface SessionManagerHeaderProps {
   activeTab: 'active' | 'archived';
@@ -32,6 +33,8 @@ interface SessionManagerHeaderProps {
   onClearSearch: () => void;
   filterProjectPath: string | null;
   onFilterProjectPathChange: (projectPath: string | null) => void;
+  filterTimeWindowHours: number | null;
+  onFilterTimeWindowHoursChange: (hours: number | null) => void;
   sessionCountByProject: Record<string, number>;
   sessionFontSize: number;
   onSessionFontSizeChange: (size: number) => void;
@@ -54,6 +57,8 @@ export function SessionManagerHeader({
   onClearSearch,
   filterProjectPath,
   onFilterProjectPathChange,
+  filterTimeWindowHours,
+  onFilterTimeWindowHoursChange,
   sessionCountByProject,
   sessionFontSize,
   onSessionFontSizeChange,
@@ -122,6 +127,11 @@ export function SessionManagerHeader({
           selectedProjectPath={filterProjectPath}
           onChange={onFilterProjectPathChange}
           sessionCounts={sessionCountByProject}
+        />
+
+        <SessionTimeFilterDropdown
+          selectedHours={filterTimeWindowHours}
+          onChange={onFilterTimeWindowHoursChange}
         />
       </div>
 

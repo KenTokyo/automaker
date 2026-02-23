@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { MessageSquare, FileText } from 'lucide-react';
 import { createLogger } from '@automaker/utils/logger';
 import { useQueryClient } from '@tanstack/react-query';
@@ -56,6 +56,7 @@ export function SessionManager({
   const [isDeleteAllArchivedDialogOpen, setIsDeleteAllArchivedDialogOpen] = useState(false);
   const [isMultiselectMode, setIsMultiselectMode] = useState(false);
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
+  const [timeFilterHours, setTimeFilterHours] = useState<number | null>(null);
 
   const { data: sessions = [], refetch: refetchSessions } = useSessions(true);
   const { searchTerm, debouncedSearchTerm, setSearchTerm, clearSearch } = useSessionSearch();
@@ -79,6 +80,7 @@ export function SessionManager({
 
   useEffect(() => {
     resetFilter();
+    setTimeFilterHours(null);
   }, [projectPath, resetFilter]);
 
   const hasCheckedInitialRef = useRef(false);
@@ -359,10 +361,22 @@ export function SessionManager({
     });
   };
 
-  const filteredActive = filteredBySearchAndProject.filter((session) => !session.isArchived);
-  const filteredArchived = filteredBySearchAndProject.filter((session) => session.isArchived);
+  const filteredByTime = useMemo(() => {
+    if (timeFilterHours === null) {
+      return filteredBySearchAndProject;
+    }
+
+    const cutoffMs = Date.now() - timeFilterHours * 60 * 60 * 1000;
+    return filteredBySearchAndProject.filter((session) => {
+      const updatedAtMs = new Date(session.updatedAt).getTime();
+      return Number.isFinite(updatedAtMs) && updatedAtMs >= cutoffMs;
+    });
+  }, [filteredBySearchAndProject, timeFilterHours]);
+
+  const filteredActive = filteredByTime.filter((session) => !session.isArchived);
+  const filteredArchived = filteredByTime.filter((session) => session.isArchived);
   const displayedSessions = activeTab === 'active' ? filteredActive : filteredArchived;
-  const isFiltering = !!debouncedSearchTerm || !!filterProjectPath;
+  const isFiltering = !!debouncedSearchTerm || !!filterProjectPath || timeFilterHours !== null;
 
   const displayEntries = useSessionGrouping({
     sessions: displayedSessions,
@@ -479,6 +493,8 @@ export function SessionManager({
             onClearSearch={clearSearch}
             filterProjectPath={filterProjectPath}
             onFilterProjectPathChange={setFilterProjectPath}
+            filterTimeWindowHours={timeFilterHours}
+            onFilterTimeWindowHoursChange={setTimeFilterHours}
             sessionCountByProject={sessionCountByProject}
             sessionFontSize={sessionFontSize}
             onSessionFontSizeChange={setSessionFontSize}

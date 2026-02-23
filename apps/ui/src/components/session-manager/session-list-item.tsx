@@ -57,6 +57,9 @@ export function SessionListItemRow({
   getProject,
   phaseIndex,
 }: SessionListItemRowProps) {
+  const formatTime = (timestamp: string) =>
+    new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
   const isCurrentSession = currentSessionId === session.id;
   const isRunning =
     (isCurrentSession && isCurrentSessionThinking) || runningSessions.has(session.id);
@@ -210,7 +213,11 @@ export function SessionListItemRow({
                 <span className="text-muted-foreground">{session.messageCount} messages</span>
                 <span className="text-muted-foreground">|</span>
                 <span className="text-muted-foreground">
-                  {new Date(session.updatedAt).toLocaleDateString()}
+                  Created {formatTime(session.createdAt)}
+                </span>
+                <span className="text-muted-foreground">|</span>
+                <span className="text-muted-foreground">
+                  Updated {formatTime(session.updatedAt)}
                 </span>
 
                 {session.projectPath && (
@@ -235,7 +242,7 @@ export function SessionListItemRow({
 
         {!isMultiselectMode && !session.isArchived && (
           <div
-            className="flex gap-0.5 opacity-80 transition-opacity duration-200 group-hover:opacity-100"
+            className="flex flex-col gap-0.5 opacity-80 transition-opacity duration-200 group-hover:opacity-100"
             onClick={(event) => event.stopPropagation()}
           >
             <Button
@@ -301,7 +308,7 @@ export function SessionListItemRow({
 
         {!isMultiselectMode && session.isArchived && (
           <div
-            className="flex gap-0.5 opacity-80 transition-opacity duration-200 group-hover:opacity-100"
+            className="flex flex-col gap-0.5 opacity-80 transition-opacity duration-200 group-hover:opacity-100"
             onClick={(event) => event.stopPropagation()}
           >
             <Button

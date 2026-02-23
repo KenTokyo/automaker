@@ -14,6 +14,7 @@ import {
   Copy,
   FilePlus,
   FileInput,
+  Type,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -102,6 +103,8 @@ interface AgentHeaderProps {
   canSaveToDocs: boolean;
   hasCurrentDocPath: boolean;
   isSavingToDoc: boolean;
+  chatFontSize: number;
+  onChatFontSizeChange: (size: number) => void;
   onSaveAsNewDoc: () => void;
   onAppendChatToCurrent: () => void;
   worktreeActions?: WorktreeActionsProps;
@@ -132,6 +135,8 @@ export function AgentHeader({
   canSaveToDocs,
   hasCurrentDocPath,
   isSavingToDoc,
+  chatFontSize,
+  onChatFontSizeChange,
   onSaveAsNewDoc,
   onAppendChatToCurrent,
   worktreeActions,
@@ -522,6 +527,25 @@ export function AgentHeader({
               </div>
             </PopoverContent>
           </Popover>
+
+          <div className="hidden items-center gap-1 rounded-md border border-border bg-muted/30 px-1.5 py-1 sm:flex">
+            <Type className="h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              type="number"
+              min={10}
+              max={16}
+              value={chatFontSize}
+              onChange={(e) => {
+                const parsed = parseInt(e.target.value, 10);
+                if (Number.isFinite(parsed)) {
+                  onChatFontSizeChange(parsed);
+                }
+              }}
+              className="h-6 w-12 border-none bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
+              aria-label="Chat font size"
+              title="Chat font size (10-16px)"
+            />
+          </div>
 
           {currentTool && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full border border-border">

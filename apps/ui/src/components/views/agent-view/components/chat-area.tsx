@@ -23,6 +23,7 @@ interface ChatAreaProps {
   onScroll: () => void;
   onShowSessionManager: () => void;
   chatBackgroundColor?: string;
+  chatFontSize: number;
 }
 
 export const ChatArea = memo(function ChatArea({
@@ -34,6 +35,7 @@ export const ChatArea = memo(function ChatArea({
   onScroll,
   onShowSessionManager,
   chatBackgroundColor,
+  chatFontSize,
 }: ChatAreaProps) {
   if (!currentSessionId) {
     return (
@@ -51,6 +53,7 @@ export const ChatArea = memo(function ChatArea({
       messagesContainerRef={messagesContainerRef}
       onScroll={onScroll}
       chatBackgroundColor={chatBackgroundColor}
+      chatFontSize={chatFontSize}
     />
   );
 });

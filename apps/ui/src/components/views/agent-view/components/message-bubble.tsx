@@ -36,9 +36,13 @@ interface Message {
 
 interface MessageBubbleProps {
   message: Message;
+  chatFontSize: number;
 }
 
-export const MessageBubble = memo(function MessageBubble({ message }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({
+  message,
+  chatFontSize,
+}: MessageBubbleProps) {
   const isError = message.isError && message.role === 'assistant';
   const hasContent = message.content.trim().length > 0;
   const showCopyButton = hasContent;
@@ -83,18 +87,25 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
         )}
       >
         {message.role === 'assistant' ? (
-          <Markdown
-            className={cn(
-              'text-sm prose-p:leading-relaxed prose-headings:text-foreground prose-strong:text-foreground prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded',
-              isError
-                ? 'text-red-600 dark:text-red-400 prose-code:text-red-600 dark:prose-code:text-red-400 prose-code:bg-red-500/10'
-                : 'text-foreground prose-code:text-primary prose-code:bg-muted'
-            )}
+          <div style={{ fontSize: `${chatFontSize}px` }}>
+            <Markdown
+              className={cn(
+                'prose-p:leading-relaxed prose-headings:text-foreground prose-strong:text-foreground prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded',
+                isError
+                  ? 'text-red-600 dark:text-red-400 prose-code:text-red-600 dark:prose-code:text-red-400 prose-code:bg-red-500/10'
+                  : 'text-foreground prose-code:text-primary prose-code:bg-muted'
+              )}
+            >
+              {message.content}
+            </Markdown>
+          </div>
+        ) : (
+          <p
+            className="whitespace-pre-wrap leading-relaxed"
+            style={{ fontSize: `${chatFontSize}px` }}
           >
             {message.content}
-          </Markdown>
-        ) : (
-          <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+          </p>
         )}
 
         {/* Display attached images for user messages */}

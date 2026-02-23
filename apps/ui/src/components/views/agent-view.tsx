@@ -57,9 +57,23 @@ export function AgentView() {
   const [input, setInput] = useState('');
   const [currentTool, setCurrentTool] = useState<string | null>(null);
   const [isDesktop, setIsDesktop] = useState(true);
+  const [chatFontSize, setChatFontSize] = useState(() => {
+    if (typeof window === 'undefined') return 13;
+    const stored = window.localStorage.getItem('automaker:chatFontSize');
+    const parsed = stored ? parseInt(stored, 10) : 13;
+    return Number.isFinite(parsed) ? Math.max(10, Math.min(16, parsed)) : 13;
+  });
   // Initialize session manager state - starts as true to match SSR
   // Then updates on mount based on actual screen size to prevent hydration mismatch
   const [showSessionManager, setShowSessionManager] = useState(true);
+
+  const handleChatFontSizeChange = useCallback((size: number) => {
+    const clamped = Math.max(10, Math.min(16, size));
+    setChatFontSize(clamped);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('automaker:chatFontSize', String(clamped));
+    }
+  }, []);
 
   // Update session manager visibility based on screen size after mount and on resize
   useEffect(() => {
@@ -728,6 +742,8 @@ export function AgentView() {
                 canSaveToDocs={Boolean(currentProject?.path) && messages.length > 0 && isConnected}
                 hasCurrentDocPath={Boolean(currentDocPath)}
                 isSavingToDoc={isSavingToDoc}
+                chatFontSize={chatFontSize}
+                onChatFontSizeChange={handleChatFontSizeChange}
                 onSaveAsNewDoc={handleSaveAsNewDoc}
                 onAppendChatToCurrent={handleAppendChatToCurrent}
                 worktreeActions={worktreeActionsProps}
@@ -743,6 +759,7 @@ export function AgentView() {
                 onScroll={handleScroll}
                 onShowSessionManager={handleShowSessionManager}
                 chatBackgroundColor={currentProject?.chatBackgroundColor}
+                chatFontSize={chatFontSize}
               />
 
               {/* Input Area */}
@@ -814,6 +831,8 @@ export function AgentView() {
             canSaveToDocs={Boolean(currentProject?.path) && messages.length > 0 && isConnected}
             hasCurrentDocPath={Boolean(currentDocPath)}
             isSavingToDoc={isSavingToDoc}
+            chatFontSize={chatFontSize}
+            onChatFontSizeChange={handleChatFontSizeChange}
             onSaveAsNewDoc={handleSaveAsNewDoc}
             onAppendChatToCurrent={handleAppendChatToCurrent}
           />
@@ -828,6 +847,7 @@ export function AgentView() {
             onScroll={handleScroll}
             onShowSessionManager={handleShowSessionManager}
             chatBackgroundColor={currentProject?.chatBackgroundColor}
+            chatFontSize={chatFontSize}
           />
 
           {/* Input Area */}
