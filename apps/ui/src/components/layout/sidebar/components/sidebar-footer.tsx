@@ -2,9 +2,10 @@ import { useCallback } from 'react';
 import type { NavigateOptions } from '@tanstack/react-router';
 import { cn } from '@/lib/utils';
 import { formatShortcut } from '@/store/app-store';
-import { Activity, Settings, BookOpen, MessageSquare, ExternalLink } from 'lucide-react';
+import { Activity, Settings, Palette, BookOpen, MessageSquare, ExternalLink } from 'lucide-react';
 import { useOSDetection } from '@/hooks/use-os-detection';
 import { getElectronAPI } from '@/lib/electron';
+import { useGraphicsDialog } from '@/contexts/graphics-dialog-context';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 function getOSAbbreviation(os: string): string {
@@ -43,6 +44,7 @@ export function SidebarFooter({
 }: SidebarFooterProps) {
   const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
   const { os } = useOSDetection();
+  const { openGraphicsDialog } = useGraphicsDialog();
   const appMode = import.meta.env.VITE_APP_MODE || '?';
   const versionSuffix = `${getOSAbbreviation(os)}${appMode}`;
 
@@ -153,6 +155,26 @@ export function SidebarFooter({
               <span className="ml-2 px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono text-muted-foreground">
                 {formatShortcut(shortcuts.settings, true)}
               </span>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={openGraphicsDialog}
+                className={cn(
+                  'flex items-center justify-center w-10 h-10 rounded-xl',
+                  'transition-all duration-200 ease-out titlebar-no-drag',
+                  'text-muted-foreground hover:text-foreground',
+                  'hover:bg-accent/50 border border-transparent hover:border-border/40'
+                )}
+                data-testid="graphics-settings-button"
+              >
+                <Palette className="w-[18px] h-[18px]" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>
+              Graphics Settings
             </TooltipContent>
           </Tooltip>
 
@@ -306,6 +328,22 @@ export function SidebarFooter({
           >
             {formatShortcut(shortcuts.settings, true)}
           </span>
+        </button>
+      </div>
+
+      <div className="px-3 py-0.5">
+        <button
+          onClick={openGraphicsDialog}
+          className={cn(
+            'group flex items-center w-full px-3 py-2 rounded-lg relative overflow-hidden titlebar-no-drag',
+            'transition-all duration-200 ease-out',
+            'text-muted-foreground hover:text-foreground',
+            'hover:bg-accent/50 border border-transparent hover:border-border/40'
+          )}
+          data-testid="graphics-settings-button"
+        >
+          <Palette className="w-[18px] h-[18px] shrink-0 transition-all duration-200 group-hover:text-brand-400" />
+          <span className="ml-3 text-sm flex-1 text-left">Graphics Settings</span>
         </button>
       </div>
 

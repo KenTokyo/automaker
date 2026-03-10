@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState, memo, useCallback, useMemo } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { Edit2, Trash2, Palette, ChevronRight, Moon, Sun, Monitor } from 'lucide-react';
+import {
+  Edit2,
+  Trash2,
+  Palette,
+  ChevronRight,
+  Moon,
+  Sun,
+  Monitor,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { type ThemeMode, useAppStore } from '@/store/app-store';
@@ -12,6 +21,7 @@ import {
   THEME_SUBMENU_CONSTANTS,
 } from '@/components/layout/sidebar/constants';
 import { useThemePreview } from '@/components/layout/sidebar/hooks';
+import { useGraphicsDialog } from '@/contexts/graphics-dialog-context';
 
 /**
  * Constant representing the "use global theme" option.
@@ -204,6 +214,7 @@ export function ProjectContextMenu({
   const [showThemeSubmenu, setShowThemeSubmenu] = useState(false);
   const themeSubmenuRef = useRef<HTMLDivElement>(null);
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { openGraphicsDialog } = useGraphicsDialog();
 
   const { handlePreviewEnter, handlePreviewLeave } = useThemePreview({ setPreviewTheme });
 
@@ -316,6 +327,12 @@ export function ProjectContextMenu({
   const handleRemove = () => {
     setShowRemoveDialog(true);
   };
+
+  const handleGraphicsSettings = useCallback(() => {
+    setPreviewTheme(null);
+    onClose();
+    openGraphicsDialog();
+  }, [onClose, openGraphicsDialog, setPreviewTheme]);
 
   const handleThemeSelect = useCallback(
     (value: ThemeMode | typeof USE_GLOBAL_THEME) => {
@@ -496,6 +513,20 @@ export function ProjectContextMenu({
                 </div>
               )}
             </div>
+
+            <button
+              onClick={handleGraphicsSettings}
+              className={cn(
+                'w-full flex items-center gap-2 px-3 py-2 rounded-md',
+                'text-sm font-medium text-left',
+                'hover:bg-accent transition-colors',
+                'focus:outline-none focus:bg-accent'
+              )}
+              data-testid="open-graphics-settings-button"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              <span>Graphics Settings</span>
+            </button>
 
             <button
               onClick={handleRemove}

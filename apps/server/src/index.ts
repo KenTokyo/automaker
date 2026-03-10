@@ -95,6 +95,13 @@ const PORT = parseInt(process.env.PORT || '3008', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 const HOSTNAME = process.env.HOSTNAME || 'localhost';
 const DATA_DIR = process.env.DATA_DIR || './data';
+
+// Server mode: 'full' (default) = all features, 'chat' = chat-only (lighter)
+const AUTOMAKER_MODE = (process.env.AUTOMAKER_MODE || 'full') as 'full' | 'chat';
+const isChatOnlyMode = AUTOMAKER_MODE === 'chat';
+logger.info(
+  `[SERVER_STARTUP] Mode: ${AUTOMAKER_MODE}${isChatOnlyMode ? ' (chat-only, lightweight)' : ' (all features)'}`
+);
 logger.info('[SERVER_STARTUP] process.env.DATA_DIR:', process.env.DATA_DIR);
 logger.info('[SERVER_STARTUP] Resolved DATA_DIR:', DATA_DIR);
 logger.info('[SERVER_STARTUP] process.cwd():', process.cwd());
@@ -267,11 +274,15 @@ const codexAppServerService = new CodexAppServerService();
 const codexModelCacheService = new CodexModelCacheService(DATA_DIR, codexAppServerService);
 const codexUsageService = new CodexUsageService(codexAppServerService);
 const mcpTestService = new MCPTestService(settingsService);
-const ideationService = new IdeationService(events, settingsService, featureLoader);
+
+// Full-mode-only services (heavy or board-specific)
+const ideationService = isChatOnlyMode
+  ? null
+  : new IdeationService(events, settingsService, featureLoader);
 
 // Initialize DevServerService with event emitter for real-time log streaming
-const devServerService = getDevServerService();
-devServerService.setEventEmitter(events);
+const devServerService = isChatOnlyMode ? null : getDevServerService();
+if (devServerService) devServerService.setEventEmitter(events);
 
 // Initialize Notification Service with event emitter for real-time updates
 const notificationService = getNotificationService();
@@ -281,11 +292,13 @@ notificationService.setEventEmitter(events);
 const eventHistoryService = getEventHistoryService();
 
 // Initialize Test Runner Service with event emitter for real-time test output streaming
-const testRunnerService = getTestRunnerService();
-testRunnerService.setEventEmitter(events);
+const testRunnerService = isChatOnlyMode ? null : getTestRunnerService();
+if (testRunnerService) testRunnerService.setEventEmitter(events);
 
 // Initialize Event Hook Service for custom event triggers (with history storage)
-eventHookService.initialize(events, settingsService, eventHistoryService, featureLoader);
+if (!isChatOnlyMode) {
+  eventHookService.initialize(events, settingsService, eventHistoryService, featureLoader);
+}
 
 // Initialize services
 (async () => {
@@ -331,13 +344,15 @@ eventHookService.initialize(events, settingsService, eventHistoryService, featur
 })();
 
 // Run stale validation cleanup every hour to prevent memory leaks from crashed validations
-const VALIDATION_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-setInterval(() => {
-  const cleaned = cleanupStaleValidations();
-  if (cleaned > 0) {
-    logger.info(`Cleaned up ${cleaned} stale validation entries`);
-  }
-}, VALIDATION_CLEANUP_INTERVAL_MS);
+if (!isChatOnlyMode) {
+  const VALIDATION_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+  setInterval(() => {
+    const cleaned = cleanupStaleValidations();
+    if (cleaned > 0) {
+      logger.info(`Cleaned up ${cleaned} stale validation entries`);
+    }
+  }, VALIDATION_CLEANUP_INTERVAL_MS);
+}
 
 // Require Content-Type: application/json for all API POST/PUT/PATCH requests
 // This helps prevent CSRF and content-type confusion attacks
@@ -354,49 +369,54 @@ app.use('/api', authMiddleware);
 // Protected health endpoint with detailed info
 app.get('/api/health/detailed', createDetailedHandler());
 
+// ─── Core routes (always loaded, both full + chat modes) ─────────────────────
 app.use('/api/fs', createFsRoutes(events));
 app.use('/api/agent', createAgentRoutes(agentService, events));
 app.use('/api/sessions', createSessionsRoutes(agentService));
-app.use(
-  '/api/features',
-  createFeaturesRoutes(featureLoader, settingsService, events, autoModeService)
-);
-app.use('/api/auto-mode', createAutoModeRoutes(autoModeService));
-app.use('/api/enhance-prompt', createEnhancePromptRoutes(settingsService));
-app.use('/api/worktree', createWorktreeRoutes(events, settingsService));
-app.use('/api/git', createGitRoutes());
 app.use('/api/models', createModelsRoutes());
-app.use('/api/spec-regeneration', createSpecRegenerationRoutes(events, settingsService));
 app.use('/api/running-agents', createRunningAgentsRoutes(autoModeService));
 app.use('/api/workspace', createWorkspaceRoutes());
-app.use('/api/templates', createTemplatesRoutes());
-app.use('/api/terminal', createTerminalRoutes());
 app.use('/api/settings', createSettingsRoutes(settingsService));
 app.use('/api/agent-prompts', createAgentPromptsRoutes());
 app.use('/api/chat-images', createChatImagesRoutes());
 app.use('/api/claude', createClaudeRoutes(claudeUsageService));
 app.use('/api/codex', createCodexRoutes(codexUsageService, codexModelCacheService));
-app.use('/api/github', createGitHubRoutes(events, settingsService));
 app.use('/api/docs', createDocsRoutes(settingsService));
-app.use('/api/context', createContextRoutes(settingsService));
-app.use('/api/backlog-plan', createBacklogPlanRoutes(events, settingsService));
 app.use('/api/mcp', createMCPRoutes(mcpTestService));
-app.use('/api/pipeline', createPipelineRoutes(pipelineService));
-app.use('/api/ideation', createIdeationRoutes(events, ideationService, featureLoader));
-app.use('/api/notifications', createNotificationsRoutes(notificationService));
-app.use('/api/event-history', createEventHistoryRoutes(eventHistoryService, settingsService));
 app.use(
   '/api/projects',
   createProjectsRoutes(featureLoader, autoModeService, settingsService, notificationService)
 );
+
+// ─── Full-mode-only routes (board, terminal, pipeline, git, etc.) ────────────
+if (!isChatOnlyMode) {
+  app.use(
+    '/api/features',
+    createFeaturesRoutes(featureLoader, settingsService, events, autoModeService)
+  );
+  app.use('/api/auto-mode', createAutoModeRoutes(autoModeService));
+  app.use('/api/enhance-prompt', createEnhancePromptRoutes(settingsService));
+  app.use('/api/worktree', createWorktreeRoutes(events, settingsService));
+  app.use('/api/git', createGitRoutes());
+  app.use('/api/spec-regeneration', createSpecRegenerationRoutes(events, settingsService));
+  app.use('/api/templates', createTemplatesRoutes());
+  app.use('/api/terminal', createTerminalRoutes());
+  app.use('/api/github', createGitHubRoutes(events, settingsService));
+  app.use('/api/context', createContextRoutes(settingsService));
+  app.use('/api/backlog-plan', createBacklogPlanRoutes(events, settingsService));
+  app.use('/api/pipeline', createPipelineRoutes(pipelineService));
+  app.use('/api/ideation', createIdeationRoutes(events, ideationService!, featureLoader));
+  app.use('/api/notifications', createNotificationsRoutes(notificationService));
+  app.use('/api/event-history', createEventHistoryRoutes(eventHistoryService, settingsService));
+}
 
 // Create HTTP server
 const server = createServer(app);
 
 // WebSocket servers using noServer mode for proper multi-path support
 const wss = new WebSocketServer({ noServer: true });
-const terminalWss = new WebSocketServer({ noServer: true });
-const terminalService = getTerminalService(settingsService);
+const terminalWss = isChatOnlyMode ? null : new WebSocketServer({ noServer: true });
+const terminalService = isChatOnlyMode ? null : getTerminalService(settingsService);
 
 /**
  * Authenticate WebSocket upgrade requests
@@ -451,7 +471,7 @@ server.on('upgrade', (request, socket, head) => {
     wss.handleUpgrade(request, socket, head, (ws) => {
       wss.emit('connection', ws, request);
     });
-  } else if (pathname === '/api/terminal/ws') {
+  } else if (pathname === '/api/terminal/ws' && terminalWss) {
     terminalWss.handleUpgrade(request, socket, head, (ws) => {
       terminalWss.emit('connection', ws, request);
     });
@@ -498,206 +518,208 @@ wss.on('connection', (ws: WebSocket) => {
   });
 });
 
-// Track WebSocket connections per session
+// Track WebSocket connections per session (terminal only, full mode)
 const terminalConnections: Map<string, Set<WebSocket>> = new Map();
-// Track last resize dimensions per session to deduplicate resize messages
 const lastResizeDimensions: Map<string, { cols: number; rows: number }> = new Map();
-// Track last resize timestamp to rate-limit resize operations (prevents resize storm)
 const lastResizeTime: Map<string, number> = new Map();
 const RESIZE_MIN_INTERVAL_MS = 100; // Minimum 100ms between resize operations
 
 // Clean up resize tracking when sessions actually exit (not just when connections close)
-terminalService.onExit((sessionId) => {
-  lastResizeDimensions.delete(sessionId);
-  lastResizeTime.delete(sessionId);
-  terminalConnections.delete(sessionId);
-});
+if (terminalService) {
+  terminalService.onExit((sessionId) => {
+    lastResizeDimensions.delete(sessionId);
+    lastResizeTime.delete(sessionId);
+    terminalConnections.delete(sessionId);
+  });
+}
 
-// Terminal WebSocket connection handler
-terminalWss.on('connection', (ws: WebSocket, req: import('http').IncomingMessage) => {
-  // Parse URL to get session ID and token
-  const url = new URL(req.url || '', `http://${req.headers.host}`);
-  const sessionId = url.searchParams.get('sessionId');
-  const token = url.searchParams.get('token');
+// Terminal WebSocket connection handler (full mode only)
+if (terminalWss && terminalService) {
+  terminalWss.on('connection', (ws: WebSocket, req: import('http').IncomingMessage) => {
+    // Parse URL to get session ID and token
+    const url = new URL(req.url || '', `http://${req.headers.host}`);
+    const sessionId = url.searchParams.get('sessionId');
+    const token = url.searchParams.get('token');
 
-  logger.info(`Connection attempt for session: ${sessionId}`);
+    logger.info(`Connection attempt for session: ${sessionId}`);
 
-  // Check if terminal is enabled
-  if (!isTerminalEnabled()) {
-    logger.info('Terminal is disabled');
-    ws.close(4003, 'Terminal access is disabled');
-    return;
-  }
+    // Check if terminal is enabled
+    if (!isTerminalEnabled()) {
+      logger.info('Terminal is disabled');
+      ws.close(4003, 'Terminal access is disabled');
+      return;
+    }
 
-  // Validate token if password is required
-  if (isTerminalPasswordRequired() && !validateTerminalToken(token || undefined)) {
-    logger.info('Invalid or missing token');
-    ws.close(4001, 'Authentication required');
-    return;
-  }
+    // Validate token if password is required
+    if (isTerminalPasswordRequired() && !validateTerminalToken(token || undefined)) {
+      logger.info('Invalid or missing token');
+      ws.close(4001, 'Authentication required');
+      return;
+    }
 
-  if (!sessionId) {
-    logger.info('No session ID provided');
-    ws.close(4002, 'Session ID required');
-    return;
-  }
+    if (!sessionId) {
+      logger.info('No session ID provided');
+      ws.close(4002, 'Session ID required');
+      return;
+    }
 
-  // Check if session exists
-  const session = terminalService.getSession(sessionId);
-  if (!session) {
-    logger.info(`Session ${sessionId} not found`);
-    ws.close(4004, 'Session not found');
-    return;
-  }
+    // Check if session exists
+    const session = terminalService.getSession(sessionId);
+    if (!session) {
+      logger.info(`Session ${sessionId} not found`);
+      ws.close(4004, 'Session not found');
+      return;
+    }
 
-  logger.info(`Client connected to session ${sessionId}`);
+    logger.info(`Client connected to session ${sessionId}`);
 
-  // Track this connection
-  if (!terminalConnections.has(sessionId)) {
-    terminalConnections.set(sessionId, new Set());
-  }
-  terminalConnections.get(sessionId)!.add(ws);
+    // Track this connection
+    if (!terminalConnections.has(sessionId)) {
+      terminalConnections.set(sessionId, new Set());
+    }
+    terminalConnections.get(sessionId)!.add(ws);
 
-  // Send initial connection success FIRST
-  ws.send(
-    JSON.stringify({
-      type: 'connected',
-      sessionId,
-      shell: session.shell,
-      cwd: session.cwd,
-    })
-  );
-
-  // Send scrollback buffer BEFORE subscribing to prevent race condition
-  // Also clear pending output buffer to prevent duplicates from throttled flush
-  const scrollback = terminalService.getScrollbackAndClearPending(sessionId);
-  if (scrollback && scrollback.length > 0) {
+    // Send initial connection success FIRST
     ws.send(
       JSON.stringify({
-        type: 'scrollback',
-        data: scrollback,
+        type: 'connected',
+        sessionId,
+        shell: session.shell,
+        cwd: session.cwd,
       })
     );
-  }
 
-  // NOW subscribe to terminal data (after scrollback is sent)
-  const unsubscribeData = terminalService.onData((sid, data) => {
-    if (sid === sessionId && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'data', data }));
+    // Send scrollback buffer BEFORE subscribing to prevent race condition
+    // Also clear pending output buffer to prevent duplicates from throttled flush
+    const scrollback = terminalService.getScrollbackAndClearPending(sessionId);
+    if (scrollback && scrollback.length > 0) {
+      ws.send(
+        JSON.stringify({
+          type: 'scrollback',
+          data: scrollback,
+        })
+      );
     }
-  });
 
-  // Subscribe to terminal exit
-  const unsubscribeExit = terminalService.onExit((sid, exitCode) => {
-    if (sid === sessionId && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'exit', exitCode }));
-      ws.close(1000, 'Session ended');
-    }
-  });
+    // NOW subscribe to terminal data (after scrollback is sent)
+    const unsubscribeData = terminalService.onData((sid, data) => {
+      if (sid === sessionId && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'data', data }));
+      }
+    });
 
-  // Handle incoming messages
-  ws.on('message', (message) => {
-    try {
-      const msg = JSON.parse(message.toString());
+    // Subscribe to terminal exit
+    const unsubscribeExit = terminalService.onExit((sid, exitCode) => {
+      if (sid === sessionId && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'exit', exitCode }));
+        ws.close(1000, 'Session ended');
+      }
+    });
 
-      switch (msg.type) {
-        case 'input':
-          // Validate input data type and length
-          if (typeof msg.data !== 'string') {
-            ws.send(JSON.stringify({ type: 'error', message: 'Invalid input type' }));
-            break;
-          }
-          // Limit input size to 1MB to prevent memory issues
-          if (msg.data.length > 1024 * 1024) {
-            ws.send(JSON.stringify({ type: 'error', message: 'Input too large' }));
-            break;
-          }
-          // Write user input to terminal
-          terminalService.write(sessionId, msg.data);
-          break;
+    // Handle incoming messages
+    ws.on('message', (message) => {
+      try {
+        const msg = JSON.parse(message.toString());
 
-        case 'resize':
-          // Validate resize dimensions are positive integers within reasonable bounds
-          if (
-            typeof msg.cols !== 'number' ||
-            typeof msg.rows !== 'number' ||
-            !Number.isInteger(msg.cols) ||
-            !Number.isInteger(msg.rows) ||
-            msg.cols < 1 ||
-            msg.cols > 1000 ||
-            msg.rows < 1 ||
-            msg.rows > 500
-          ) {
-            break; // Silently ignore invalid resize requests
-          }
-          // Resize terminal with deduplication and rate limiting
-          if (msg.cols && msg.rows) {
-            const now = Date.now();
-            const lastTime = lastResizeTime.get(sessionId) || 0;
-            const lastDimensions = lastResizeDimensions.get(sessionId);
-
-            // Skip if resized too recently (prevents resize storm during splits)
-            if (now - lastTime < RESIZE_MIN_INTERVAL_MS) {
+        switch (msg.type) {
+          case 'input':
+            // Validate input data type and length
+            if (typeof msg.data !== 'string') {
+              ws.send(JSON.stringify({ type: 'error', message: 'Invalid input type' }));
               break;
             }
-
-            // Check if dimensions are different from last resize
-            if (
-              !lastDimensions ||
-              lastDimensions.cols !== msg.cols ||
-              lastDimensions.rows !== msg.rows
-            ) {
-              // Only suppress output on subsequent resizes, not the first one
-              // The first resize happens on terminal open and we don't want to drop the initial prompt
-              const isFirstResize = !lastDimensions;
-              terminalService.resize(sessionId, msg.cols, msg.rows, !isFirstResize);
-              lastResizeDimensions.set(sessionId, {
-                cols: msg.cols,
-                rows: msg.rows,
-              });
-              lastResizeTime.set(sessionId, now);
+            // Limit input size to 1MB to prevent memory issues
+            if (msg.data.length > 1024 * 1024) {
+              ws.send(JSON.stringify({ type: 'error', message: 'Input too large' }));
+              break;
             }
-          }
-          break;
+            // Write user input to terminal
+            terminalService.write(sessionId, msg.data);
+            break;
 
-        case 'ping':
-          // Respond to ping
-          ws.send(JSON.stringify({ type: 'pong' }));
-          break;
+          case 'resize':
+            // Validate resize dimensions are positive integers within reasonable bounds
+            if (
+              typeof msg.cols !== 'number' ||
+              typeof msg.rows !== 'number' ||
+              !Number.isInteger(msg.cols) ||
+              !Number.isInteger(msg.rows) ||
+              msg.cols < 1 ||
+              msg.cols > 1000 ||
+              msg.rows < 1 ||
+              msg.rows > 500
+            ) {
+              break; // Silently ignore invalid resize requests
+            }
+            // Resize terminal with deduplication and rate limiting
+            if (msg.cols && msg.rows) {
+              const now = Date.now();
+              const lastTime = lastResizeTime.get(sessionId) || 0;
+              const lastDimensions = lastResizeDimensions.get(sessionId);
 
-        default:
-          logger.warn(`Unknown message type: ${msg.type}`);
+              // Skip if resized too recently (prevents resize storm during splits)
+              if (now - lastTime < RESIZE_MIN_INTERVAL_MS) {
+                break;
+              }
+
+              // Check if dimensions are different from last resize
+              if (
+                !lastDimensions ||
+                lastDimensions.cols !== msg.cols ||
+                lastDimensions.rows !== msg.rows
+              ) {
+                // Only suppress output on subsequent resizes, not the first one
+                // The first resize happens on terminal open and we don't want to drop the initial prompt
+                const isFirstResize = !lastDimensions;
+                terminalService.resize(sessionId, msg.cols, msg.rows, !isFirstResize);
+                lastResizeDimensions.set(sessionId, {
+                  cols: msg.cols,
+                  rows: msg.rows,
+                });
+                lastResizeTime.set(sessionId, now);
+              }
+            }
+            break;
+
+          case 'ping':
+            // Respond to ping
+            ws.send(JSON.stringify({ type: 'pong' }));
+            break;
+
+          default:
+            logger.warn(`Unknown message type: ${msg.type}`);
+        }
+      } catch (error) {
+        logger.error('Error processing message:', error);
       }
-    } catch (error) {
-      logger.error('Error processing message:', error);
-    }
-  });
+    });
 
-  ws.on('close', () => {
-    logger.info(`Client disconnected from session ${sessionId}`);
-    unsubscribeData();
-    unsubscribeExit();
+    ws.on('close', () => {
+      logger.info(`Client disconnected from session ${sessionId}`);
+      unsubscribeData();
+      unsubscribeExit();
 
-    // Remove from connections tracking
-    const connections = terminalConnections.get(sessionId);
-    if (connections) {
-      connections.delete(ws);
-      if (connections.size === 0) {
-        terminalConnections.delete(sessionId);
-        // DON'T delete lastResizeDimensions/lastResizeTime here!
-        // The session still exists, and reconnecting clients need to know
-        // this isn't the "first resize" to prevent duplicate prompts.
-        // These get cleaned up when the session actually exits.
+      // Remove from connections tracking
+      const connections = terminalConnections.get(sessionId);
+      if (connections) {
+        connections.delete(ws);
+        if (connections.size === 0) {
+          terminalConnections.delete(sessionId);
+          // DON'T delete lastResizeDimensions/lastResizeTime here!
+          // The session still exists, and reconnecting clients need to know
+          // this isn't the "first resize" to prevent duplicate prompts.
+          // These get cleaned up when the session actually exits.
+        }
       }
-    }
-  });
+    });
 
-  ws.on('error', (error) => {
-    logger.error(`Error on session ${sessionId}:`, error);
-    unsubscribeData();
-    unsubscribeExit();
+    ws.on('error', (error) => {
+      logger.error(`Error on session ${sessionId}:`, error);
+      unsubscribeData();
+      unsubscribeExit();
+    });
   });
-});
+} // end if (terminalWss && terminalService)
 
 // Start server with error handling for port conflicts
 const startServer = (port: number, host: string) => {
@@ -716,10 +738,15 @@ const startServer = (port: number, host: string) => {
     const healthUrl = `http://${HOSTNAME}:${port}/api/health`;
 
     const sHeader = '🚀 Automaker Backend Server'.padEnd(BOX_CONTENT_WIDTH);
+    const s0 = `Mode:         ${AUTOMAKER_MODE}${isChatOnlyMode ? ' (chat-only)' : ''}`.padEnd(
+      BOX_CONTENT_WIDTH
+    );
     const s1 = `Listening:    ${listenAddr}`.padEnd(BOX_CONTENT_WIDTH);
     const s2 = `HTTP API:     ${httpUrl}`.padEnd(BOX_CONTENT_WIDTH);
     const s3 = `WebSocket:    ${wsEventsUrl}`.padEnd(BOX_CONTENT_WIDTH);
-    const s4 = `Terminal WS:  ${wsTerminalUrl}`.padEnd(BOX_CONTENT_WIDTH);
+    const s4 = isChatOnlyMode
+      ? `Terminal WS:  disabled (chat mode)`.padEnd(BOX_CONTENT_WIDTH)
+      : `Terminal WS:  ${wsTerminalUrl}`.padEnd(BOX_CONTENT_WIDTH);
     const s5 = `Health:       ${healthUrl}`.padEnd(BOX_CONTENT_WIDTH);
     const s6 = `Terminal:     ${terminalStatus}`.padEnd(BOX_CONTENT_WIDTH);
 
@@ -728,6 +755,7 @@ const startServer = (port: number, host: string) => {
 ║  ${sHeader}║
 ╠═════════════════════════════════════════════════════════════════════╣
 ║                                                                     ║
+║  ${s0}║
 ║  ${s1}║
 ║  ${s2}║
 ║  ${s3}║
@@ -824,7 +852,7 @@ const gracefulShutdown = async (signal: string) => {
   // Note: markAllRunningFeaturesInterrupted handles errors internally and never rejects
   await autoModeService.markAllRunningFeaturesInterrupted(`${signal} signal received`);
 
-  terminalService.cleanup();
+  terminalService?.cleanup();
   server.close(() => {
     clearTimeout(forceExitTimeout);
     logger.info('Server closed');

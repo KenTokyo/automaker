@@ -12,6 +12,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "dev:chat": "cross-env AUTOMAKER_MODE=chat tsx watch src/index.ts",
     "dev:test": "tsx src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
@@ -54,6 +55,7 @@
     "@types/ws": "8.18.1",
     "@vitest/coverage-v8": "4.0.16",
     "@vitest/ui": "4.0.16",
+    "cross-env": "10.1.0",
     "tsx": "4.21.0",
     "typescript": "5.9.3",
     "vitest": "4.0.16"

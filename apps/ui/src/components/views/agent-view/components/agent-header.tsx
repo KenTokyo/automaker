@@ -146,6 +146,7 @@ export function AgentHeader({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [pathCopied, setPathCopied] = useState(false);
+  const [isSaveDocMenuOpen, setIsSaveDocMenuOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -569,14 +570,26 @@ export function AgentHeader({
           </Button>
 
           {canSaveToDocs && (
-            <DropdownMenu>
+            <DropdownMenu open={isSaveDocMenuOpen} onOpenChange={setIsSaveDocMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
                   disabled={isSavingToDoc}
                   className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                  title="Chat als Dokument speichern"
+                  title="Klick: Verlauf speichern + Pfad kopieren. Alt+Klick: Optionen."
+                  onPointerDown={(event) => {
+                    const isAltLeftClick = event.altKey && event.button === 0;
+                    if (!isAltLeftClick) {
+                      event.preventDefault();
+                      setIsSaveDocMenuOpen(false);
+                    }
+                  }}
+                  onClick={(event) => {
+                    if (event.altKey) return;
+                    event.preventDefault();
+                    onSaveAsNewDoc();
+                  }}
                 >
                   <FilePlus className="w-4 h-4" />
                 </Button>

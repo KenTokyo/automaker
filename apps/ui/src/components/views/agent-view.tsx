@@ -41,7 +41,12 @@ const LG_BREAKPOINT = 1024;
 const XL_BREAKPOINT = 1440;
 const logger = createLogger('AgentView');
 
-export function AgentView() {
+interface AgentViewProps {
+  /** When true, the built-in AgentHeader is not rendered (useful for custom headers). */
+  hideHeader?: boolean;
+}
+
+export function AgentView({ hideHeader }: AgentViewProps = {}) {
   const {
     currentProject,
     projects,
@@ -543,8 +548,13 @@ export function AgentView() {
         name: docName,
         content: summary.formattedChat,
       });
-      toast.success(`Verlauf gespeichert: ${docName}`);
-      setDocsOpen(true);
+      const pathWasCopied = await copyToClipboard(newDoc.path);
+      if (pathWasCopied) {
+        toast.success('Verlauf gespeichert und Dateipfad kopiert');
+      } else {
+        toast.success(`Verlauf gespeichert: ${docName}`);
+        toast.error('Dateipfad konnte nicht in die Zwischenablage kopiert werden');
+      }
       setCurrentDocPath(newDoc.path);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Fehler beim Speichern';
@@ -552,7 +562,7 @@ export function AgentView() {
     } finally {
       setIsSavingToDoc(false);
     }
-  }, [currentProject, messages, isSavingToDoc, currentSessionName, setDocsOpen, setCurrentDocPath]);
+  }, [currentProject, messages, isSavingToDoc, currentSessionName, setCurrentDocPath]);
 
   const handleAppendChatToCurrent = useCallback(async () => {
     if (!currentProject?.path || !currentDocPath || messages.length === 0 || isSavingToDoc) return;
@@ -724,30 +734,34 @@ export function AgentView() {
           <ResizablePanel id="chat-area" defaultSize={60} minSize={30}>
             <div className="flex-1 flex flex-col overflow-hidden h-full">
               {/* Header */}
-              <AgentHeader
-                currentProject={currentProject}
-                projects={projects}
-                onProjectSelect={setCurrentProject}
-                currentSessionId={currentSessionId}
-                isConnected={isConnected}
-                isProcessing={isProcessing}
-                currentTool={currentTool}
-                messagesCount={messages.length}
-                showSessionManager={showSessionManager}
-                onToggleSessionManager={handleToggleSessionManager}
-                onClearChat={handleClearChat}
-                onCopyAll={handleCopyAll}
-                copySuccess={copySuccess}
-                canCopyAll={messages.length > 0 && isConnected}
-                canSaveToDocs={Boolean(currentProject?.path) && messages.length > 0 && isConnected}
-                hasCurrentDocPath={Boolean(currentDocPath)}
-                isSavingToDoc={isSavingToDoc}
-                chatFontSize={chatFontSize}
-                onChatFontSizeChange={handleChatFontSizeChange}
-                onSaveAsNewDoc={handleSaveAsNewDoc}
-                onAppendChatToCurrent={handleAppendChatToCurrent}
-                worktreeActions={worktreeActionsProps}
-              />
+              {!hideHeader && (
+                <AgentHeader
+                  currentProject={currentProject}
+                  projects={projects}
+                  onProjectSelect={setCurrentProject}
+                  currentSessionId={currentSessionId}
+                  isConnected={isConnected}
+                  isProcessing={isProcessing}
+                  currentTool={currentTool}
+                  messagesCount={messages.length}
+                  showSessionManager={showSessionManager}
+                  onToggleSessionManager={handleToggleSessionManager}
+                  onClearChat={handleClearChat}
+                  onCopyAll={handleCopyAll}
+                  copySuccess={copySuccess}
+                  canCopyAll={messages.length > 0 && isConnected}
+                  canSaveToDocs={
+                    Boolean(currentProject?.path) && messages.length > 0 && isConnected
+                  }
+                  hasCurrentDocPath={Boolean(currentDocPath)}
+                  isSavingToDoc={isSavingToDoc}
+                  chatFontSize={chatFontSize}
+                  onChatFontSizeChange={handleChatFontSizeChange}
+                  onSaveAsNewDoc={handleSaveAsNewDoc}
+                  onAppendChatToCurrent={handleAppendChatToCurrent}
+                  worktreeActions={worktreeActionsProps}
+                />
+              )}
 
               {/* Messages */}
               <ChatArea
@@ -813,29 +827,31 @@ export function AgentView() {
       ) : (
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Header */}
-          <AgentHeader
-            currentProject={currentProject}
-            projects={projects}
-            onProjectSelect={setCurrentProject}
-            currentSessionId={currentSessionId}
-            isConnected={isConnected}
-            isProcessing={isProcessing}
-            currentTool={currentTool}
-            messagesCount={messages.length}
-            showSessionManager={showSessionManager}
-            onToggleSessionManager={handleToggleSessionManager}
-            onClearChat={handleClearChat}
-            onCopyAll={handleCopyAll}
-            copySuccess={copySuccess}
-            canCopyAll={messages.length > 0 && isConnected}
-            canSaveToDocs={Boolean(currentProject?.path) && messages.length > 0 && isConnected}
-            hasCurrentDocPath={Boolean(currentDocPath)}
-            isSavingToDoc={isSavingToDoc}
-            chatFontSize={chatFontSize}
-            onChatFontSizeChange={handleChatFontSizeChange}
-            onSaveAsNewDoc={handleSaveAsNewDoc}
-            onAppendChatToCurrent={handleAppendChatToCurrent}
-          />
+          {!hideHeader && (
+            <AgentHeader
+              currentProject={currentProject}
+              projects={projects}
+              onProjectSelect={setCurrentProject}
+              currentSessionId={currentSessionId}
+              isConnected={isConnected}
+              isProcessing={isProcessing}
+              currentTool={currentTool}
+              messagesCount={messages.length}
+              showSessionManager={showSessionManager}
+              onToggleSessionManager={handleToggleSessionManager}
+              onClearChat={handleClearChat}
+              onCopyAll={handleCopyAll}
+              copySuccess={copySuccess}
+              canCopyAll={messages.length > 0 && isConnected}
+              canSaveToDocs={Boolean(currentProject?.path) && messages.length > 0 && isConnected}
+              hasCurrentDocPath={Boolean(currentDocPath)}
+              isSavingToDoc={isSavingToDoc}
+              chatFontSize={chatFontSize}
+              onChatFontSizeChange={handleChatFontSizeChange}
+              onSaveAsNewDoc={handleSaveAsNewDoc}
+              onAppendChatToCurrent={handleAppendChatToCurrent}
+            />
+          )}
 
           {/* Messages */}
           <ChatArea

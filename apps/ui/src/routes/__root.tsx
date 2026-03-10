@@ -11,6 +11,7 @@ import {
   useFileBrowser,
   setGlobalFileBrowser,
 } from '@/contexts/file-browser-context';
+import { GraphicsDialogProvider } from '@/contexts/graphics-dialog-context';
 import { useAppStore, getStoredTheme, type ThemeMode } from '@/store/app-store';
 import { useKeyboardShortcuts, useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
 import { useSetupStore } from '@/store/setup-store';
@@ -804,7 +805,9 @@ function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <FileBrowserProvider>
-        <RootLayoutContent />
+        <GraphicsDialogProvider>
+          <RootLayoutContent />
+        </GraphicsDialogProvider>
       </FileBrowserProvider>
       {shouldShowDevtools && (
         <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />

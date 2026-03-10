@@ -24,7 +24,7 @@ MENU_INNER_WIDTH=64
 LOGO_WIDTH=52
 INPUT_TIMEOUT=30
 SELECTED_OPTION=1
-MAX_OPTIONS=4
+MAX_OPTIONS=6
 
 # Platform detection (set early for cross-platform compatibility)
 IS_WINDOWS=false
@@ -118,6 +118,8 @@ MODES:
   electron         Launch as desktop app (Electron)
   docker           Launch in Docker container (dev with live reload)
   docker-electron  Launch Electron with Docker API backend
+  chat             Launch Chat Web app (localhost:3009)
+  chat-electron    Launch Chat as desktop app (Electron)
 
 OPTIONS:
   --help           Show this help message
@@ -134,12 +136,14 @@ EXAMPLES:
   start-automaker.sh web --production  # Launch web mode (production)
   start-automaker.sh electron     # Launch desktop app directly
   start-automaker.sh docker       # Launch Docker dev container
+  start-automaker.sh chat         # Launch Chat Web app
+  start-automaker.sh chat-electron # Launch Chat desktop app
   start-automaker.sh --version    # Show version
 
 KEYBOARD SHORTCUTS (in menu):
   Up/Down arrows   Navigate between options
   Enter            Select highlighted option
-  1-4              Jump to and select mode
+  1-6              Jump to and select mode
   Q                Exit
 
 HISTORY:
@@ -183,7 +187,7 @@ parse_args() {
             --production)
                 PRODUCTION_MODE=true
                 ;;
-            web|electron|docker|docker-electron)
+            web|electron|docker|docker-electron|chat|chat-electron)
                 MODE="$1"
                 ;;
             *)
@@ -687,14 +691,16 @@ show_menu() {
     printf "╮${RESET}\n"
 
     # Menu items with selection indicator
-    local sel1="" sel2="" sel3="" sel4=""
-    local txt1="${C_MUTE}" txt2="${C_MUTE}" txt3="${C_MUTE}" txt4="${C_MUTE}"
+    local sel1="" sel2="" sel3="" sel4="" sel5="" sel6=""
+    local txt1="${C_MUTE}" txt2="${C_MUTE}" txt3="${C_MUTE}" txt4="${C_MUTE}" txt5="${C_MUTE}" txt6="${C_MUTE}"
 
     case $SELECTED_OPTION in
         1) sel1="${C_ACC}▸${RESET} ${C_PRI}"; txt1="${C_WHITE}" ;;
         2) sel2="${C_ACC}▸${RESET} ${C_PRI}"; txt2="${C_WHITE}" ;;
         3) sel3="${C_ACC}▸${RESET} ${C_PRI}"; txt3="${C_WHITE}" ;;
         4) sel4="${C_ACC}▸${RESET} ${C_PRI}"; txt4="${C_WHITE}" ;;
+        5) sel5="${C_ACC}▸${RESET} ${C_PRI}"; txt5="${C_WHITE}" ;;
+        6) sel6="${C_ACC}▸${RESET} ${C_PRI}"; txt6="${C_WHITE}" ;;
     esac
 
     # Default non-selected prefix
@@ -702,11 +708,15 @@ show_menu() {
     [[ -z "$sel2" ]] && sel2="  ${C_MUTE}"
     [[ -z "$sel3" ]] && sel3="  ${C_MUTE}"
     [[ -z "$sel4" ]] && sel4="  ${C_MUTE}"
+    [[ -z "$sel5" ]] && sel5="  ${C_MUTE}"
+    [[ -z "$sel6" ]] && sel6="  ${C_MUTE}"
 
     printf "%s${border}${sel1}[1]${RESET} 🌐  ${txt1}Web App${RESET}           ${C_MUTE}Server + Browser (localhost:$WEB_PORT)${RESET}   ${border}\n" "$pad"
     printf "%s${border}${sel2}[2]${RESET} 🖥   ${txt2}Electron${RESET}          ${DIM}Desktop App (embedded server)${RESET}       ${border}\n" "$pad"
     printf "%s${border}${sel3}[3]${RESET} 🐳  ${txt3}Docker${RESET}            ${DIM}Full Stack (live reload)${RESET}            ${border}\n" "$pad"
     printf "%s${border}${sel4}[4]${RESET} 🔗  ${txt4}Electron & Docker${RESET} ${DIM}Desktop + Docker Server${RESET}             ${border}\n" "$pad"
+    printf "%s${border}${sel5}[5]${RESET} 💬  ${txt5}Chat Web${RESET}          ${DIM}Standalone Chat (localhost:3009)${RESET}    ${border}\n" "$pad"
+    printf "%s${border}${sel6}[6]${RESET} 💬  ${txt6}Chat Desktop${RESET}      ${DIM}Chat Electron App${RESET}                  ${border}\n" "$pad"
 
     printf "%s${C_GRAY}├" "$pad"
     draw_line "─" "$C_GRAY" "$MENU_INNER_WIDTH"
@@ -719,7 +729,7 @@ show_menu() {
     printf "╯${RESET}\n"
 
     echo ""
-    local footer_text="[↑↓] Navigate  [Enter] Select  [1-4] Quick Select  [Q] Exit"
+    local footer_text="[↑↓] Navigate  [Enter] Select  [1-6] Quick Select  [Q] Exit"
     local f_pad=$(( (TERM_COLS - ${#footer_text}) / 2 ))
     printf "%${f_pad}s" ""
     echo -e "${DIM}${footer_text}${RESET}"
@@ -1093,6 +1103,8 @@ if [ -z "$MODE" ]; then
             2) SELECTED_OPTION=2; MODE="electron"; break ;;
             3) SELECTED_OPTION=3; MODE="docker"; break ;;
             4) SELECTED_OPTION=4; MODE="docker-electron"; break ;;
+            5) SELECTED_OPTION=5; MODE="chat"; break ;;
+            6) SELECTED_OPTION=6; MODE="chat-electron"; break ;;
             ""|$'\n'|$'\r')
                 # Enter key - select current option
                 case $SELECTED_OPTION in
@@ -1100,6 +1112,8 @@ if [ -z "$MODE" ]; then
                     2) MODE="electron" ;;
                     3) MODE="docker" ;;
                     4) MODE="docker-electron" ;;
+                    5) MODE="chat" ;;
+                    6) MODE="chat-electron" ;;
                 esac
                 break
                 ;;
@@ -1122,9 +1136,11 @@ case $MODE in
     electron) MODE_NAME="Desktop App" ;;
     docker) MODE_NAME="Docker Dev" ;;
     docker-electron) MODE_NAME="Electron + Docker" ;;
+    chat) MODE_NAME="Chat Web" ;;
+    chat-electron) MODE_NAME="Chat Desktop" ;;
     *)
         echo "${C_RED}Error:${RESET} Invalid mode '$MODE'"
-        echo "Valid modes: web, electron, docker, docker-electron"
+        echo "Valid modes: web, electron, docker, docker-electron, chat, chat-electron"
         exit 1
         ;;
 esac
@@ -1249,6 +1265,119 @@ case $MODE in
             export VITE_APP_MODE="1"
             npm run _dev:web
         fi
+        ;;
+    chat)
+        # Chat Web Mode - standalone lightweight chat app
+        export PORT="$SERVER_PORT"
+        export AUTOMAKER_MODE="chat"
+        export VITE_SERVER_URL="http://${APP_HOST}:$SERVER_PORT"
+        CHAT_PORT=3009
+        export CHAT_PORT
+        CORS_ORIGINS="http://localhost:$CHAT_PORT,http://127.0.0.1:$CHAT_PORT"
+        if [[ "$APP_HOST" != "localhost" && "$APP_HOST" != "127.0.0.1" ]]; then
+            CORS_ORIGINS="${CORS_ORIGINS},http://${APP_HOST}:$CHAT_PORT"
+        fi
+        export CORS_ORIGIN="$CORS_ORIGINS"
+        export DATA_DIR="$SCRIPT_DIR/data"
+
+        if [ "$PRODUCTION_MODE" = true ]; then
+            # Production: build everything then run server + preview
+            echo ""
+            center_print "Building for production..." "$C_YELLOW"
+            npm run build:chat
+            center_print "✓ Build complete" "$C_GREEN"
+            echo ""
+
+            center_print "Starting server on port $SERVER_PORT..." "$C_YELLOW"
+            npm run start --workspace=apps/server &
+            SERVER_PID=$!
+
+            # Wait for server to be healthy
+            center_print "Waiting for server to be ready..." "$C_YELLOW"
+            max_retries=30
+            server_ready=false
+            for ((i=0; i<max_retries; i++)); do
+                if curl -s "http://localhost:$SERVER_PORT/api/health" > /dev/null 2>&1; then
+                    server_ready=true
+                    break
+                fi
+                sleep 1
+            done
+
+            if [ "$server_ready" = false ]; then
+                center_print "✗ Server failed to start" "$C_RED"
+                kill $SERVER_PID 2>/dev/null || true
+                exit 1
+            fi
+            center_print "✓ Server is ready!" "$C_GREEN"
+            echo ""
+
+            center_print "Chat app available at: http://${APP_HOST}:$CHAT_PORT" "$C_GREEN"
+            echo ""
+
+            npm run preview --workspace=apps/chat -- --port "$CHAT_PORT"
+            kill $SERVER_PID 2>/dev/null || true
+        else
+            # Development: build packages, start server, then start UI with Vite dev server
+            echo ""
+            center_print "Building shared packages..." "$C_YELLOW"
+            npm run build:packages
+            center_print "✓ Packages built" "$C_GREEN"
+            echo ""
+
+            # Start backend server in chat mode (background)
+            center_print "Starting backend server (chat mode) on port $SERVER_PORT..." "$C_YELLOW"
+            npm run _dev:server:chat &
+            SERVER_PID=$!
+
+            # Wait for server to be healthy
+            center_print "Waiting for server to be ready..." "$C_YELLOW"
+            max_retries=30
+            server_ready=false
+            for ((i=0; i<max_retries; i++)); do
+                if curl -s "http://localhost:$SERVER_PORT/api/health" > /dev/null 2>&1; then
+                    server_ready=true
+                    break
+                fi
+                sleep 1
+                printf "."
+            done
+            echo ""
+
+            if [ "$server_ready" = false ]; then
+                center_print "✗ Server failed to start" "$C_RED"
+                kill $SERVER_PID 2>/dev/null || true
+                exit 1
+            fi
+            center_print "✓ Server is ready!" "$C_GREEN"
+            echo ""
+
+            center_print "Chat app will be available at: http://${APP_HOST}:$CHAT_PORT" "$C_GREEN"
+            echo ""
+
+            # Start Chat UI with Vite dev server
+            npm run _dev:chat
+        fi
+        ;;
+    chat-electron)
+        # Chat Desktop App - Electron starts its own server with AUTOMAKER_MODE=chat
+        export PORT="$SERVER_PORT"
+        export AUTOMAKER_MODE="chat"
+        export VITE_SERVER_URL="http://localhost:$SERVER_PORT"
+        CHAT_PORT=3009
+        export CHAT_PORT
+        export CORS_ORIGIN="http://localhost:$CHAT_PORT,http://127.0.0.1:$CHAT_PORT"
+
+        if [ "$PRODUCTION_MODE" = true ]; then
+            center_print "Note: For production Chat Electron, use the packaged app" "$C_YELLOW"
+            center_print "Running with production-built packages..." "$C_MUTE"
+            echo ""
+        fi
+
+        center_print "Launching Chat Desktop Application..." "$C_YELLOW"
+        center_print "(Electron will start its own backend server in chat mode)" "$C_MUTE"
+        echo ""
+        npm run dev:electron:chat
         ;;
     electron)
         # Set environment variables for Electron (it starts its own server)
