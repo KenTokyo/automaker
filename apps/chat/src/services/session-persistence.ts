@@ -130,7 +130,10 @@ function sanitizeMessages(messages: SessionMessage[]): SessionMessage[] {
   const now = new Date().toISOString();
 
   return limited.map((message, index) => ({
-    id: typeof message.id === 'string' && message.id.trim().length > 0 ? message.id : `restored-${index + 1}`,
+    id:
+      typeof message.id === 'string' && message.id.trim().length > 0
+        ? message.id
+        : `restored-${index + 1}`,
     role: message.role === 'assistant' ? 'assistant' : 'user',
     content:
       typeof message.content === 'string' ? message.content.slice(0, MAX_MESSAGE_TEXT_LENGTH) : '',
@@ -158,7 +161,11 @@ function createPersistedMetadata(session: SessionState): PersistedSessionMetadat
     workingDirectory: session.workingDirectory,
     isArchived: session.isArchived,
     isRunning: false,
-    processStatus: session.isArchived ? 'stopped' : session.processStatus === 'running' ? 'idle' : session.processStatus,
+    processStatus: session.isArchived
+      ? 'stopped'
+      : session.processStatus === 'running'
+        ? 'idle'
+        : session.processStatus,
     model: session.model,
     thinkingLevel: session.thinkingLevel,
     reasoningEffort: session.reasoningEffort,
@@ -198,7 +205,10 @@ function createMetaStoreFromState(state: SessionStoreState): PersistedSessionMet
   };
 }
 
-function createMessageStore(sessionId: string, messages: SessionMessage[]): PersistedSessionMessagesStore {
+function createMessageStore(
+  sessionId: string,
+  messages: SessionMessage[]
+): PersistedSessionMessagesStore {
   return {
     schemaVersion: SESSION_PERSISTENCE_SCHEMA_VERSION,
     savedAt: new Date().toISOString(),
@@ -207,7 +217,10 @@ function createMessageStore(sessionId: string, messages: SessionMessage[]): Pers
   };
 }
 
-function toSnapshot(meta: PersistedSessionMetaStore, messageMap: Record<string, SessionMessage[]>): PersistedSessionStoreSnapshot {
+function toSnapshot(
+  meta: PersistedSessionMetaStore,
+  messageMap: Record<string, SessionMessage[]>
+): PersistedSessionStoreSnapshot {
   return {
     schemaVersion: meta.schemaVersion,
     savedAt: meta.savedAt,

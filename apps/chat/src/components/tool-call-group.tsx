@@ -15,7 +15,9 @@ interface ToolCallGroupProps {
 }
 
 function getGroupStatus(group: ToolCallGroupData, nowMs: number): ToolCallStatus {
-  const hasTimeout = group.steps.some((step) => step.status === 'running' && isTimedOut(step.startedAt, nowMs));
+  const hasTimeout = group.steps.some(
+    (step) => step.status === 'running' && isTimedOut(step.startedAt, nowMs)
+  );
   if (hasTimeout) return 'timeout';
   return group.status;
 }

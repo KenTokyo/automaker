@@ -19,9 +19,7 @@ export function RunningSessionsBadge() {
   if (runningSessions.length === 0) return null;
 
   const label =
-    runningSessions.length === 1
-      ? '1 Agent aktiv'
-      : `${runningSessions.length} Agents aktiv`;
+    runningSessions.length === 1 ? '1 Agent aktiv' : `${runningSessions.length} Agents aktiv`;
 
   const tooltipLines = runningSessions.map(toShortName).join('\n');
 

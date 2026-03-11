@@ -30,18 +30,18 @@ Nur wenn alles zusammenspielt, gilt die Umsetzung als fertig.
 
 ### Geänderte Dateien (Beispiele)
 
-| Datei | Zweck |
-|---|---|
-| `apps/chat/HOW-TO-RUN.md` | Aktuelle Start- und Nutzungsanleitung |
-| `plans/standalone-chat-v2/00-global-tasklist.md` | Finale Statuspflege |
-| `History/chat-history.md` | Verlauf mit Abschlussstand |
+| Datei                                            | Zweck                                 |
+| ------------------------------------------------ | ------------------------------------- |
+| `apps/chat/HOW-TO-RUN.md`                        | Aktuelle Start- und Nutzungsanleitung |
+| `plans/standalone-chat-v2/00-global-tasklist.md` | Finale Statuspflege                   |
+| `History/chat-history.md`                        | Verlauf mit Abschlussstand            |
 
 ### Optionale neue Dateien
 
-| Datei | Zweck |
-|---|---|
-| `docs/standalone-chat-v2-handbook.md` | Kurze Bedien- und Troubleshooting-Hilfe |
-| `docs/standalone-chat-v2-release-checklist.md` | Klare Abnahme-Checkliste |
+| Datei                                          | Zweck                                   |
+| ---------------------------------------------- | --------------------------------------- |
+| `docs/standalone-chat-v2-handbook.md`          | Kurze Bedien- und Troubleshooting-Hilfe |
+| `docs/standalone-chat-v2-release-checklist.md` | Klare Abnahme-Checkliste                |
 
 ---
 
@@ -94,9 +94,9 @@ Nur wenn alles zusammenspielt, gilt die Umsetzung als fertig.
 
 ## Edge Cases
 
-| Fall | Lösung |
-|---|---|
-| Einzelne Phase fertig, Integration bricht | Rückbau auf letzte stabile Version |
-| Unterschiedliches Verhalten Web/Electron | Plattform-spezifische Checkliste führen |
-| Unerwartete Encoding-Probleme | UTF-8-Check in kritischen Dateien |
-| Zeitdruck vor Release | Must-have und Nice-to-have klar trennen |
+| Fall                                      | Lösung                                  |
+| ----------------------------------------- | --------------------------------------- |
+| Einzelne Phase fertig, Integration bricht | Rückbau auf letzte stabile Version      |
+| Unterschiedliches Verhalten Web/Electron  | Plattform-spezifische Checkliste führen |
+| Unerwartete Encoding-Probleme             | UTF-8-Check in kritischen Dateien       |
+| Zeitdruck vor Release                     | Must-have und Nice-to-have klar trennen |

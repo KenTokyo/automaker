@@ -64,7 +64,9 @@ export function MarkdownFavorites({
           <FileText className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm">{getFileName(filePath)}</p>
-            <p className="truncate text-[10px] text-muted-foreground">{getRelativePath(filePath)}</p>
+            <p className="truncate text-[10px] text-muted-foreground">
+              {getRelativePath(filePath)}
+            </p>
           </div>
           <button
             type="button"

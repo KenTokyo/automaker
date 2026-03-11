@@ -89,7 +89,9 @@ export function SessionTabBar({
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    const nextTab = container.querySelector<HTMLElement>(`[data-session-tab-id="${activeSessionId}"]`);
+    const nextTab = container.querySelector<HTMLElement>(
+      `[data-session-tab-id="${activeSessionId}"]`
+    );
     if (!nextTab) return;
 
     nextTab.scrollIntoView({

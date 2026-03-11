@@ -54,7 +54,11 @@ export function MessageToolResult({
           className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
           onClick={() => setOpen((value) => !value)}
         >
-          {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          {open ? (
+            <ChevronDown className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5" />
+          )}
           {open ? 'Weniger anzeigen' : 'Mehr anzeigen'}
         </button>
       )}

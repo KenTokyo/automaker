@@ -30,17 +30,17 @@ Jede Session bleibt sauber getrennt.
 
 ### Neue Dateien (`apps/chat/src/`)
 
-| Datei | Zweck |
-|---|---|
-| `hooks/use-parallel-session-routing.ts` | Event-Zuordnung je Session |
+| Datei                                      | Zweck                        |
+| ------------------------------------------ | ---------------------------- |
+| `hooks/use-parallel-session-routing.ts`    | Event-Zuordnung je Session   |
 | `components/running-session-indicator.tsx` | Übersicht laufender Sessions |
 
 ### Geänderte Dateien
 
-| Datei | Was ändern |
-|---|---|
-| `stores/session-store.ts` | Parallele Statusführung robust machen |
-| `components/session-tab.tsx` | Laufstatus pro Tab klar zeigen |
+| Datei                        | Was ändern                            |
+| ---------------------------- | ------------------------------------- |
+| `stores/session-store.ts`    | Parallele Statusführung robust machen |
+| `components/session-tab.tsx` | Laufstatus pro Tab klar zeigen        |
 | `components/chat-header.tsx` | Gesamtanzahl laufender Agenten zeigen |
 
 ---
@@ -91,9 +91,9 @@ Jede Session bleibt sauber getrennt.
 
 ## Edge Cases
 
-| Fall | Lösung |
-|---|---|
-| Session wird während Lauf gelöscht | Vorher Stop + sichere Bereinigung |
-| Netzwerk kurz weg | Reconnect und Zustand neu laden |
-| Zwei schnelle Stop-Klicks | Idempotente Stop-Logik |
-| Parallel laufende Fehler | Fehler je Session getrennt anzeigen |
+| Fall                               | Lösung                              |
+| ---------------------------------- | ----------------------------------- |
+| Session wird während Lauf gelöscht | Vorher Stop + sichere Bereinigung   |
+| Netzwerk kurz weg                  | Reconnect und Zustand neu laden     |
+| Zwei schnelle Stop-Klicks          | Idempotente Stop-Logik              |
+| Parallel laufende Fehler           | Fehler je Session getrennt anzeigen |

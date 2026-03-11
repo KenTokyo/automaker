@@ -61,15 +61,10 @@ export function OrchestratorStatusBar({ runInfo, isProcessing }: OrchestratorSta
 
       <span className="font-medium text-foreground">{statusLabel}</span>
 
-      <span className="text-muted-foreground">
-        Iteration {runInfo.currentIteration}
-      </span>
+      <span className="text-muted-foreground">Iteration {runInfo.currentIteration}</span>
 
       {runInfo.runId && (
-        <span
-          className="hidden text-muted-foreground/70 sm:inline"
-          title={runInfo.runId}
-        >
+        <span className="hidden text-muted-foreground/70 sm:inline" title={runInfo.runId}>
           Run {formatRunId(runInfo.runId)}
         </span>
       )}

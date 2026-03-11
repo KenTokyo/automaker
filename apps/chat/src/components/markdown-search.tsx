@@ -154,7 +154,9 @@ export function MarkdownSearch({
               </p>
               {entry.snippet && (
                 <p className="mt-0.5 truncate text-[10px] text-muted-foreground/70 italic">
-                  {entry.matchLine && <span className="not-italic font-medium">L{entry.matchLine}: </span>}
+                  {entry.matchLine && (
+                    <span className="not-italic font-medium">L{entry.matchLine}: </span>
+                  )}
                   {entry.snippet}
                 </p>
               )}

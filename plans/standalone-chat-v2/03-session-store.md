@@ -36,19 +36,19 @@ Ein eigener Zustand-Store (`useSessionStore`) für:
 
 ### Neue Dateien (apps/chat/src/)
 
-| Datei                          | Zweck                                                     |
-| ------------------------------ | --------------------------------------------------------- |
-| `stores/types.ts`              | Typen für Session-Daten                                   |
-| `stores/session-store.ts`      | Zustand-Store inkl. Persistenz und Session-Logik          |
-| `hooks/use-active-session.ts`  | Hook für aktive Session plus Sessions im aktuellen Projekt |
+| Datei                          | Zweck                                                       |
+| ------------------------------ | ----------------------------------------------------------- |
+| `stores/types.ts`              | Typen für Session-Daten                                     |
+| `stores/session-store.ts`      | Zustand-Store inkl. Persistenz und Session-Logik            |
+| `hooks/use-active-session.ts`  | Hook für aktive Session plus Sessions im aktuellen Projekt  |
 | `hooks/use-session-actions.ts` | Aktionen mit API-Anbindung (erstellen, wechseln, schließen) |
 
 ### Geänderte Dateien
 
-| Datei                        | Was wurde ergänzt |
-| ---------------------------- | ----------------- |
-| `components/chat-view.tsx`   | Session-Store angebunden (Drafts, Wechsel, Event-Routing) |
-| `src/app.tsx`                | Projektkontext für Session-Store gesetzt |
+| Datei                      | Was wurde ergänzt                                         |
+| -------------------------- | --------------------------------------------------------- |
+| `components/chat-view.tsx` | Session-Store angebunden (Drafts, Wechsel, Event-Routing) |
+| `src/app.tsx`              | Projektkontext für Session-Store gesetzt                  |
 
 ---
 

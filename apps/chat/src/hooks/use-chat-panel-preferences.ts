@@ -25,7 +25,9 @@ function readStoredSidebarTab(): SidebarTab {
 
 export function useChatPanelPreferences() {
   const [leftOpen, setLeftOpen] = useState(() => readStoredBoolean(LEFT_OPEN_STORAGE_KEY, true));
-  const [rightOpen, setRightOpen] = useState(() => readStoredBoolean(RIGHT_OPEN_STORAGE_KEY, false));
+  const [rightOpen, setRightOpen] = useState(() =>
+    readStoredBoolean(RIGHT_OPEN_STORAGE_KEY, false)
+  );
   const [leftWidth, setLeftWidth] = useState(() =>
     readStoredWidth(LEFT_WIDTH_STORAGE_KEY, DEFAULT_SIDEBAR_WIDTH)
   );

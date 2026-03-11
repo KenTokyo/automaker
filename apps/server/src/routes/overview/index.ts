@@ -18,7 +18,11 @@ import { createStatusHandler } from './routes/status.js';
 export function createOverviewRoutes(events: EventEmitter, dataDir: string): Router {
   const router = Router();
 
-  router.post('/generate', validatePathParams('projectPath'), createGenerateHandler(events, dataDir));
+  router.post(
+    '/generate',
+    validatePathParams('projectPath'),
+    createGenerateHandler(events, dataDir)
+  );
   router.delete('/generate', createCancelHandler());
   router.get('/status', createStatusHandler(dataDir));
   router.get('/:timeRange', createLoadHandler(dataDir));

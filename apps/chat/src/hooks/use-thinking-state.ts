@@ -65,11 +65,14 @@ export function useThinkingState(messages: Message[]) {
     }
   }, []);
 
-  const isOpen = useCallback((messageId: string, block: ThinkingBlockData): boolean => {
-    const value = openByMessageId[messageId];
-    if (typeof value === 'boolean') return value;
-    return getDefaultOpenState(block, preferredOpen);
-  }, [openByMessageId, preferredOpen]);
+  const isOpen = useCallback(
+    (messageId: string, block: ThinkingBlockData): boolean => {
+      const value = openByMessageId[messageId];
+      if (typeof value === 'boolean') return value;
+      return getDefaultOpenState(block, preferredOpen);
+    },
+    [openByMessageId, preferredOpen]
+  );
 
   return {
     thinkingBlocksByMessageId,

@@ -66,7 +66,11 @@ export function getToolDurationMs(startedAt: string, finishedAt?: string): numbe
   return finished - started;
 }
 
-export function isTimedOut(startedAt: string, nowMs = Date.now(), timeoutMs = TOOL_TIMEOUT_MS): boolean {
+export function isTimedOut(
+  startedAt: string,
+  nowMs = Date.now(),
+  timeoutMs = TOOL_TIMEOUT_MS
+): boolean {
   const started = parseIso(startedAt);
   if (Number.isNaN(started)) return false;
   return nowMs - started >= timeoutMs;
@@ -203,7 +207,10 @@ export function sanitizeToolCallGroup(value: unknown): ToolCallGroupData | undef
   const sanitizedSteps: ToolCallStep[] = rawSteps
     .filter((step): step is Record<string, unknown> => !!step && typeof step === 'object')
     .map((step, index) => {
-      const startedAt = toIso(typeof step.startedAt === 'string' ? step.startedAt : undefined, nowIso());
+      const startedAt = toIso(
+        typeof step.startedAt === 'string' ? step.startedAt : undefined,
+        nowIso()
+      );
       const finishedAt =
         typeof step.finishedAt === 'string' ? toIso(step.finishedAt, step.finishedAt) : undefined;
       const statusValue =
@@ -225,7 +232,9 @@ export function sanitizeToolCallGroup(value: unknown): ToolCallGroupData | undef
         startedAt,
         finishedAt,
         durationMs:
-          typeof step.durationMs === 'number' && Number.isFinite(step.durationMs) && step.durationMs >= 0
+          typeof step.durationMs === 'number' &&
+          Number.isFinite(step.durationMs) &&
+          step.durationMs >= 0
             ? step.durationMs
             : getToolDurationMs(startedAt, finishedAt),
         errorMessage:
@@ -253,20 +262,19 @@ export function sanitizeToolCallGroup(value: unknown): ToolCallGroupData | undef
   const result = resultRecord
     ? {
         preview:
-          typeof resultRecord.preview === 'string'
-            ? clampText(resultRecord.preview, 500)
-            : '',
+          typeof resultRecord.preview === 'string' ? clampText(resultRecord.preview, 500) : '',
         fullText:
-          typeof resultRecord.fullText === 'string'
-            ? clampText(resultRecord.fullText, 8000)
-            : '',
+          typeof resultRecord.fullText === 'string' ? clampText(resultRecord.fullText, 8000) : '',
         json: resultRecord.json ?? null,
         isJson: resultRecord.isJson === true,
       }
     : undefined;
 
   const statusValue =
-    record.status === 'running' || record.status === 'ok' || record.status === 'error' || record.status === 'timeout'
+    record.status === 'running' ||
+    record.status === 'ok' ||
+    record.status === 'error' ||
+    record.status === 'timeout'
       ? record.status
       : 'ok';
 
@@ -280,8 +288,10 @@ export function sanitizeToolCallGroup(value: unknown): ToolCallGroupData | undef
     status: statusValue,
     finishedAt: typeof record.finishedAt === 'string' ? record.finishedAt : undefined,
     result,
-    errorMessage: typeof record.errorMessage === 'string' ? clampText(record.errorMessage, 600) : undefined,
-    userImpact: typeof record.userImpact === 'string' ? clampText(record.userImpact, 320) : undefined,
+    errorMessage:
+      typeof record.errorMessage === 'string' ? clampText(record.errorMessage, 600) : undefined,
+    userImpact:
+      typeof record.userImpact === 'string' ? clampText(record.userImpact, 320) : undefined,
   });
 }
 

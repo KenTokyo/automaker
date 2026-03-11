@@ -115,7 +115,9 @@ export function useSessionActions() {
       const api = getElectronAPI();
       if (!api.sessions) return;
 
-      const archivedIds = useSessionStore.getState().closeIdleSessions(maxIdleSessions, projectPath);
+      const archivedIds = useSessionStore
+        .getState()
+        .closeIdleSessions(maxIdleSessions, projectPath);
       if (archivedIds.length === 0) return;
 
       await Promise.all(
@@ -143,7 +145,7 @@ export function useSessionActions() {
       const projectSessions = getProjectSessions(storeState, context.projectPath);
       const nextSessionName = createSessionName(projectSessions.map((session) => session.name));
       const activeSession = storeState.activeSessionId
-        ? storeState.sessions[storeState.activeSessionId] ?? null
+        ? (storeState.sessions[storeState.activeSessionId] ?? null)
         : null;
 
       const activeReusable =
@@ -163,7 +165,11 @@ export function useSessionActions() {
 
       const reusableSession = activeReusable ?? fallbackReusable;
       if (reusableSession) {
-        const reusableCopy = createReusableSessionCopy(storeState, reusableSession.id, nextSessionName);
+        const reusableCopy = createReusableSessionCopy(
+          storeState,
+          reusableSession.id,
+          nextSessionName
+        );
         if (reusableCopy) {
           useSessionStore.getState().upsertSession(reusableCopy);
           useSessionStore.getState().switchSession(reusableCopy.id);

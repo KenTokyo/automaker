@@ -23,7 +23,8 @@ export function useChatSessionShortcuts({
       const currentIndex = projectSessions.findIndex((session) => session.id === activeSessionId);
       if (currentIndex < 0) return;
 
-      const nextIndex = (currentIndex + direction + projectSessions.length) % projectSessions.length;
+      const nextIndex =
+        (currentIndex + direction + projectSessions.length) % projectSessions.length;
       const nextSession = projectSessions[nextIndex];
       if (!nextSession) return;
       onSelectSession(nextSession.id);

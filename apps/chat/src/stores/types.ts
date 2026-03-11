@@ -128,7 +128,12 @@ export interface SessionStoreState {
   removeSession: (sessionId: string) => void;
   updateSession: (sessionId: string, partial: Partial<SessionState>) => void;
   setSessionRunning: (sessionId: string, isRunning: boolean, error?: string | null) => void;
-  setSessionModel: (sessionId: string, model: string, thinkingLevel: string, reasoningEffort: string) => void;
+  setSessionModel: (
+    sessionId: string,
+    model: string,
+    thinkingLevel: string,
+    reasoningEffort: string
+  ) => void;
   setMessages: (sessionId: string, messages: SessionMessage[]) => void;
   addMessage: (sessionId: string, message: SessionMessage) => void;
   clearMessages: (sessionId: string) => void;
@@ -139,7 +144,12 @@ export interface SessionStoreState {
     draftTextFiles?: SessionDraftTextFile[]
   ) => void;
   setSessionTitle: (sessionId: string, title: string | null, description?: string | null) => void;
-  setSessionTokens: (sessionId: string, inputTokens: number, outputTokens: number, cost: number) => void;
+  setSessionTokens: (
+    sessionId: string,
+    inputTokens: number,
+    outputTokens: number,
+    cost: number
+  ) => void;
   setOrchestratorMode: (sessionId: string, enabled: boolean, runId?: string | null) => void;
   incrementOrchestratorIteration: (sessionId: string) => void;
   markSessionTouched: (sessionId: string) => void;

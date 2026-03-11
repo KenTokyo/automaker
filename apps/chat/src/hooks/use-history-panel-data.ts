@@ -1,6 +1,10 @@
 import { useMemo } from 'react';
 import { toHistoryName } from '../components/chat-view-utils';
-import type { HistoryListItem, HistoryStatusFilter, HistoryTimeFilter } from '../components/history-types';
+import type {
+  HistoryListItem,
+  HistoryStatusFilter,
+  HistoryTimeFilter,
+} from '../components/history-types';
 import type { SessionState } from '../stores/types';
 
 interface UseHistoryPanelDataInput {
@@ -21,11 +25,7 @@ function toSafeHistoryName(session: SessionState): string {
 }
 
 function matchesSearch(session: HistoryListItem, searchQuery: string): boolean {
-  const terms = searchQuery
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
+  const terms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
 
   if (terms.length === 0) {
     return true;

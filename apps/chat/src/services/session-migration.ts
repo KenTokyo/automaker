@@ -97,7 +97,8 @@ function sanitizeMessage(
   const timestamp = toIsoDate(raw.timestamp, fallbackTimestamp);
   const toolCalls = sanitizeToolCalls(raw.toolCalls);
   const toolCallGroup = sanitizeToolCallGroup(raw.toolCallGroup);
-  const thinking = typeof raw.thinking === 'string' ? raw.thinking.slice(0, maxMessageLength) : undefined;
+  const thinking =
+    typeof raw.thinking === 'string' ? raw.thinking.slice(0, maxMessageLength) : undefined;
   const thinkingBlock = sanitizeThinkingBlock(raw.thinkingBlock);
 
   return {
@@ -138,7 +139,8 @@ function sanitizeMetadataEntry(
 
   const isArchived = toBoolean(value.isArchived);
   const name = toNonEmptyString(value.name, 'Chat');
-  const previewSource = typeof value.preview === 'string' ? value.preview : messages.at(-1)?.content ?? '';
+  const previewSource =
+    typeof value.preview === 'string' ? value.preview : (messages.at(-1)?.content ?? '');
   const preview = previewSource.replace(/\s+/g, ' ').trim().slice(0, 160);
 
   return {
@@ -149,7 +151,10 @@ function sanitizeMetadataEntry(
     createdAt: toIsoDate(value.createdAt, fallbackNow),
     updatedAt: toIsoDate(value.updatedAt, fallbackNow),
     projectPath: toNonEmptyString(value.projectPath, ''),
-    workingDirectory: toNonEmptyString(value.workingDirectory, toNonEmptyString(value.projectPath, '')),
+    workingDirectory: toNonEmptyString(
+      value.workingDirectory,
+      toNonEmptyString(value.projectPath, '')
+    ),
     isArchived,
     isRunning: false,
     processStatus: toSessionProcessStatus(value.processStatus, isArchived),
@@ -169,7 +174,10 @@ function sanitizeMetadataEntry(
   };
 }
 
-function normalizeSessionOrder(order: unknown, sessions: Record<string, PersistedSessionMetadata>): string[] {
+function normalizeSessionOrder(
+  order: unknown,
+  sessions: Record<string, PersistedSessionMetadata>
+): string[] {
   if (!Array.isArray(order)) return [];
 
   const knownIds = new Set(Object.keys(sessions));
@@ -200,7 +208,9 @@ export function parsePersistedSessionMeta(raw: unknown): PersistedSessionMetaSto
 
   const sessionOrder = normalizeSessionOrder(raw.sessionOrder, sessions);
   const activeSessionId =
-    typeof raw.activeSessionId === 'string' && sessions[raw.activeSessionId] ? raw.activeSessionId : null;
+    typeof raw.activeSessionId === 'string' && sessions[raw.activeSessionId]
+      ? raw.activeSessionId
+      : null;
 
   return {
     schemaVersion: SESSION_PERSISTENCE_SCHEMA_VERSION,
@@ -252,7 +262,7 @@ function createSnapshotFromLegacyState(
   const activeSessionId =
     typeof rawState.activeSessionId === 'string' && sessions[rawState.activeSessionId]
       ? rawState.activeSessionId
-      : sessionOrder[0] ?? null;
+      : (sessionOrder[0] ?? null);
 
   return {
     schemaVersion: SESSION_PERSISTENCE_SCHEMA_VERSION,
@@ -274,7 +284,11 @@ export function migrateLegacySessionStore(
 ): PersistedSessionStoreSnapshot | null {
   if (!isRecord(raw)) return null;
 
-  const maybeDirectSnapshot = createSnapshotFromLegacyState(raw, maxMessagesPerSession, maxMessageLength);
+  const maybeDirectSnapshot = createSnapshotFromLegacyState(
+    raw,
+    maxMessagesPerSession,
+    maxMessageLength
+  );
   if (maybeDirectSnapshot) {
     return maybeDirectSnapshot;
   }

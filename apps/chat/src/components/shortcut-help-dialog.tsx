@@ -47,9 +47,7 @@ const SHORTCUT_CATEGORIES: { title: string; shortcuts: ShortcutEntry[] }[] = [
   },
   {
     title: 'Hilfe',
-    shortcuts: [
-      { keys: 'Ctrl + /', label: 'Diese Uebersicht' },
-    ],
+    shortcuts: [{ keys: 'Ctrl + /', label: 'Diese Uebersicht' }],
   },
 ];
 
@@ -62,9 +60,7 @@ export function ShortcutHelpDialog({ open, onOpenChange }: ShortcutHelpDialogPro
             <Keyboard className="h-5 w-5" />
             Tastenkuerzel
           </DialogTitle>
-          <DialogDescription>
-            Alle verfuegbaren Tastenkuerzel auf einen Blick.
-          </DialogDescription>
+          <DialogDescription>Alle verfuegbaren Tastenkuerzel auf einen Blick.</DialogDescription>
         </DialogHeader>
 
         <div className="mt-4 space-y-4 max-h-[60vh] overflow-y-auto">

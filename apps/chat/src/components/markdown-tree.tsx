@@ -18,16 +18,15 @@ export function MarkdownTree({
   onToggleFolder,
   onToggleFavorite,
 }: MarkdownTreeProps) {
-  const { rootNodes, expandedPaths, selectedFilePath, isLoadingRoot, favorites } =
-    useExplorerStore(
-      useShallow((state) => ({
-        rootNodes: state.rootNodes,
-        expandedPaths: state.expandedPaths,
-        selectedFilePath: state.selectedFilePath,
-        isLoadingRoot: state.isLoadingRoot,
-        favorites: state.favorites[projectPath] ?? [],
-      }))
-    );
+  const { rootNodes, expandedPaths, selectedFilePath, isLoadingRoot, favorites } = useExplorerStore(
+    useShallow((state) => ({
+      rootNodes: state.rootNodes,
+      expandedPaths: state.expandedPaths,
+      selectedFilePath: state.selectedFilePath,
+      isLoadingRoot: state.isLoadingRoot,
+      favorites: state.favorites[projectPath] ?? [],
+    }))
+  );
 
   const isFavoriteCheck = useCallback(
     (filePath: string) => favorites.includes(filePath),

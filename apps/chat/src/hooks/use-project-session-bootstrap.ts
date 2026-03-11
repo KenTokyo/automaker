@@ -82,9 +82,7 @@ export function useProjectSessionBootstrap({
                 .map((sessionId) => storeState.sessions[sessionId])
                 .find(
                   (session) =>
-                    !!session &&
-                    session.projectPath === context.projectPath &&
-                    !session.isArchived
+                    !!session && session.projectPath === context.projectPath && !session.isArchived
                 ) ?? localProjectSessions[0];
 
             if (fallbackLocalSession) {
@@ -102,8 +100,8 @@ export function useProjectSessionBootstrap({
           activeSessionForProject && availableSessionIds.has(activeSessionForProject.id)
             ? activeSessionForProject.id
             : preferredSessionId && availableSessionIds.has(preferredSessionId)
-            ? preferredSessionId
-            : serverSessions[0]?.id;
+              ? preferredSessionId
+              : serverSessions[0]?.id;
 
         if (nextSessionId) {
           switchSession(nextSessionId);

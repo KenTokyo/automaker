@@ -31,18 +31,18 @@ Start, Erfolg, Fehler, Orchestrator-Phasenwechsel.
 
 ### Neue Dateien (`apps/chat/src/`)
 
-| Datei | Zweck |
-|---|---|
-| `services/sound-service.ts` | Zentrale Ton-Steuerung |
+| Datei                       | Zweck                            |
+| --------------------------- | -------------------------------- |
+| `services/sound-service.ts` | Zentrale Ton-Steuerung           |
 | `hooks/use-sound-events.ts` | Verknüpft Chat-Events mit Sounds |
-| `assets/sounds/` | Kurze Tondateien für Ereignisse |
+| `assets/sounds/`            | Kurze Tondateien für Ereignisse  |
 
 ### Geänderte Dateien
 
-| Datei | Was ändern |
-|---|---|
-| `components/chat-view.tsx` | Sound-Hook einbinden |
-| `stores/session-store.ts` | Sound-relevante Statusänderungen markieren |
+| Datei                      | Was ändern                                 |
+| -------------------------- | ------------------------------------------ |
+| `components/chat-view.tsx` | Sound-Hook einbinden                       |
+| `stores/session-store.ts`  | Sound-relevante Statusänderungen markieren |
 
 ---
 
@@ -103,9 +103,9 @@ Start, Erfolg, Fehler, Orchestrator-Phasenwechsel.
 
 ## Edge Cases
 
-| Fall | Lösung |
-|---|---|
-| Audio-Ausgabe blockiert | Leiser visueller Hinweis als Ersatz |
-| Sehr viele Events in kurzer Zeit | Cooldown pro Sound-Typ |
-| Datei fehlt | Fallback-Sound oder stilles Ignorieren |
-| Nutzer mit Headset-Wechsel | Bei Fehler automatisch neu initialisieren |
+| Fall                             | Lösung                                    |
+| -------------------------------- | ----------------------------------------- |
+| Audio-Ausgabe blockiert          | Leiser visueller Hinweis als Ersatz       |
+| Sehr viele Events in kurzer Zeit | Cooldown pro Sound-Typ                    |
+| Datei fehlt                      | Fallback-Sound oder stilles Ignorieren    |
+| Nutzer mit Headset-Wechsel       | Bei Fehler automatisch neu initialisieren |

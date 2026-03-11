@@ -30,18 +30,18 @@ Standardmäßig kompakt, bei Bedarf aufklappbar.
 
 ### Neue Dateien (`apps/chat/src/`)
 
-| Datei | Zweck |
-|---|---|
+| Datei                           | Zweck                        |
+| ------------------------------- | ---------------------------- |
 | `components/thinking-block.tsx` | Visualisierung der Denkphase |
-| `components/thinking-timer.tsx` | Laufender Zeitmesser |
-| `hooks/use-thinking-state.ts` | Mapping von Streaming-Events |
+| `components/thinking-timer.tsx` | Laufender Zeitmesser         |
+| `hooks/use-thinking-state.ts`   | Mapping von Streaming-Events |
 
 ### Geänderte Dateien
 
-| Datei | Was ändern |
-|---|---|
+| Datei                          | Was ändern                          |
+| ------------------------------ | ----------------------------------- |
 | `components/chat-messages.tsx` | Thinking-Blöcke in den Fluss setzen |
-| `stores/session-store.ts` | Thinking-Status pro Session führen |
+| `stores/session-store.ts`      | Thinking-Status pro Session führen  |
 
 ---
 
@@ -90,9 +90,9 @@ Standardmäßig kompakt, bei Bedarf aufklappbar.
 
 ## Edge Cases
 
-| Fall | Lösung |
-|---|---|
-| Sehr lange Denkzeit | Timer im Minuten:Sekunden-Format |
-| Sehr kurze Denkzeit | Mindestanzeige 1s für Klarheit |
-| Event-Reihenfolge vertauscht | Robustes State-Mapping mit Fallback |
+| Fall                             | Lösung                              |
+| -------------------------------- | ----------------------------------- |
+| Sehr lange Denkzeit              | Timer im Minuten:Sekunden-Format    |
+| Sehr kurze Denkzeit              | Mindestanzeige 1s für Klarheit      |
+| Event-Reihenfolge vertauscht     | Robustes State-Mapping mit Fallback |
 | Session-Wechsel während Thinking | Zustand pro Session getrennt halten |

@@ -27,19 +27,19 @@ Für parallele Arbeit brauchte es eine klare Tab-Leiste.
 
 ### Neue Dateien (apps/chat/src/)
 
-| Datei | Zweck |
-| --- | --- |
-| `components/session-tab.tsx` | Einzelner Session-Tab mit Status, Kosten, Modell, Umbenennen und Kontextmenü |
-| `components/session-tab-bar.tsx` | Tab-Leiste mit horizontalem Scroll, Pfeiltasten und „Neuer Chat“-Button |
+| Datei                            | Zweck                                                                        |
+| -------------------------------- | ---------------------------------------------------------------------------- |
+| `components/session-tab.tsx`     | Einzelner Session-Tab mit Status, Kosten, Modell, Umbenennen und Kontextmenü |
+| `components/session-tab-bar.tsx` | Tab-Leiste mit horizontalem Scroll, Pfeiltasten und „Neuer Chat“-Button      |
 
 ### Geänderte Dateien
 
-| Datei | Was wurde ergänzt |
-| --- | --- |
-| `components/chat-header.tsx` | Tab-Leiste in den Header eingebaut |
-| `components/chat-view.tsx` | Session-Aktionen für Erstellen/Wechseln/Schließen/Umbenennen inkl. Scroll- und Draft-Speicherung |
-| `hooks/use-session-actions.ts` | `renameSession()` für Server-Update ergänzt |
-| `components/session-tab-bar.tsx` | Typ-Export für `SessionTabItem` ergänzt |
+| Datei                            | Was wurde ergänzt                                                                                |
+| -------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `components/chat-header.tsx`     | Tab-Leiste in den Header eingebaut                                                               |
+| `components/chat-view.tsx`       | Session-Aktionen für Erstellen/Wechseln/Schließen/Umbenennen inkl. Scroll- und Draft-Speicherung |
+| `hooks/use-session-actions.ts`   | `renameSession()` für Server-Update ergänzt                                                      |
+| `components/session-tab-bar.tsx` | Typ-Export für `SessionTabItem` ergänzt                                                          |
 
 ---
 

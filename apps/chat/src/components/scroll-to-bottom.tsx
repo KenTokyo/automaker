@@ -16,9 +16,7 @@ export function ScrollToBottom({ visible, onClick, unreadCount = 0 }: ScrollToBo
       className={cn(
         'absolute bottom-4 right-4 z-10 gap-1 rounded-full border border-muted bg-card/95 text-xs text-foreground shadow',
         'transition-all duration-200',
-        visible
-          ? 'translate-y-0 opacity-100'
-          : 'pointer-events-none translate-y-2 opacity-0'
+        visible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
       )}
       onClick={onClick}
       aria-label="Zum Ende vom Chat springen"

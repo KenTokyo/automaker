@@ -30,22 +30,22 @@ Kurzinfos zuerst, Details auf Wunsch.
 
 ### Neue Dateien (`apps/chat/src/`)
 
-| Datei | Zweck |
-|---|---|
-| `components/tool-call-group.tsx` | Gruppe mehrerer Tool-Aufrufe |
-| `components/tool-call-item.tsx` | Einzelner Tool-Schritt |
-| `components/tool-call-result.tsx` | Ausgabe/Ergebnis des Tools |
+| Datei                              | Zweck                            |
+| ---------------------------------- | -------------------------------- |
+| `components/tool-call-group.tsx`   | Gruppe mehrerer Tool-Aufrufe     |
+| `components/tool-call-item.tsx`    | Einzelner Tool-Schritt           |
+| `components/tool-call-result.tsx`  | Ausgabe/Ergebnis des Tools       |
 | `components/tool-call-summary.tsx` | Kurze Zusammenfassung pro Gruppe |
 
 ### Geänderte Dateien
 
-| Datei | Was ändern |
-|---|---|
-| `components/chat-messages.tsx` | Tool-Elemente einbauen |
-| `stores/session-store.ts` | Tool-Events sauber ablegen |
-| `hooks/use-chat-stream-sync.ts` | Tool-Schritte live im Stream zusammenführen |
-| `components/chat-center.tsx` | Store-Tooldaten in die sichtbaren Nachrichten mergen |
-| `services/tool-call-utils.ts` | Hilfen für Dauer, Status, Timeout und Ergebnis |
+| Datei                           | Was ändern                                           |
+| ------------------------------- | ---------------------------------------------------- |
+| `components/chat-messages.tsx`  | Tool-Elemente einbauen                               |
+| `stores/session-store.ts`       | Tool-Events sauber ablegen                           |
+| `hooks/use-chat-stream-sync.ts` | Tool-Schritte live im Stream zusammenführen          |
+| `components/chat-center.tsx`    | Store-Tooldaten in die sichtbaren Nachrichten mergen |
+| `services/tool-call-utils.ts`   | Hilfen für Dauer, Status, Timeout und Ergebnis       |
 
 ---
 
@@ -108,9 +108,9 @@ Kurzinfos zuerst, Details auf Wunsch.
 
 ## Edge Cases
 
-| Fall | Lösung |
-|---|---|
-| Tool liefert riesige Ausgabe | Kürzen + „Mehr anzeigen“ |
-| Tool bleibt hängen | Timeout-Status anzeigen |
+| Fall                         | Lösung                      |
+| ---------------------------- | --------------------------- |
+| Tool liefert riesige Ausgabe | Kürzen + „Mehr anzeigen“    |
+| Tool bleibt hängen           | Timeout-Status anzeigen     |
 | Tool-Events kommen verspätet | Nachträgliches Einsortieren |
-| Unbekannter Tool-Typ | Neutraler Standardblock |
+| Unbekannter Tool-Typ         | Neutraler Standardblock     |

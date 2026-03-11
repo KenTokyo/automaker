@@ -1,7 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import { toast } from 'sonner';
-import { loadPersistedSessionStore, startSessionStorePersistence } from '../services/session-persistence';
+import {
+  loadPersistedSessionStore,
+  startSessionStorePersistence,
+} from '../services/session-persistence';
 import { useSessionStore } from '../stores/session-store';
 
 const logger = createLogger('SessionHydration');
@@ -30,4 +33,3 @@ export function useSessionHydration(): boolean {
 
   return hasHydratedFromDisk;
 }
-

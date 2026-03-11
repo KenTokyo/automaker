@@ -192,9 +192,7 @@ export function clampIdleSessionsLimit(limit: number): number {
 }
 
 export function getRunningSessions(sessions: Record<string, SessionState>): SessionState[] {
-  return Object.values(sessions).filter(
-    (session) => session.isRunning && !session.isArchived
-  );
+  return Object.values(sessions).filter((session) => session.isRunning && !session.isArchived);
 }
 
 export function getRunningSessionCount(sessions: Record<string, SessionState>): number {
@@ -231,7 +229,11 @@ export function toPersistedSessionState(
     workingDirectory: metadata.workingDirectory || metadata.projectPath || '',
     isArchived,
     isRunning: false,
-    processStatus: isArchived ? 'stopped' : metadata.processStatus === 'running' ? 'idle' : metadata.processStatus,
+    processStatus: isArchived
+      ? 'stopped'
+      : metadata.processStatus === 'running'
+        ? 'idle'
+        : metadata.processStatus,
     model: metadata.model || DEFAULT_MODEL,
     thinkingLevel: metadata.thinkingLevel || DEFAULT_THINKING_LEVEL,
     reasoningEffort: metadata.reasoningEffort || DEFAULT_REASONING_EFFORT,
@@ -265,4 +267,3 @@ export function createSessionsFromSnapshot(
 
   return nextSessions;
 }
-

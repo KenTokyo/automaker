@@ -43,8 +43,12 @@ export function ToolCallSummary({ group, expanded }: ToolCallSummaryProps) {
     <div className="flex w-full items-center gap-2 text-xs">
       <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
       <span className="font-medium text-foreground">{expanded ? 'Tool-Details' : title}</span>
-      <span className={cn('rounded-full border px-2 py-0.5 font-medium', getStatusClass(group.status))}>
-        <StatusIcon className={cn('mr-1 inline h-3 w-3', group.status === 'running' && 'animate-spin')} />
+      <span
+        className={cn('rounded-full border px-2 py-0.5 font-medium', getStatusClass(group.status))}
+      >
+        <StatusIcon
+          className={cn('mr-1 inline h-3 w-3', group.status === 'running' && 'animate-spin')}
+        />
         {getStatusLabel(group.status)}
       </span>
       {duration ? <span className="text-muted-foreground">Dauer {duration}</span> : null}

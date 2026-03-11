@@ -41,7 +41,7 @@ export async function generateOverview(
   projectPath: string,
   sinceHours: number,
   timeRange: DashboardTimeRange,
-  options: GenerateOverviewOptions = {},
+  options: GenerateOverviewOptions = {}
 ): Promise<DashboardOverviewData> {
   const res = await fetch(`${baseUrl()}/generate`, {
     method: 'POST',
@@ -65,7 +65,7 @@ export async function generateOverview(
 
 export async function loadOverview(
   projectPath: string,
-  timeRange: DashboardTimeRange,
+  timeRange: DashboardTimeRange
 ): Promise<DashboardOverviewData | null> {
   const url = `${baseUrl()}/${timeRange}?projectPath=${encodeURIComponent(projectPath)}`;
   const res = await fetch(url, {

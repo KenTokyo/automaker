@@ -32,17 +32,17 @@ Laden und Speichern sollen robust sein, auch bei Unterbrechungen.
 
 ### Neue Dateien (`apps/chat/src/`)
 
-| Datei | Zweck |
-|---|---|
+| Datei                             | Zweck                             |
+| --------------------------------- | --------------------------------- |
 | `services/session-persistence.ts` | Speichern/Laden von Session-Daten |
-| `services/session-migration.ts` | Versions-Umzug alter Daten |
-| `hooks/use-session-hydration.ts` | Laden beim App-Start |
+| `services/session-migration.ts`   | Versions-Umzug alter Daten        |
+| `hooks/use-session-hydration.ts`  | Laden beim App-Start              |
 
 ### Geänderte Dateien
 
-| Datei | Was ändern |
-|---|---|
-| `stores/session-store.ts` | Persistenz-Aufrufe integrieren |
+| Datei                          | Was ändern                     |
+| ------------------------------ | ------------------------------ |
+| `stores/session-store.ts`      | Persistenz-Aufrufe integrieren |
 | `components/history-panel.tsx` | Archiv/Löschen Aktionen nutzen |
 
 ---
@@ -99,9 +99,9 @@ Laden und Speichern sollen robust sein, auch bei Unterbrechungen.
 
 ## Edge Cases
 
-| Fall | Lösung |
-|---|---|
+| Fall                                   | Lösung                                  |
+| -------------------------------------- | --------------------------------------- |
 | Plötzlicher App-Abbruch beim Speichern | Nächster Start lädt letzte valide Daten |
-| Sehr viele große Chats | Begrenzung + optionales Aufräumen |
-| Alte Daten ohne Version | Migration mit sicheren Defaults |
-| Unerwartete Zeichen in Texten | Immer UTF-8 lesen und speichern |
+| Sehr viele große Chats                 | Begrenzung + optionales Aufräumen       |
+| Alte Daten ohne Version                | Migration mit sicheren Defaults         |
+| Unerwartete Zeichen in Texten          | Immer UTF-8 lesen und speichern         |

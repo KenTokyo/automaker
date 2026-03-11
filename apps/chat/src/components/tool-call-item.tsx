@@ -1,7 +1,19 @@
-﻿import { AlertCircle, CheckCircle2, ChevronDown, ChevronRight, Clock3, LoaderCircle } from 'lucide-react';
+﻿import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Clock3,
+  LoaderCircle,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { getToolDurationMs, isTimedOut, type ToolCallStatus, type ToolCallStep } from '../services/tool-call-utils';
+import {
+  getToolDurationMs,
+  isTimedOut,
+  type ToolCallStatus,
+  type ToolCallStep,
+} from '../services/tool-call-utils';
 
 interface ToolCallItemProps {
   step: ToolCallStep;
@@ -91,10 +103,21 @@ export function ToolCallItem({ step, nowMs }: ToolCallItemProps) {
         onClick={() => setOpen((value) => !value)}
         className="flex w-full items-center gap-2 text-left text-xs"
       >
-        {open ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+        {open ? (
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+        )}
         <span className="font-mono text-xs font-medium text-foreground">{step.name}</span>
-        <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium', getStatusClass(status))}>
-          <StatusIcon className={cn('mr-1 inline h-3 w-3', status === 'running' && 'animate-spin')} />
+        <span
+          className={cn(
+            'rounded-full border px-2 py-0.5 text-[11px] font-medium',
+            getStatusClass(status)
+          )}
+        >
+          <StatusIcon
+            className={cn('mr-1 inline h-3 w-3', status === 'running' && 'animate-spin')}
+          />
           {getStatusLabel(status)}
         </span>
         <span className="text-muted-foreground">{formatDuration(step, status, nowMs)}</span>
@@ -105,7 +128,10 @@ export function ToolCallItem({ step, nowMs }: ToolCallItemProps) {
       {status === 'error' && (
         <div className="mt-2 rounded border border-red-400/40 bg-red-500/5 px-2 py-1 text-xs text-red-800">
           <p className="font-medium">Was bedeutet das für mich?</p>
-          <p>{step.userImpact || 'Ein Tool-Schritt ist fehlgeschlagen. Das Ergebnis kann unvollständig sein.'}</p>
+          <p>
+            {step.userImpact ||
+              'Ein Tool-Schritt ist fehlgeschlagen. Das Ergebnis kann unvollständig sein.'}
+          </p>
         </div>
       )}
 

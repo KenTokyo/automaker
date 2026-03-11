@@ -10,13 +10,13 @@ ULTRATHINK
 
 ## Dashboard Feature - Planungen
 
-| Plan | Datei | Titel | Status |
-| --- | --- | --- | --- |
-| 19 | `19-markdown-explorer-zeitfilter.md` | Markdown Explorer: Zeitbasierte Filterung | ✅ Abgeschlossen |
-| 20 | `20-dashboard-ui-shell.md` | Dashboard UI Shell & Navigation | ✅ Abgeschlossen |
-| 21 | `21-dashboard-generation-backend.md` | Dashboard: KI-Analyse Backend | ✅ Abgeschlossen |
-| 22 | `22-dashboard-rendering-persistence.md` | Dashboard: Rendering & Persistierung | ✅ Abgeschlossen |
-| 23 | `23-dashboard-actions-refinement.md` | Dashboard: Aktionen, Verfeinerung & Modell-Wahl | ✅ Abgeschlossen |
+| Plan | Datei                                   | Titel                                           | Status           |
+| ---- | --------------------------------------- | ----------------------------------------------- | ---------------- |
+| 19   | `19-markdown-explorer-zeitfilter.md`    | Markdown Explorer: Zeitbasierte Filterung       | ✅ Abgeschlossen |
+| 20   | `20-dashboard-ui-shell.md`              | Dashboard UI Shell & Navigation                 | ✅ Abgeschlossen |
+| 21   | `21-dashboard-generation-backend.md`    | Dashboard: KI-Analyse Backend                   | ✅ Abgeschlossen |
+| 22   | `22-dashboard-rendering-persistence.md` | Dashboard: Rendering & Persistierung            | ✅ Abgeschlossen |
+| 23   | `23-dashboard-actions-refinement.md`    | Dashboard: Aktionen, Verfeinerung & Modell-Wahl | ✅ Abgeschlossen |
 
 ## Was in Plan 23 fertig wurde
 

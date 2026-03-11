@@ -32,24 +32,24 @@ Für einen klaren Standalone-Chat fehlten moderne Chat-Bausteine.
 
 ### Neue Dateien (apps/chat/src/components/)
 
-| Datei | Zweck |
-| --- | --- |
-| `chat-messages.tsx` | Neuer Nachrichten-Container |
-| `message-bubble.tsx` | Eigene Nachrichtendarstellung |
-| `message-tool-use.tsx` | Aufklappbare Tool-Aufrufe |
-| `message-tool-result.tsx` | Ergebnis-Vorschau für Tool-Aufrufe |
-| `message-thinking.tsx` | Thinking-Anzeige mit Timer |
-| `message-error.tsx` | Fehlerdarstellung im Chat |
-| `message-system.tsx` | System-Hinweise im Chat |
-| `chat-context-bar.tsx` | Titel-/Kontext-Leiste über dem Chat |
-| `scroll-to-bottom.tsx` | Schwebender Nach-unten-Button |
+| Datei                     | Zweck                               |
+| ------------------------- | ----------------------------------- |
+| `chat-messages.tsx`       | Neuer Nachrichten-Container         |
+| `message-bubble.tsx`      | Eigene Nachrichtendarstellung       |
+| `message-tool-use.tsx`    | Aufklappbare Tool-Aufrufe           |
+| `message-tool-result.tsx` | Ergebnis-Vorschau für Tool-Aufrufe  |
+| `message-thinking.tsx`    | Thinking-Anzeige mit Timer          |
+| `message-error.tsx`       | Fehlerdarstellung im Chat           |
+| `message-system.tsx`      | System-Hinweise im Chat             |
+| `chat-context-bar.tsx`    | Titel-/Kontext-Leiste über dem Chat |
+| `scroll-to-bottom.tsx`    | Schwebender Nach-unten-Button       |
 
 ### Geänderte Dateien
 
-| Datei | Änderung |
-| --- | --- |
+| Datei                        | Änderung                                                    |
+| ---------------------------- | ----------------------------------------------------------- |
 | `components/chat-center.tsx` | Alte MessageList entfernt, neue Chat-Komponenten integriert |
-| `components/chat-view.tsx` | Session-Beschreibung an Chat-Center übergeben |
+| `components/chat-view.tsx`   | Session-Beschreibung an Chat-Center übergeben               |
 
 ---
 

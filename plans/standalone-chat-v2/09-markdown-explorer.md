@@ -31,14 +31,14 @@ Dateibaum, Suche, Favoriten, Vorschau und schnelle Aktionen.
 
 ### Neue Dateien (`apps/chat/src/`)
 
-| Datei | Zweck |
-|---|---|
-| `components/markdown-explorer.tsx` | Hauptcontainer der rechten Sidebar |
-| `components/markdown-tree.tsx` | Dateibaum mit Ordnern |
-| `components/markdown-tree-item.tsx` | Ein Knoten im Baum |
-| `components/markdown-search.tsx` | Suche für Dateinamen/Inhalte |
-| `components/markdown-favorites.tsx` | Favoriten-Liste |
-| `components/markdown-preview.tsx` | Vorschau der ausgewählten Datei |
+| Datei                               | Zweck                              |
+| ----------------------------------- | ---------------------------------- |
+| `components/markdown-explorer.tsx`  | Hauptcontainer der rechten Sidebar |
+| `components/markdown-tree.tsx`      | Dateibaum mit Ordnern              |
+| `components/markdown-tree-item.tsx` | Ein Knoten im Baum                 |
+| `components/markdown-search.tsx`    | Suche für Dateinamen/Inhalte       |
+| `components/markdown-favorites.tsx` | Favoriten-Liste                    |
+| `components/markdown-preview.tsx`   | Vorschau der ausgewählten Datei    |
 
 ---
 
@@ -100,9 +100,9 @@ Dateibaum, Suche, Favoriten, Vorschau und schnelle Aktionen.
 
 ## Edge Cases
 
-| Fall | Lösung |
-|---|---|
-| Sehr tiefe Ordnerstruktur | Lazy-Loading und virtuelle Liste |
+| Fall                        | Lösung                                 |
+| --------------------------- | -------------------------------------- |
+| Sehr tiefe Ordnerstruktur   | Lazy-Loading und virtuelle Liste       |
 | Datei wurde extern gelöscht | Eintrag beim nächsten Reload entfernen |
-| Riesige Markdown-Datei | Teilweises Laden mit Hinweis |
-| Keine Markdown-Dateien | Freundlicher Leerer-Zustand |
+| Riesige Markdown-Datei      | Teilweises Laden mit Hinweis           |
+| Keine Markdown-Dateien      | Freundlicher Leerer-Zustand            |

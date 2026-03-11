@@ -20,7 +20,7 @@ export function MarkdownPreview({
 }: MarkdownPreviewProps) {
   const [copied, setCopied] = useState(false);
 
-  const fileName = filePath ? filePath.replace(/\\/g, '/').split('/').pop() ?? '' : '';
+  const fileName = filePath ? (filePath.replace(/\\/g, '/').split('/').pop() ?? '') : '';
 
   const handleCopy = useCallback(async () => {
     if (!content) return;
@@ -72,7 +72,10 @@ export function MarkdownPreview({
     <div className="flex h-full min-h-0 flex-col">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-muted px-3 py-1.5">
-        <span className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground" title={filePath}>
+        <span
+          className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground"
+          title={filePath}
+        >
           {fileName}
         </span>
         <div className="flex items-center gap-0.5">

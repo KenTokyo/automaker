@@ -25,7 +25,11 @@ export function ToolCallResult({ result }: ToolCallResultProps) {
         className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
       >
         {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-        {result.isJson ? <FileJson className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
+        {result.isJson ? (
+          <FileJson className="h-3.5 w-3.5" />
+        ) : (
+          <FileText className="h-3.5 w-3.5" />
+        )}
         {open ? 'Weniger anzeigen' : 'Ergebnis anzeigen'}
       </button>
       <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words rounded border border-muted bg-muted/20 p-2 text-[11px] text-muted-foreground">

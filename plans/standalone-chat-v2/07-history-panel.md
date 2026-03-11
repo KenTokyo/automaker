@@ -32,14 +32,14 @@ Jeder Verlaufseintrag zeigt Titel, letzte Aktivität und Status.
 
 ### Neue Dateien (`apps/chat/src/`)
 
-| Datei | Zweck |
-|---|---|
-| `components/history-panel.tsx` | Gesamtes Verlauf-Panel links |
-| `components/history-search.tsx` | Suchfeld mit klarer Rückmeldung |
-| `components/history-list.tsx` | Liste mit Verlaufseinträgen |
-| `components/history-item.tsx` | Einzelner Verlaufseintrag |
-| `components/history-filters.tsx` | Einfache Filter-Auswahl |
-| `components/history-empty-state.tsx` | Leerer Zustand mit Hilfe-Text |
+| Datei                                | Zweck                           |
+| ------------------------------------ | ------------------------------- |
+| `components/history-panel.tsx`       | Gesamtes Verlauf-Panel links    |
+| `components/history-search.tsx`      | Suchfeld mit klarer Rückmeldung |
+| `components/history-list.tsx`        | Liste mit Verlaufseinträgen     |
+| `components/history-item.tsx`        | Einzelner Verlaufseintrag       |
+| `components/history-filters.tsx`     | Einfache Filter-Auswahl         |
+| `components/history-empty-state.tsx` | Leerer Zustand mit Hilfe-Text   |
 
 ---
 
@@ -100,9 +100,9 @@ Jeder Verlaufseintrag zeigt Titel, letzte Aktivität und Status.
 
 ## Edge Cases
 
-| Fall | Lösung |
-|---|---|
-| 0 Sessions vorhanden | Klarer Start-Hinweis mit „Neuen Chat starten“ |
-| 300+ Sessions | Liste nutzt gruppierte Anzeige und `content-visibility` für flüssiges Scrollen |
-| Session ohne Titel | Fallback-Titel wie „Chat ohne Titel“ |
-| Sehr lange Titel | Abschneiden mit `...` und Tooltip |
+| Fall                 | Lösung                                                                         |
+| -------------------- | ------------------------------------------------------------------------------ |
+| 0 Sessions vorhanden | Klarer Start-Hinweis mit „Neuen Chat starten“                                  |
+| 300+ Sessions        | Liste nutzt gruppierte Anzeige und `content-visibility` für flüssiges Scrollen |
+| Session ohne Titel   | Fallback-Titel wie „Chat ohne Titel“                                           |
+| Sehr lange Titel     | Abschneiden mit `...` und Tooltip                                              |

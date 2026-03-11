@@ -30,18 +30,18 @@ Sicher, schnell und klar begrenzt auf erlaubte Projektpfade.
 
 ### Neue Dateien (`apps/server/src/`)
 
-| Datei | Zweck |
-|---|---|
-| `routes/markdown-explorer/index.ts` | Router für Explorer-Endpunkte |
-| `routes/markdown-explorer/routes/tree.ts` | Dateibaum liefern |
-| `routes/markdown-explorer/routes/file.ts` | Dateiinhalt liefern |
-| `routes/markdown-explorer/routes/search.ts` | Suchtreffer liefern |
-| `services/markdown-explorer-service.ts` | Geschäftslogik für Lesen/Suchen |
+| Datei                                       | Zweck                           |
+| ------------------------------------------- | ------------------------------- |
+| `routes/markdown-explorer/index.ts`         | Router für Explorer-Endpunkte   |
+| `routes/markdown-explorer/routes/tree.ts`   | Dateibaum liefern               |
+| `routes/markdown-explorer/routes/file.ts`   | Dateiinhalt liefern             |
+| `routes/markdown-explorer/routes/search.ts` | Suchtreffer liefern             |
+| `services/markdown-explorer-service.ts`     | Geschäftslogik für Lesen/Suchen |
 
 ### Geänderte Dateien
 
-| Datei | Was ändern |
-|---|---|
+| Datei                      | Was ändern              |
+| -------------------------- | ----------------------- |
 | `apps/server/src/index.ts` | Neue Route registrieren |
 
 ---
@@ -101,9 +101,9 @@ Sicher, schnell und klar begrenzt auf erlaubte Projektpfade.
 
 ## Edge Cases
 
-| Fall | Lösung |
-|---|---|
+| Fall                                 | Lösung                                  |
+| ------------------------------------ | --------------------------------------- |
 | Binary-Datei versehentlich angefragt | Als „nicht unterstützte Datei“ ablehnen |
-| Suche über 100k Dateien | Paging + Abbruch + Zeitlimit |
-| Umlaute im Pfad | UTF-8 und normalisierte Pfade nutzen |
-| Datei während Lesen geändert | Versionshinweis oder erneutes Laden |
+| Suche über 100k Dateien              | Paging + Abbruch + Zeitlimit            |
+| Umlaute im Pfad                      | UTF-8 und normalisierte Pfade nutzen    |
+| Datei während Lesen geändert         | Versionshinweis oder erneutes Laden     |

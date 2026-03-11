@@ -34,7 +34,11 @@ export function MessageThinking({
             type="button"
             className="flex w-full items-center gap-2 text-left text-xs text-muted-foreground"
           >
-            {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            {open ? (
+              <ChevronDown className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5" />
+            )}
             <Brain className={cn('h-3.5 w-3.5', !isComplete && 'animate-pulse')} />
             <span className="font-medium">
               {isComplete ? 'Denken beendet' : 'Denkt nach'} ({formatElapsed(elapsedSeconds)})
@@ -44,7 +48,8 @@ export function MessageThinking({
 
         <CollapsibleContent className="pt-2">
           <p className="whitespace-pre-wrap rounded-lg border border-muted bg-muted/30 p-2 text-xs text-muted-foreground">
-            {thinkingText?.trim() || 'Die Antwort wird gerade vorbereitet. Du kannst warten oder den Lauf stoppen.'}
+            {thinkingText?.trim() ||
+              'Die Antwort wird gerade vorbereitet. Du kannst warten oder den Lauf stoppen.'}
           </p>
         </CollapsibleContent>
       </Collapsible>

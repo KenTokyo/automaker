@@ -29,19 +29,19 @@ Ein runder Feinschliff für schnelle Bedienung und klare Orientierung.
 
 ### Neue Dateien (`apps/chat/src/`)
 
-| Datei | Zweck |
-|---|---|
-| `hooks/use-chat-shortcuts.ts` | Globale Tastenkürzel |
-| `components/shortcut-help-dialog.tsx` | Hilfeübersicht für Kürzel |
-| `components/ux-hints.tsx` | Kleine kontextbezogene Hilfen |
+| Datei                                 | Zweck                         |
+| ------------------------------------- | ----------------------------- |
+| `hooks/use-chat-shortcuts.ts`         | Globale Tastenkürzel          |
+| `components/shortcut-help-dialog.tsx` | Hilfeübersicht für Kürzel     |
+| `components/ux-hints.tsx`             | Kleine kontextbezogene Hilfen |
 
 ### Geänderte Dateien
 
-| Datei | Was ändern |
-|---|---|
-| `components/chat-header.tsx` | Hilfezugang für Kürzel |
-| `components/chat-input.tsx` | Kürzel korrekt behandeln |
-| `components/session-tab-bar.tsx` | Tab-Kürzel integrieren |
+| Datei                            | Was ändern               |
+| -------------------------------- | ------------------------ |
+| `components/chat-header.tsx`     | Hilfezugang für Kürzel   |
+| `components/chat-input.tsx`      | Kürzel korrekt behandeln |
+| `components/session-tab-bar.tsx` | Tab-Kürzel integrieren   |
 
 ---
 
@@ -94,9 +94,9 @@ Ein runder Feinschliff für schnelle Bedienung und klare Orientierung.
 
 ## Edge Cases
 
-| Fall | Lösung |
-|---|---|
-| Browser-Kürzel überschneiden sich | Alternative Kürzel bereitstellen |
-| Eingabefeld hat Fokus | Nur passende Kürzel abfangen |
-| Nicht deutsches Tastaturlayout | Kürzel robust auf Key-Codes prüfen |
-| Sehr kleines Fenster | Kompakte Header-Aktionen verwenden |
+| Fall                              | Lösung                             |
+| --------------------------------- | ---------------------------------- |
+| Browser-Kürzel überschneiden sich | Alternative Kürzel bereitstellen   |
+| Eingabefeld hat Fokus             | Nur passende Kürzel abfangen       |
+| Nicht deutsches Tastaturlayout    | Kürzel robust auf Key-Codes prüfen |
+| Sehr kleines Fenster              | Kompakte Header-Aktionen verwenden |

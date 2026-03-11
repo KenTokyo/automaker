@@ -2,7 +2,12 @@
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/store/app-store';
 import { getHttpApiClient } from '@/lib/http-api-client';
-import { cancelOverview, generateOverview, getOverviewStatus, loadOverview } from '../services/overview-api';
+import {
+  cancelOverview,
+  generateOverview,
+  getOverviewStatus,
+  loadOverview,
+} from '../services/overview-api';
 import { useDashboardStore } from '../stores/dashboard-store';
 import {
   DASHBOARD_TIME_RANGES,
@@ -77,7 +82,7 @@ export function useDashboard() {
       setActiveTimeRange: s.setActiveTimeRange,
       setModelOverride: s.setModelOverride,
       setLastUsedMode: s.setLastUsedMode,
-    })),
+    }))
   );
 
   const currentProjectPath = useAppStore((state) => state.currentProject?.path ?? null);
@@ -117,7 +122,7 @@ export function useDashboard() {
         }
       }
     },
-    [currentProjectPath],
+    [currentProjectPath]
   );
 
   const refreshStatus = useCallback(async () => {
@@ -169,7 +174,7 @@ export function useDashboard() {
         state.setGenerating(false);
       }
     },
-    [currentProjectPath],
+    [currentProjectPath]
   );
 
   const handleCancel = useCallback(async () => {

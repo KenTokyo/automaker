@@ -44,7 +44,7 @@ export function detectPhases(
   messages: SessionMessage[],
   orchestratorMode: boolean,
   orchestratorIteration: number,
-  orchestratorRunId: string | null,
+  orchestratorRunId: string | null
 ): OrchestratorRunInfo {
   const empty: OrchestratorRunInfo = {
     runId: orchestratorRunId,
@@ -97,9 +97,7 @@ export function detectPhases(
 
   // If there are messages after the last phase marker, there's a running phase
   if (currentPhaseStart < messages.length && !isAllComplete) {
-    const hasError = messages.some(
-      (m, idx) => idx >= currentPhaseStart && m.isError
-    );
+    const hasError = messages.some((m, idx) => idx >= currentPhaseStart && m.isError);
     phases.push({
       iteration: currentIteration,
       status: hasError ? 'error' : 'running',
@@ -126,7 +124,9 @@ export function detectPhases(
 /**
  * Returns the set of message indices where a phase divider should appear BEFORE.
  */
-export function getPhaseDividerIndices(phases: OrchestratorPhaseInfo[]): Map<number, OrchestratorPhaseInfo> {
+export function getPhaseDividerIndices(
+  phases: OrchestratorPhaseInfo[]
+): Map<number, OrchestratorPhaseInfo> {
   const dividers = new Map<number, OrchestratorPhaseInfo>();
   for (let i = 1; i < phases.length; i++) {
     const phase = phases[i];

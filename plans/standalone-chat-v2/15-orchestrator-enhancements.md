@@ -30,19 +30,19 @@ Orchestrator = unser Ablauf-Steuerer für mehrere KI-Schritte hintereinander.
 
 ### Neue Dateien (`apps/chat/src/`)
 
-| Datei | Zweck |
-|---|---|
+| Datei                                    | Zweck                          |
+| ---------------------------------------- | ------------------------------ |
 | `components/orchestrator-status-bar.tsx` | Run-ID, Iteration, Fortschritt |
-| `components/orchestrator-phase-list.tsx` | Liste der Phasen im Run |
-| `components/orchestrator-phase-item.tsx` | Einzelne Phase mit Status |
+| `components/orchestrator-phase-list.tsx` | Liste der Phasen im Run        |
+| `components/orchestrator-phase-item.tsx` | Einzelne Phase mit Status      |
 
 ### Geänderte Dateien
 
-| Datei | Was ändern |
-|---|---|
-| `components/chat-header.tsx` | Orchestrator-Status sichtbar machen |
-| `stores/session-store.ts` | Run-Metadaten erweitern |
-| `components/chat-messages.tsx` | Phasenereignisse gruppieren |
+| Datei                          | Was ändern                          |
+| ------------------------------ | ----------------------------------- |
+| `components/chat-header.tsx`   | Orchestrator-Status sichtbar machen |
+| `stores/session-store.ts`      | Run-Metadaten erweitern             |
+| `components/chat-messages.tsx` | Phasenereignisse gruppieren         |
 
 ---
 
@@ -91,9 +91,9 @@ Orchestrator = unser Ablauf-Steuerer für mehrere KI-Schritte hintereinander.
 
 ## Edge Cases
 
-| Fall | Lösung |
-|---|---|
-| Iteration springt unerwartet | Validierung gegen letzte bekannte Nummer |
+| Fall                           | Lösung                                     |
+| ------------------------------ | ------------------------------------------ |
+| Iteration springt unerwartet   | Validierung gegen letzte bekannte Nummer   |
 | Run endet ohne Abschluss-Event | Nach Timeout als „unvollständig“ markieren |
-| Mehrere Runs in einer Session | Nur aktiven Run prominent zeigen |
-| Fehlende Run-ID im Event | Fallback auf Session-ID + Zeitstempel |
+| Mehrere Runs in einer Session  | Nur aktiven Run prominent zeigen           |
+| Fehlende Run-ID im Event       | Fallback auf Session-ID + Zeitstempel      |

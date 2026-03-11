@@ -59,7 +59,11 @@ export function ThinkingBlock({ block, open, onToggle }: ThinkingBlockProps) {
             : 'border-muted bg-muted/20'
       )}
     >
-      <button type="button" onClick={onToggle} className="flex w-full items-center gap-2 text-left text-xs">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-2 text-left text-xs"
+      >
         {open ? (
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
         ) : (
@@ -67,7 +71,12 @@ export function ThinkingBlock({ block, open, onToggle }: ThinkingBlockProps) {
         )}
         <Brain className={cn('h-3.5 w-3.5 text-muted-foreground', isRunning && 'animate-pulse')} />
         <span className="font-medium text-foreground">{getStatusLabel(block.status)}</span>
-        <span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-medium', getStatusClass(block.status))}>
+        <span
+          className={cn(
+            'rounded-full border px-2 py-0.5 text-[11px] font-medium',
+            getStatusClass(block.status)
+          )}
+        >
           {block.status === 'done' ? (
             <CircleCheckBig className="mr-1 inline h-3 w-3" />
           ) : block.status === 'aborted' ? (

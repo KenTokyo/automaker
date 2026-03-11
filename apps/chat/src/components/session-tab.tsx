@@ -157,7 +157,10 @@ export function SessionTab({
     };
   }, [menuPosition]);
 
-  const statusConfig = useMemo(() => getStatusConfig(session.processStatus), [session.processStatus]);
+  const statusConfig = useMemo(
+    () => getStatusConfig(session.processStatus),
+    [session.processStatus]
+  );
   const modelShortLabel = useMemo(() => toModelShortLabel(session.model), [session.model]);
   const costLabel = useMemo(() => toCostLabel(session.totalCost), [session.totalCost]);
   const messageLabel = useMemo(() => {

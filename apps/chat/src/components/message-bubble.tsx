@@ -61,7 +61,9 @@ export function MessageBubble({ message, modelLabel, providerLabel, onRetry }: M
             {providerLabel ? (
               <span className="rounded-full border border-muted px-2 py-0.5">{providerLabel}</span>
             ) : null}
-            {modelLabel ? <span className="rounded-full border border-muted px-2 py-0.5">{modelLabel}</span> : null}
+            {modelLabel ? (
+              <span className="rounded-full border border-muted px-2 py-0.5">{modelLabel}</span>
+            ) : null}
           </div>
         )}
 
@@ -90,7 +92,9 @@ export function MessageBubble({ message, modelLabel, providerLabel, onRetry }: M
         )}
 
         <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="text-[11px] text-muted-foreground">{formatTimestamp(message.timestamp)}</span>
+          <span className="text-[11px] text-muted-foreground">
+            {formatTimestamp(message.timestamp)}
+          </span>
 
           <div className="flex items-center gap-1">
             <button

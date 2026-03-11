@@ -30,17 +30,17 @@ Mit Testknopf, Lautstärke und Ereignis-Auswahl.
 
 ### Neue Dateien (`apps/chat/src/`)
 
-| Datei | Zweck |
-|---|---|
-| `components/sound-settings-panel.tsx` | UI für Sound-Steuerung |
-| `components/sound-toggle.tsx` | Kleiner Schnellschalter |
+| Datei                                 | Zweck                   |
+| ------------------------------------- | ----------------------- |
+| `components/sound-settings-panel.tsx` | UI für Sound-Steuerung  |
+| `components/sound-toggle.tsx`         | Kleiner Schnellschalter |
 
 ### Geänderte Dateien
 
-| Datei | Was ändern |
-|---|---|
-| `components/settings-panel.tsx` | Sound-Bereich ergänzen |
-| `stores/session-store.ts` | Sound-Settings im Store führen |
+| Datei                           | Was ändern                     |
+| ------------------------------- | ------------------------------ |
+| `components/settings-panel.tsx` | Sound-Bereich ergänzen         |
+| `stores/session-store.ts`       | Sound-Settings im Store führen |
 
 ---
 
@@ -99,9 +99,9 @@ Mit Testknopf, Lautstärke und Ereignis-Auswahl.
 
 ## Edge Cases
 
-| Fall | Lösung |
-|---|---|
+| Fall                               | Lösung                              |
+| ---------------------------------- | ----------------------------------- |
 | Lautstärke auf 0, aber Sounds „an“ | Klar als „praktisch stumm“ anzeigen |
-| Defektes Audio-Gerät | Hinweis ohne App-Fehler |
-| Sehr schneller Toggle-Wechsel | Entprellen (Debounce) bei Speichern |
-| Einstellungen aus alter Version | Migration auf neue Defaults |
+| Defektes Audio-Gerät               | Hinweis ohne App-Fehler             |
+| Sehr schneller Toggle-Wechsel      | Entprellen (Debounce) bei Speichern |
+| Einstellungen aus alter Version    | Migration auf neue Defaults         |

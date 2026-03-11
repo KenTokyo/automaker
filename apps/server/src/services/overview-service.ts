@@ -48,7 +48,7 @@ export class OverviewService {
 
   constructor(
     private readonly projectPath: string,
-    private readonly dataDir: string,
+    private readonly dataDir: string
   ) {}
 
   // -----------------------------------------------------------------------
@@ -62,7 +62,7 @@ export class OverviewService {
     sinceHours: number,
     timeRange: DashboardTimeRange,
     options: GenerateOverviewOptions = {},
-    onProgress?: (phase: string) => void,
+    onProgress?: (phase: string) => void
   ): Promise<DashboardOverviewData> {
     const startMs = Date.now();
     const mode = this.resolveMode(options.mode);
@@ -82,14 +82,20 @@ export class OverviewService {
         markdownData,
         gitData,
         sinceHours,
-        mode,
+        mode
       );
 
       onProgress?.('KI erstellt Übersicht…');
       const rawResponse = await this.callClaude(systemPrompt, userPrompt, resolvedModel);
 
       onProgress?.('Ergebnis verarbeiten…');
-      const data = this.parseOverviewResponse(rawResponse, timeRange, truncated, resolvedModel, mode);
+      const data = this.parseOverviewResponse(
+        rawResponse,
+        timeRange,
+        truncated,
+        resolvedModel,
+        mode
+      );
 
       data.metadata.durationMs = Date.now() - startMs;
       data.metadata.filesAnalysed = markdownData.length;
@@ -154,7 +160,7 @@ export class OverviewService {
     try {
       const raw = execSync(
         `git log --since="${sinceArg}" --pretty=format:"%h|%s|%an|%ai" --no-merges -n ${MAX_GIT_COMMITS + 1}`,
-        { cwd: this.projectPath, encoding: 'utf-8', timeout: 15_000 },
+        { cwd: this.projectPath, encoding: 'utf-8', timeout: 15_000 }
       );
 
       const lines = raw.trim().split('\n').filter(Boolean);
@@ -179,7 +185,7 @@ export class OverviewService {
     markdownData: OverviewMarkdownData[],
     gitData: OverviewGitData,
     sinceHours: number,
-    mode: DashboardMode,
+    mode: DashboardMode
   ): { systemPrompt: string; userPrompt: string; truncated: boolean } {
     const timeLabel = this.sinceHoursToLabel(sinceHours);
     const modeInstructions = this.getModeInstructions(mode);
@@ -193,13 +199,22 @@ export class OverviewService {
       JSON.stringify(
         {
           summary: '<2-3 Sätze Gesamtübersicht>',
-          sections: [{ title: '<Bereichsname>', items: [{ text: '<Beschreibung>', file: '<optionaler Dateipfad>' }] }],
-          improvements: [{ title: '<Titel>', description: '<Beschreibung>', priority: 'low|medium|high' }],
-          security: [{ title: '<Titel>', description: '<Beschreibung>', severity: 'info|warning|critical' }],
+          sections: [
+            {
+              title: '<Bereichsname>',
+              items: [{ text: '<Beschreibung>', file: '<optionaler Dateipfad>' }],
+            },
+          ],
+          improvements: [
+            { title: '<Titel>', description: '<Beschreibung>', priority: 'low|medium|high' },
+          ],
+          security: [
+            { title: '<Titel>', description: '<Beschreibung>', severity: 'info|warning|critical' },
+          ],
           stats: { filesChanged: 0, commits: 0, linesAdded: 0, linesRemoved: 0 },
         },
         null,
-        2,
+        2
       ),
     ].join('\n');
 
@@ -273,7 +288,11 @@ export class OverviewService {
   // Claude Call (via Agent SDK - one-shot, no tools)
   // -----------------------------------------------------------------------
 
-  private async callClaude(systemPrompt: string, userPrompt: string, model: string): Promise<string> {
+  private async callClaude(
+    systemPrompt: string,
+    userPrompt: string,
+    model: string
+  ): Promise<string> {
     const sdkOptions: Options = {
       model,
       systemPrompt,
@@ -290,8 +309,13 @@ export class OverviewService {
       const stream = query({ prompt: userPrompt, options: sdkOptions });
 
       for await (const msg of stream) {
-        if (msg.type === 'assistant' && Array.isArray((msg as { message?: { content?: unknown } }).message?.content)) {
-          for (const block of (msg as { message: { content: Array<{ type?: string; text?: string }> } }).message.content) {
+        if (
+          msg.type === 'assistant' &&
+          Array.isArray((msg as { message?: { content?: unknown } }).message?.content)
+        ) {
+          for (const block of (
+            msg as { message: { content: Array<{ type?: string; text?: string }> } }
+          ).message.content) {
             if (block.type === 'text' && typeof block.text === 'string') {
               textParts.push(block.text);
             }
@@ -323,7 +347,7 @@ export class OverviewService {
     timeRange: DashboardTimeRange,
     truncated: boolean,
     model: string,
-    mode: DashboardMode,
+    mode: DashboardMode
   ): DashboardOverviewData {
     let parsed: Record<string, unknown> | null = null;
 
@@ -349,7 +373,10 @@ export class OverviewService {
       const lastBrace = rawResponse.lastIndexOf('}');
       if (firstBrace !== -1 && lastBrace > firstBrace) {
         try {
-          parsed = JSON.parse(rawResponse.slice(firstBrace, lastBrace + 1)) as Record<string, unknown>;
+          parsed = JSON.parse(rawResponse.slice(firstBrace, lastBrace + 1)) as Record<
+            string,
+            unknown
+          >;
         } catch {
           // Fallback unten
         }
@@ -365,11 +392,15 @@ export class OverviewService {
       model,
       mode,
       summary: typeof parsed?.summary === 'string' ? parsed.summary : rawResponse.slice(0, 500),
-      sections: Array.isArray(parsed?.sections) ? (parsed.sections as DashboardOverviewData['sections']) : [],
+      sections: Array.isArray(parsed?.sections)
+        ? (parsed.sections as DashboardOverviewData['sections'])
+        : [],
       improvements: Array.isArray(parsed?.improvements)
         ? (parsed.improvements as DashboardOverviewData['improvements'])
         : [],
-      security: Array.isArray(parsed?.security) ? (parsed.security as DashboardOverviewData['security']) : [],
+      security: Array.isArray(parsed?.security)
+        ? (parsed.security as DashboardOverviewData['security'])
+        : [],
       stats: {
         filesChanged: this.toNumber(parsedStats.filesChanged),
         commits: this.toNumber(parsedStats.commits),

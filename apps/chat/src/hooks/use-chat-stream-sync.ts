@@ -289,7 +289,9 @@ export function useChatStreamSync({ activeSessionId, isProcessing }: UseChatStre
 
       if (event.type === 'tool_use') {
         const session = store.sessions[event.sessionId];
-        const fallbackMessageId = session ? getLatestAssistantMessageId(session.messages) : undefined;
+        const fallbackMessageId = session
+          ? getLatestAssistantMessageId(session.messages)
+          : undefined;
         const pending = pendingToolsBySessionRef.current.get(event.sessionId);
         const now = nowToolIso();
         const currentPending: PendingToolGroupState = pending ?? {

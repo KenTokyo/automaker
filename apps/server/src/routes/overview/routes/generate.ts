@@ -48,7 +48,9 @@ export function createGenerateHandler(events: EventEmitter, dataDir: string) {
         return;
       }
       if (!timeRange || !VALID_TIME_RANGES.has(timeRange)) {
-        res.status(400).json({ success: false, error: 'timeRange must be one of: 12h, 24h, 4d, 1w' });
+        res
+          .status(400)
+          .json({ success: false, error: 'timeRange must be one of: 12h, 24h, 4d, 1w' });
         return;
       }
       if (mode && !VALID_MODES.has(mode)) {
@@ -79,7 +81,7 @@ export function createGenerateHandler(events: EventEmitter, dataDir: string) {
         },
         (phase) => {
           events.emit('overview:progress', { phase });
-        },
+        }
       );
 
       // Persist for later retrieval

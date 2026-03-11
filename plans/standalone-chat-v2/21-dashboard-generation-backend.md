@@ -16,6 +16,7 @@ ULTRATHINK
 ### Was soll das Feature leisten?
 
 Wenn der User auf "Generieren" klickt, passiert Folgendes im Hintergrund:
+
 1. **Daten sammeln:** Relevante Markdown-Dateien + Git-Changes fuer den gewaehlten Zeitraum
 2. **KI-Prompt bauen:** Einen strukturierten Prompt mit den gesammelten Daten
 3. **KI aufrufen:** Den Prompt an Claude (via Claude Agent SDK) schicken
@@ -23,6 +24,7 @@ Wenn der User auf "Generieren" klickt, passiert Folgendes im Hintergrund:
 5. **Ergebnis zurueckgeben:** JSON via WebSocket an den Client senden
 
 **Was bedeutet das konkret fuer den User?**
+
 > Der User klickt "Generieren" im 24h-Tab. Der Server sammelt alle Markdown-Dateien der letzten 24 Stunden + alle Git-Commits dieses Zeitraums, baut daraus einen Analyse-Prompt und laesst die KI eine strukturierte Zusammenfassung generieren. Das Ergebnis erscheint als schoene Karten-Ansicht.
 
 ### Warum als separater Service?
@@ -34,13 +36,13 @@ Wenn der User auf "Generieren" klickt, passiert Folgendes im Hintergrund:
 
 ### Architektur-Unterschied zu VS Code Extension
 
-| Aspekt | VS Code Extension | Automaker Web |
-|--------|-------------------|---------------|
-| KI-Aufruf | CLI-Spawn (`claude --print`) | Claude Agent SDK (`Anthropic` SDK direkt) |
-| Kommunikation | `ctx.postMessage()` | WebSocket Events + HTTP REST |
-| Datei-Zugriff | Extension Host `fs` | Server-seitiger Express-Service |
-| State | Webview `vscode.getState()` | Zustand Store (Client) |
-| Persistierung | `.overview/` im Workspace | `data/overviews/` im Data-Dir |
+| Aspekt        | VS Code Extension            | Automaker Web                             |
+| ------------- | ---------------------------- | ----------------------------------------- |
+| KI-Aufruf     | CLI-Spawn (`claude --print`) | Claude Agent SDK (`Anthropic` SDK direkt) |
+| Kommunikation | `ctx.postMessage()`          | WebSocket Events + HTTP REST              |
+| Datei-Zugriff | Extension Host `fs`          | Server-seitiger Express-Service           |
+| State         | Webview `vscode.getState()`  | Zustand Store (Client)                    |
+| Persistierung | `.overview/` im Workspace    | `data/overviews/` im Data-Dir             |
 
 ### Verbindung zu anderen Features
 
@@ -54,26 +56,34 @@ Wenn der User auf "Generieren" klickt, passiert Folgendes im Hintergrund:
 ## Proaktive F&A & Edge Cases
 
 ### F1: Wie laeuft die KI-Generierung, ohne den Chat zu blockieren?
+
 > Wir nutzen die **Claude Agent SDK** (`@anthropic-ai/sdk`) direkt auf dem Server. Ein separater API-Call, unabhaengig von laufenden Chat-Sessions. Kein Streaming noetig — One-Shot-Anfrage.
 
 ### F2: Was passiert, wenn die Datenmenge zu gross ist (100+ Dateien)?
+
 > **Chunking-Strategie:**
+>
 > 1. Dateien priorisieren: Zuerst nach `modified` sortieren (neueste zuerst)
 > 2. Inhalt begrenzen: Pro Datei nur die ersten 50 Zeilen + Metadaten
 > 3. Harte Grenze: Maximal 30 Dateien pro Anfrage
 > 4. Falls trotzdem zu gross: Nur Dateinamen + Aenderungsdatum + erste 3 Zeilen
 
 ### F3: Was passiert, wenn keine Git-Historie verfuegbar ist?
+
 > Kein Problem. Die Git-Analyse ist **optional**. Wenn `git log` fehlschlaegt (kein Repo), wird der Overview nur aus Markdown-Dateien generiert. Ein Hinweis im JSON: `"gitAvailable": false`.
 
 ### F4: Welches Modell wird fuer die Generierung genutzt?
+
 > Standard: **Sonnet** (schnell + guenstig fuer Analysen). In Plan 23 kommt ein Model-Selector dazu, der ueberschrieben werden kann.
 
 ### F5: Was passiert bei einem Netzwerk-/API-Fehler?
+
 > Der Service faengt den Fehler und sendet ein `overview:error` WebSocket-Event an den Client. Der Client zeigt einen Error-State mit Retry-Button (Plan 20 hat die UI-States schon vorbereitet).
 
 ### F6: Wie sieht das JSON-Format der KI-Antwort aus?
+
 > Definiertes Schema:
+>
 > ```typescript
 > interface DashboardOverviewData {
 >   timeRange: '12h' | '24h' | '4d' | '1w';
@@ -90,18 +100,23 @@ Wenn der User auf "Generieren" klickt, passiert Folgendes im Hintergrund:
 > ```
 
 ### F7: Was passiert, wenn die KI kein valides JSON zurueckgibt?
+
 > **Fallback-Parsing:**
-> 1. Suche nach ```json ... ``` Block via Regex
+>
+> 1. Suche nach `json ... ` Block via Regex
 > 2. Falls nicht gefunden: gesamten Text als JSON parsen
 > 3. Letzter Fallback: Raw-Text in einem `summary`-Feld zurueckgeben
 
 ### F8: Kann der User die Generierung abbrechen?
+
 > Ja. Der Cancel-Button sendet ein HTTP DELETE. Der Service bricht den laufenden API-Call ab (`AbortController`).
 
 ### F9: Wie lange dauert eine typische Generierung?
+
 > Geschaetzt: 10-45 Sekunden. Deshalb: Loading-State mit Phasen-Anzeige via WebSocket-Events ("Dateien sammeln...", "Git analysieren...", "KI generiert...", "Ergebnis verarbeiten...").
 
 ### F10: Was passiert bei Context-Overflow (zu viel Input fuer die KI)?
+
 > Hard-Limit fuer die Prompt-Groesse (ca. 50.000 Zeichen). Wenn ueberschritten: Datei-Inhalte kuerzen, dann Git-Diffs kuerzen, zuletzt aelteste Dateien weglassen.
 
 ---
@@ -142,15 +157,15 @@ User klickt "Generieren" im 1w-Tab (grosse Datenmenge)
 
 ## Code-Wiederverwendung
 
-| Bestehendes Element | Wiederverwendung |
-|---------------------|------------------|
+| Bestehendes Element                                     | Wiederverwendung                                        |
+| ------------------------------------------------------- | ------------------------------------------------------- |
 | `apps/server/src/services/markdown-explorer-service.ts` | Dateien nach Zeitraum filtern (mit Plan 19 Erweiterung) |
-| `apps/server/src/routes/markdown-explorer/` | Pattern fuer Route-Struktur |
-| `@automaker/utils` `createLogger` | Logging im neuen Service |
-| `@automaker/platform` `secureFs` | Dateizugriff |
-| `@automaker/model-resolver` | Model-Alias-Aufloesung |
-| `child_process.execSync('git log ...')` | Git-History abrufen |
-| WebSocket Event-Pattern aus `lib/events.ts` | Progress-Events an Client |
+| `apps/server/src/routes/markdown-explorer/`             | Pattern fuer Route-Struktur                             |
+| `@automaker/utils` `createLogger`                       | Logging im neuen Service                                |
+| `@automaker/platform` `secureFs`                        | Dateizugriff                                            |
+| `@automaker/model-resolver`                             | Model-Alias-Aufloesung                                  |
+| `child_process.execSync('git log ...')`                 | Git-History abrufen                                     |
+| WebSocket Event-Pattern aus `lib/events.ts`             | Progress-Events an Client                               |
 
 ---
 
@@ -163,6 +178,7 @@ User klickt "Generieren" im 1w-Tab (grosse Datenmenge)
 #### 1.1 OverviewService Grundgeruest
 
 **`apps/server/src/services/overview-service.ts`** (~200 Zeilen, neue Datei)
+
 - Klasse `OverviewService` mit Dependency auf `MarkdownExplorerService`
 - Constructor: nimmt `projectPath` als Parameter
 
@@ -187,6 +203,7 @@ User klickt "Generieren" im 1w-Tab (grosse Datenmenge)
 #### 1.2 Types & Interfaces
 
 **`apps/server/src/services/overview-types.ts`** (~80 Zeilen, neue Datei)
+
 - `OverviewMarkdownData`: `{ path, name, modified, preview, size }`
 - `OverviewGitData`: `{ available, commits: OverviewGitCommit[], totalCommits }`
 - `OverviewGitCommit`: `{ hash, message, author, date }`
@@ -258,7 +275,7 @@ User klickt "Generieren" im 1w-Tab (grosse Datenmenge)
 **`apps/server/src/services/overview-service.ts`** (~100 Zeilen Ergaenzung)
 
 - `private _parseOverviewResponse(rawResponse: string, sinceHours: number): DashboardOverviewData`
-  - **Stufe 1:** Suche nach ```json ... ``` Block via Regex
+  - **Stufe 1:** Suche nach `json ... ` Block via Regex
   - **Stufe 2:** Falls nicht gefunden, gesamten Text als JSON parsen
   - **Stufe 3:** Suche nach erstem `{` und letztem `}` und parse Substring
   - **Fallback:** Minimal-`DashboardOverviewData` mit Raw-Text im `summary`-Feld
@@ -304,11 +321,13 @@ User klickt "Generieren" im 1w-Tab (grosse Datenmenge)
 #### 3.2 Route-Registrierung
 
 **`apps/server/src/index.ts`** (~10 Zeilen Aenderung)
+
 - Import und Registrierung der Overview-Routes: `app.use('/api/overview', overviewRoutes)`
 
 #### 3.3 WebSocket-Event-Typen
 
 **WebSocket-Events (in bestehender Event-Infrastruktur):**
+
 - `overview:progress` — `{ phase: string }` (Fortschritts-Updates waehrend Generierung)
 - `overview:data` — `{ data: DashboardOverviewData }` (Ergebnis)
 - `overview:error` — `{ message: string }` (Fehler)
@@ -335,19 +354,21 @@ User klickt "Generieren" im 1w-Tab (grosse Datenmenge)
 
 ## Zusammenfassung
 
-| Phase | Typ | Dateien | ~Zeilen | Inhalt |
-|-------|-----|---------|---------|--------|
-| 1 | Backend | 2 Dateien | ~280 | OverviewService Daten-Sammlung + Types |
-| 2 | Backend | 1 Datei | ~350 | Prompt-Builder, KI-Aufruf, JSON-Parser |
-| 3 | Backend | 3-4 Dateien | ~250 | API-Routes, WebSocket-Events, Persistierung |
-| **Gesamt** | | **~6 Dateien** | **~880** | |
+| Phase      | Typ     | Dateien        | ~Zeilen  | Inhalt                                      |
+| ---------- | ------- | -------------- | -------- | ------------------------------------------- |
+| 1          | Backend | 2 Dateien      | ~280     | OverviewService Daten-Sammlung + Types      |
+| 2          | Backend | 1 Datei        | ~350     | Prompt-Builder, KI-Aufruf, JSON-Parser      |
+| 3          | Backend | 3-4 Dateien    | ~250     | API-Routes, WebSocket-Events, Persistierung |
+| **Gesamt** |         | **~6 Dateien** | **~880** |                                             |
 
 ### Umsetzungs-Reihenfolge
+
 1. Phase 1 zuerst (Daten-Sammlung = Grundlage fuer alles)
 2. Phase 2 danach (Prompt + KI-Aufruf braucht die gesammelten Daten)
 3. Phase 3 zuletzt (Routes + Events verbinden alles)
 
 ### CHAT-Zuordnung
+
 - **CHAT 10:** Phase 1 + Phase 2 + Phase 3 (~90.000 Tokens geschaetzt)
 
 ---
@@ -355,6 +376,7 @@ User klickt "Generieren" im 1w-Tab (grosse Datenmenge)
 ## Dokumentation
 
 Nach Abschluss aktualisieren:
+
 - `plans/standalone-chat-v2/00-global-tasklist.md` -> Plan 21 als erledigt markieren
 - `CLAUDE.md` -> Hinweis auf `OverviewService` API-Verwendung
 - JSON-Schema dokumentieren (fuer spaetere Agent-Prompt-Anpassungen in Plan 23)

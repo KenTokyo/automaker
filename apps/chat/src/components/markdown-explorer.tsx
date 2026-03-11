@@ -111,49 +111,46 @@ export function MarkdownExplorer({ projectPath, onClose }: MarkdownExplorerProps
   }, [projectPath]);
 
   // ── Load a directory's children ───────────────────────────────────────
-  const loadDirectory = useCallback(
-    async (dirPath: string, rootPath: string) => {
-      const store = useExplorerStore.getState();
-      const isRoot = dirPath === rootPath;
+  const loadDirectory = useCallback(async (dirPath: string, rootPath: string) => {
+    const store = useExplorerStore.getState();
+    const isRoot = dirPath === rootPath;
+
+    if (isRoot) {
+      store.setIsLoadingRoot(true);
+    } else {
+      store.setChildrenLoading(dirPath, true);
+    }
+
+    try {
+      const api = getHttpApiClient();
+      const result = await api.readdir(dirPath);
+
+      if (!result.success || !result.entries) {
+        if (isRoot) store.setRootNodes([], 0);
+        return;
+      }
+
+      const nodes: FileTreeNode[] = result.entries
+        .filter((entry) => !shouldIgnore(entry.name))
+        .map((entry) => ({
+          name: entry.name,
+          path: joinPath(dirPath, entry.name),
+          isDirectory: entry.isDirectory,
+          children: entry.isDirectory ? null : null,
+        }));
+
+      const sorted = sortNodes(nodes);
 
       if (isRoot) {
-        store.setIsLoadingRoot(true);
+        store.setRootNodes(sorted, sorted.length);
       } else {
-        store.setChildrenLoading(dirPath, true);
+        store.setChildren(dirPath, sorted);
       }
-
-      try {
-        const api = getHttpApiClient();
-        const result = await api.readdir(dirPath);
-
-        if (!result.success || !result.entries) {
-          if (isRoot) store.setRootNodes([], 0);
-          return;
-        }
-
-        const nodes: FileTreeNode[] = result.entries
-          .filter((entry) => !shouldIgnore(entry.name))
-          .map((entry) => ({
-            name: entry.name,
-            path: joinPath(dirPath, entry.name),
-            isDirectory: entry.isDirectory,
-            children: entry.isDirectory ? null : null,
-          }));
-
-        const sorted = sortNodes(nodes);
-
-        if (isRoot) {
-          store.setRootNodes(sorted, sorted.length);
-        } else {
-          store.setChildren(dirPath, sorted);
-        }
-      } catch (err) {
-        logger.error('Failed to load directory', err);
-        if (isRoot) store.setRootNodes([], 0);
-      }
-    },
-    []
-  );
+    } catch (err) {
+      logger.error('Failed to load directory', err);
+      if (isRoot) store.setRootNodes([], 0);
+    }
+  }, []);
 
   // ── Toggle folder expand/collapse ─────────────────────────────────────
   const handleToggleFolder = useCallback(
