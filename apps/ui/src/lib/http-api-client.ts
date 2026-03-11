@@ -349,9 +349,20 @@ export const checkAuthStatus = async (): Promise<{
   required: boolean;
 }> => {
   try {
+    const headers: Record<string, string> = {};
+    const apiKey = getApiKey();
+    const sessionToken = getSessionToken();
+
+    if (apiKey) {
+      headers['X-API-Key'] = apiKey;
+    }
+    if (sessionToken) {
+      headers['X-Session-Token'] = sessionToken;
+    }
+
     const response = await fetch(`${getServerUrl()}/api/auth/status`, {
       credentials: 'include',
-      headers: getApiKey() ? { 'X-API-Key': getApiKey()! } : undefined,
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
       cache: NO_STORE_CACHE_MODE,
     });
     const data = await response.json();
@@ -563,6 +574,9 @@ type EventType =
   | 'spec-regeneration:event'
   | 'issue-validation:event'
   | 'backlog-plan:event'
+  | 'overview:progress'
+  | 'overview:data'
+  | 'overview:error'
   | 'ideation:stream'
   | 'ideation:analysis'
   | 'worktree:init-started'
@@ -902,6 +916,18 @@ export class HttpApiClient implements ElectronAPI {
     };
   }
 
+  onOverviewProgress(callback: (payload: { phase?: string }) => void): () => void {
+    return this.subscribeToEvent('overview:progress', callback as EventCallback);
+  }
+
+  onOverviewData(callback: (payload: { data?: unknown }) => void): () => void {
+    return this.subscribeToEvent('overview:data', callback as EventCallback);
+  }
+
+  onOverviewError(callback: (payload: { message?: string }) => void): () => void {
+    return this.subscribeToEvent('overview:error', callback as EventCallback);
+  }
+
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -1190,6 +1216,56 @@ export class HttpApiClient implements ElectronAPI {
   async trashItem(filePath: string): Promise<WriteResult> {
     // In web mode, trash is just delete
     return this.deleteFile(filePath);
+  }
+
+  /** Search files by name and optionally content within a project. */
+  async explorerSearch(
+    projectPath: string,
+    query: string,
+    options?: { searchContent?: boolean; limit?: number; sinceHours?: number }
+  ): Promise<{
+    success: boolean;
+    results: Array<{
+      name: string;
+      path: string;
+      isDirectory: boolean;
+      matchLine?: number;
+      snippet?: string;
+    }>;
+    totalCount: number;
+    error?: string;
+  }> {
+    return this.post('/api/markdown-explorer/search', {
+      projectPath,
+      query,
+      searchContent: options?.searchContent,
+      limit: options?.limit,
+      sinceHours: options?.sinceHours,
+    });
+  }
+
+  /** Get files modified within the last N hours. */
+  async explorerFilesByTime(
+    projectPath: string,
+    sinceHours: number,
+    limit?: number
+  ): Promise<{
+    success: boolean;
+    files: Array<{
+      name: string;
+      path: string;
+      modified: number;
+      size: number;
+    }>;
+    totalCount: number;
+    error?: string;
+  }> {
+    const params = new URLSearchParams({
+      projectPath,
+      sinceHours: String(sinceHours),
+    });
+    if (limit) params.set('limit', String(limit));
+    return this.get(`/api/markdown-explorer/files-by-time?${params.toString()}`);
   }
 
   async getPath(name: string): Promise<string> {

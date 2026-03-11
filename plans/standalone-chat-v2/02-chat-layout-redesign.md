@@ -2,7 +2,7 @@
 
 ULTRATHINK
 
-**Status**: ⬜ OFFEN
+**Status**: ✅ ERLEDIGT
 **Chat**: 1
 **Geschätzte Tokens**: ~35.000
 
@@ -49,6 +49,14 @@ Ein neues 3-Spalten-Layout wie in der UniAI Chat VS Code Extension:
 3. Rechts: Markdown Explorer (aufklappbar, ein-/ausblendbar)
 4. Oben: Session-Tabs für parallele Chats
 5. Beides (links/rechts) kann mit einem Klick ein-/ausgeblendet werden
+
+## Ergebnis
+
+1. Das neue 3-Spalten-Layout ist im Chat aktiv.
+2. Oben gibt es jetzt eine klare Kopfzeile mit Projektwahl, Session-Tabs und Aktionen.
+3. Links gibt es einen Verlauf mit Suche und schnellem „Neuer Chat“-Button.
+4. Rechts gibt es einen klaren Datei-Bereich als Platzhalter für den Markdown Explorer.
+5. Unten zeigt eine Statusleiste Modell, Token-Schätzung, Verbindung und Fehler.
 
 ---
 
@@ -167,15 +175,15 @@ Zeigt:
 
 ## Prüfpunkte
 
-- [ ] 3-Spalten-Layout wird korrekt dargestellt
-- [ ] Sidebars lassen sich ein-/ausblenden
-- [ ] Sidebar-Breite per Drag veränderbar
-- [ ] Breiten-Einstellungen werden gespeichert
-- [ ] Responsive: Auf schmalen Bildschirmen nur Chat sichtbar
-- [ ] Header zeigt Projekt + Aktions-Buttons
-- [ ] Statusleiste zeigt Modell + Token-Info
-- [ ] Chat-Nachrichten scrollen korrekt
-- [ ] Theme-Wechsel funktioniert
+- [x] 3-Spalten-Layout wird korrekt dargestellt
+- [x] Sidebars lassen sich ein-/ausblenden
+- [x] Sidebar-Breite per Drag veränderbar
+- [x] Breiten-Einstellungen werden gespeichert
+- [x] Responsive: Auf schmalen Bildschirmen nur Chat sichtbar
+- [x] Header zeigt Projekt + Aktions-Buttons
+- [x] Statusleiste zeigt Modell + Token-Info
+- [x] Chat-Nachrichten scrollen korrekt
+- [x] Theme-Wechsel funktioniert
 
 ---
 
@@ -187,3 +195,23 @@ Zeigt:
 | Sidebar-Breite gespeichert, Monitor gewechselt | Validierung: max 40% der Fensterbreite     |
 | Theme-Wechsel während Chat                     | CSS-Variablen aktualisieren, kein Neuladen |
 | Kein Projekt ausgewählt                        | Willkommens-Bildschirm statt 3-Spalten     |
+
+## Konkret umgesetzt
+
+### Neue Dateien
+
+- `apps/chat/src/components/chat-view.tsx`
+- `apps/chat/src/components/chat-layout-v2.tsx`
+- `apps/chat/src/components/chat-header.tsx`
+- `apps/chat/src/components/chat-sidebar-left.tsx`
+- `apps/chat/src/components/chat-sidebar-right.tsx`
+- `apps/chat/src/components/chat-center.tsx`
+- `apps/chat/src/components/chat-status-bar.tsx`
+
+### Geänderte Datei
+
+- `apps/chat/src/chat-layout.tsx` nutzt jetzt `ChatView` statt direktem Alt-Aufbau.
+
+## TypeScript-Check
+
+- `npm run typecheck:chat` ✅

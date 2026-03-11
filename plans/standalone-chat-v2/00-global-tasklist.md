@@ -1,130 +1,185 @@
-# UniAI Chat Standalone v2 - Globale Taskliste (Master Plan)
+﻿# UniAI Chat Standalone v2 - Globale Taskliste (Master Plan)
 
 ULTRATHINK
 
 ## Projektziel
 
-Den bestehenden Standalone Chat (`apps/chat/`) komplett umbauen zu einer vollwertigen Chat-Plattform.
-Vorbild ist die UniAI Chat VS Code Extension - mit Thread-System, Markdown Explorer, Sound-System und professionellem Chat-Erlebnis.
+Den bestehenden Standalone-Chat (`apps/chat/`) zu einer klaren Chat-Plattform ausbauen.
+Vorbild ist die UniAI Chat VS Code Extension mit Thread-System, Markdown Explorer, Sound-System und stabilem Chat-Fluss.
 
 ## Was sich ändert (Überblick)
 
-| Bereich           | Vorher                | Nachher                                    |
-| ----------------- | --------------------- | ------------------------------------------ |
-| Login             | API-Key Eingabe nötig | Auto-Login, kein Key-Dialog                |
-| Chat-Layout       | Einfacher AgentView   | Sidebar-basiert mit History + Explorer     |
-| Sessions          | Eine Session          | Multi-Session mit Tabs                     |
-| History           | Keine                 | Linke Sidebar mit Verlauf, Filter, Suche   |
-| Markdown Explorer | Keiner                | Rechte Sidebar mit Dateibaum, Favoriten    |
-| Sounds            | Keine                 | Benachrichtigungstöne bei Task-/Phase-Ende |
-| Tool-Anzeige      | Einfach               | Aufklappbare Tool-Gruppen mit Ergebnissen  |
-| Thinking          | Einfach               | Timer, aufklappbare Thinking-Blöcke        |
-| Orchestrator      | Grundfunktion         | Phasen-Erkennung, Gruppierung im Verlauf   |
-| Parallele Agenten | Nicht möglich         | Multi-Session parallel                     |
+| Bereich | Vorher | Nachher |
+| --- | --- | --- |
+| Login | API-Key Eingabe nötig | Auto-Login, kein Key-Dialog |
+| Chat-Layout | Einfacher AgentView | 3-Spalten-Layout mit Seitenleisten |
+| Sessions | Eine Session | Multi-Session mit Tabs |
+| Verlauf | Kaum Übersicht | Linke Sidebar mit Suche/Filter |
+| Markdown Explorer | Nicht vorhanden | Rechte Sidebar mit Baum + Suche |
+| Sounds | Keine Hinweise | Töne bei Task/Phase/Fehler |
+| Tool-Anzeige | Roh dargestellt | Aufklappbare Gruppen |
+| Thinking | Wenig sichtbar | Timer + klare Blöcke |
+| Orchestrator | Basis | Run/Iteration/Phase sichtbar |
+| Parallele Agenten | Eingeschränkt | Mehrere Sessions gleichzeitig |
 
-## Architektur-Entscheidungen
+## Architektur-Leitplanken
 
-1. **Weiterhin shared imports** aus `apps/ui/src/` via Vite-Alias `@/`
-2. **Neue Chat-spezifische Komponenten** in `apps/chat/src/components/`
-3. **Zustand Stores** für Session-Management (neuer Store)
-4. **Server-Erweiterungen** für Markdown Explorer API und Sound-Dateien
-5. **Kein Fork** von AgentView - stattdessen eigener Chat-View bauen
+1. Shared Imports aus `apps/ui/src/` über Vite-Alias `@/` beibehalten.
+2. Chat-spezifische UI in `apps/chat/src/components/` bündeln.
+3. Session-Verwaltung über eigenen Zustand-Store führen.
+4. Server um Explorer-API und Sound-Unterstützung ergänzen.
+5. Keine Code-Forks ohne Not; klare, wartbare Komponenten.
 
-## Referenz-Dateien (immer mitgeben)
+## Referenzdateien für jeden Chat
 
-- `plans/standalone-chat-v2/00-global-tasklist.md` (diese Datei)
-- `CLAUDE.md` und `AGENTS.md` (Projektregeln)
+- `plans/standalone-chat-v2/00-global-tasklist.md` (Master Plan)
+- `plans/standalone-chat-v2/temp.md` (falls vorhanden)
+- `CLAUDE.md`
+- `AGENTS.md`
 - `shared-docs/ai-architecture/toolcall-architecture/05-uniai-chat-vscode-extension-toolcall-system-und-sidebar.md`
 - `apps/chat/HOW-TO-RUN.md`
 
-## Kontext-Datei
-
-Falls ein Chat Zwischenergebnisse hat, wird eine `temp.md` im selben Ordner angelegt.
-Diese wird dann beim nächsten Chat mitgegeben.
-
 ---
 
-## Phasen-Übersicht
+## Phasenübersicht nach Chats
 
 ### CHAT 1 (~80.000 Tokens)
 
-| Phase | Datei                        | Titel                                  | Status   |
-| ----- | ---------------------------- | -------------------------------------- | -------- |
-| 1     | `01-auto-login.md`           | Auto-Login (API-Key Pflicht entfernen) | ⬜ OFFEN |
-| 2     | `02-chat-layout-redesign.md` | Chat-Layout Neustruktur (3-Spalten)    | ⬜ OFFEN |
-| 3     | `03-session-store.md`        | Session/Thread Zustand Store           | ⬜ OFFEN |
+| Phase | Datei | Titel | Status |
+| --- | --- | --- | --- |
+| 1 | `01-auto-login.md` | Auto-Login (API-Key Pflicht entfernen) | ✅ ERLEDIGT |
+| 2 | `02-chat-layout-redesign.md` | Chat-Layout Neustruktur (3-Spalten) | ✅ ERLEDIGT |
+| 3 | `03-session-store.md` | Session/Thread Zustand Store | ✅ ERLEDIGT |
 
 ### CHAT 2 (~90.000 Tokens)
 
-| Phase | Datei                      | Titel                                 | Status   |
-| ----- | -------------------------- | ------------------------------------- | -------- |
-| 4     | `04-session-tabs.md`       | Session Tab-Leiste                    | ⬜ OFFEN |
-| 5     | `05-chat-message-area.md`  | Chat-Nachrichtenbereich Überarbeitung | ⬜ OFFEN |
-| 6     | `06-input-improvements.md` | Eingabebereich Verbesserungen         | ⬜ OFFEN |
+| Phase | Datei | Titel | Status |
+| --- | --- | --- | --- |
+| 4 | `04-session-tabs.md` | Session Tab-Leiste | ✅ ERLEDIGT |
+| 5 | `05-chat-message-area.md` | Chat-Nachrichtenbereich Überarbeitung | ✅ ERLEDIGT |
+| 6 | `06-input-improvements.md` | Eingabebereich Verbesserungen | ✅ ERLEDIGT |
 
 ### CHAT 3 (~80.000 Tokens)
 
-| Phase | Datei                            | Titel                         | Status   |
-| ----- | -------------------------------- | ----------------------------- | -------- |
-| 7     | `07-history-panel.md`            | Verlauf-Panel (linke Sidebar) | ⬜ OFFEN |
-| 8     | `08-conversation-persistence.md` | Konversations-Speicherung     | ⬜ OFFEN |
+| Phase | Datei | Titel | Status |
+| --- | --- | --- | --- |
+| 7 | `07-history-panel.md` | Verlauf-Panel (linke Sidebar) | ✅ ERLEDIGT |
+| 8 | `08-conversation-persistence.md` | Konversations-Speicherung | ✅ ERLEDIGT |
 
 ### CHAT 4 (~90.000 Tokens)
 
-| Phase | Datei                             | Titel                              | Status   |
-| ----- | --------------------------------- | ---------------------------------- | -------- |
-| 9     | `09-markdown-explorer.md`         | Markdown Explorer (rechte Sidebar) | ⬜ OFFEN |
-| 10    | `10-markdown-explorer-backend.md` | Markdown Explorer Backend-API      | ⬜ OFFEN |
+| Phase | Datei | Titel | Status |
+| --- | --- | --- | --- |
+| 9 | `09-markdown-explorer.md` | Markdown Explorer (rechte Sidebar) | ✅ ERLEDIGT |
+| 10 | `10-markdown-explorer-backend.md` | Markdown Explorer Backend-API | ✅ ERLEDIGT |
 
 ### CHAT 5 (~60.000 Tokens)
 
-| Phase | Datei                  | Titel                           | Status   |
-| ----- | ---------------------- | ------------------------------- | -------- |
-| 11    | `11-sound-system.md`   | Sound & Benachrichtigungssystem | ⬜ OFFEN |
-| 12    | `12-sound-settings.md` | Sound-Einstellungen UI          | ⬜ OFFEN |
+| Phase | Datei | Titel | Status |
+| --- | --- | --- | --- |
+| 11 | `11-sound-system.md` | Sound- und Benachrichtigungssystem | ✅ ERLEDIGT |
+| 12 | `12-sound-settings.md` | Sound-Einstellungen im UI | ✅ ERLEDIGT |
 
 ### CHAT 6 (~70.000 Tokens)
 
-| Phase | Datei                     | Titel                      | Status   |
-| ----- | ------------------------- | -------------------------- | -------- |
-| 13    | `13-tool-call-display.md` | Tool-Call Anzeige im Chat  | ⬜ OFFEN |
-| 14    | `14-thinking-blocks.md`   | Thinking-Block Darstellung | ⬜ OFFEN |
+| Phase | Datei | Titel | Status |
+| --- | --- | --- | --- |
+| 13 | `13-tool-call-display.md` | Tool-Call Anzeige im Chat | ✅ ERLEDIGT |
+| 14 | `14-thinking-blocks.md` | Thinking-Blöcke | ✅ ERLEDIGT |
 
 ### CHAT 7 (~60.000 Tokens)
 
-| Phase | Datei                             | Titel                             | Status   |
-| ----- | --------------------------------- | --------------------------------- | -------- |
-| 15    | `15-orchestrator-enhancements.md` | Orchestrator-Modus Verbesserungen | ⬜ OFFEN |
-| 16    | `16-parallel-agents.md`           | Parallele Agenten (Multi-Session) | ⬜ OFFEN |
+| Phase | Datei | Titel | Status |
+| --- | --- | --- | --- |
+| 15 | `15-orchestrator-enhancements.md` | Orchestrator-Modus Verbesserungen | ✅ ERLEDIGT |
+| 16 | `16-parallel-agents.md` | Parallele Agenten (Multi-Session) | ✅ ERLEDIGT |
 
 ### CHAT 8 (~50.000 Tokens)
 
-| Phase | Datei                         | Titel                         | Status   |
-| ----- | ----------------------------- | ----------------------------- | -------- |
-| 17    | `17-keyboard-shortcuts-ux.md` | Tastenkürzel & UX-Feinschliff | ⬜ OFFEN |
-| 18    | `18-final-integration.md`     | Abschluss & Integration       | ⬜ OFFEN |
+| Phase | Datei | Titel | Status |
+| --- | --- | --- | --- |
+| 17 | `17-keyboard-shortcuts-ux.md` | Tastenkürzel und UX-Feinschliff | ✅ ERLEDIGT |
+| 18 | `18-final-integration.md` | Abschluss und Gesamtintegration | ✅ ERLEDIGT |
+
+---
+
+## Dashboard / Übersicht Feature
+
+### Feature-Beschreibung
+
+Ein neues Dashboard-Panel in der linken Sidebar (neben dem Verlauf-Tab). Der User sieht auf einen Blick, was im Projekt passiert ist.
+
+Kernidee:
+- Tab-Umschalter in der linken Sidebar: Verlauf ↔ Übersicht
+- Zeitraum-Tabs: 12h, 24h, 4 Tage, 1 Woche
+- KI generiert eine Zusammenfassung aus Markdown-Dateien und Git-Änderungen
+- Card-Darstellung mit Statistiken, Sektionen, Verbesserungen und Sicherheitshinweisen
+- Persistierung als JSON auf dem Server
+- Optionen: Neu generieren, Vereinfachen, Mehr Details, Modell-Wahl
+
+### Abhängigkeiten zwischen Plänen
+
+```
+Plan 19 (Zeitfilter) --+
+                       +--> Plan 21 (Generation Backend) nutzt Zeitfilter-Logik
+Plan 20 (UI Shell) ----+
+                       +--> Plan 22 (Rendering) baut auf UI Shell auf
+Plan 21 (Generation) --+
+                       +--> Plan 23 (Aktionen) erweitert Generation + Rendering
+Plan 22 (Rendering) ---+
+```
+
+Kritischer Pfad: Plan 19 -> Plan 20 -> Plan 21 -> Plan 22 -> Plan 23
+
+### CHAT 9 (~80.000 Tokens)
+
+| Phase | Datei | Titel | Status |
+| --- | --- | --- | --- |
+| 19 | `19-markdown-explorer-zeitfilter.md` | Markdown Explorer: Zeitbasierte Filterung | ✅ Abgeschlossen |
+| 20 | `20-dashboard-ui-shell.md` | Dashboard UI Shell & Navigation | ✅ Abgeschlossen |
+
+### CHAT 10 (~90.000 Tokens)
+
+| Phase | Datei | Titel | Status |
+| --- | --- | --- | --- |
+| 21 | `21-dashboard-generation-backend.md` | Dashboard: KI-Analyse Backend | ✅ Abgeschlossen |
+
+### CHAT 11 (~90.000 Tokens)
+
+| Phase | Datei | Titel | Status |
+| --- | --- | --- | --- |
+| 22 | `22-dashboard-rendering-persistence.md` | Dashboard: Rendering & Persistierung | ✅ Abgeschlossen |
+
+### CHAT 12 (~80.000 Tokens)
+
+| Phase | Datei | Titel | Status |
+| --- | --- | --- | --- |
+| 23 | `23-dashboard-actions-refinement.md` | Dashboard: Aktionen, Verfeinerung & Modell-Wahl | ✅ Abgeschlossen |
+
+### Status-Legende
+- ⏳ Noch nicht erstellt (Planung ausstehend)
+- 📝 Geplant (Planungsdatei erstellt, noch nicht implementiert)
+- 🔄 In Arbeit (Implementierung läuft)
+- ✅ Abgeschlossen
 
 ---
 
 ## Aktueller Stand
 
-- **Letzter abgeschlossener Chat**: - (noch keiner)
-- **Nächster Chat**: CHAT 1 (Phasen 1-3)
-- **Gesamtfortschritt**: 0/18 Phasen erledigt
+- Planungsdateien vorhanden: **23/23**.
+- Umsetzungsfortschritt: **23/23 Phasen erledigt**.
+- Letzter Umsetzungsschritt: **Plan 23 abgeschlossen (Dashboard Aktionen, Verfeinerung & Modell-Wahl)**.
+- Nächster Schritt: **Übergabe und optionaler Feinschliff nach Feedback**.
 
----
-
-## Chat-Übergabe Protokoll
+## Chat-Übergabe-Protokoll
 
 Jeder Chat bekommt:
+1. Diese globale Taskliste.
+2. Die relevanten Phasen-Dateien.
+3. `temp.md` mit Kurzkontext (falls vorhanden).
+4. `CLAUDE.md` und `AGENTS.md`.
 
-1. Diese globale Taskliste
-2. Die relevanten Phase-Dateien für den aktuellen Chat
-3. Falls vorhanden: `temp.md` mit Zwischenergebnissen
-4. `CLAUDE.md` + `AGENTS.md`
-
-Jeder Chat gibt zurück:
-
-1. Aktualisierte globale Taskliste (Status-Updates)
-2. Aktualisierte Phase-Dateien (Status: FERTIG)
-3. Falls nötig: `temp.md` mit Kontext für den nächsten Chat
+Jeder Chat liefert zurück:
+1. Aktualisierte globale Taskliste mit Status.
+2. Aktualisierte Phasen-Dateien (`Status` pro Phase).
+3. Aktualisierte `temp.md` für den nächsten Chat.

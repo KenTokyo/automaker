@@ -30,6 +30,19 @@ function isEnvTrue(envVar: string | undefined): boolean {
   return envVar === 'true';
 }
 
+/**
+ * Auto-login is active in non-production chat mode by default.
+ * Can be forced with AUTOMAKER_AUTO_LOGIN=true or disabled with =false.
+ */
+export function isAutoLoginEnabled(): boolean {
+  if (process.env.NODE_ENV === 'production') return false;
+
+  if (process.env.AUTOMAKER_AUTO_LOGIN === 'true') return true;
+  if (process.env.AUTOMAKER_AUTO_LOGIN === 'false') return false;
+
+  return process.env.AUTOMAKER_MODE === 'chat';
+}
+
 // Session store - persisted to file for survival across server restarts
 const validSessions = new Map<string, { createdAt: number; expiresAt: number }>();
 
@@ -142,7 +155,7 @@ const BOX_CONTENT_WIDTH = 67;
 
 // Print API key to console for web mode users (unless suppressed for production logging)
 if (!isEnvTrue(process.env.AUTOMAKER_HIDE_API_KEY)) {
-  const autoLoginEnabled = isEnvTrue(process.env.AUTOMAKER_AUTO_LOGIN);
+  const autoLoginEnabled = isAutoLoginEnabled();
   const autoLoginStatus = autoLoginEnabled ? 'enabled (auto-login active)' : 'disabled';
 
   // Build box lines with exact padding
@@ -157,7 +170,7 @@ if (!isEnvTrue(process.env.AUTOMAKER_HIDE_API_KEY)) {
   const line4 = `Auto-login (AUTOMAKER_AUTO_LOGIN): ${autoLoginStatus}`.padEnd(BOX_CONTENT_WIDTH);
   const tipHeader = '💡 Tips'.padEnd(BOX_CONTENT_WIDTH);
   const line5 = 'Set AUTOMAKER_API_KEY env var to use a fixed key'.padEnd(BOX_CONTENT_WIDTH);
-  const line6 = 'Set AUTOMAKER_AUTO_LOGIN=true to skip the login prompt'.padEnd(BOX_CONTENT_WIDTH);
+  const line6 = 'Set AUTOMAKER_AUTO_LOGIN=false to force manual login'.padEnd(BOX_CONTENT_WIDTH);
 
   logger.info(`
 ╔═════════════════════════════════════════════════════════════════════╗

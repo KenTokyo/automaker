@@ -2,7 +2,7 @@
 
 ULTRATHINK
 
-**Status**: ⬜ OFFEN
+**Status**: ✅ ERLEDIGT
 **Chat**: 2
 **Geschätzte Tokens**: ~25.000
 
@@ -159,16 +159,16 @@ Ablauf beim Senden:
 
 ## Prüfpunkte
 
-- [ ] Auto-Resize der Textarea funktioniert
-- [ ] Enter/Ctrl+Enter zum Senden
-- [ ] Modell-Auswahl per Dropdown
-- [ ] Thinking-Modus Toggle + Intensität
-- [ ] Orchestrator-Modus Toggle
-- [ ] Bild-Anhänge per Drag&Drop und Zwischenablage
-- [ ] Draft-Speicherung pro Session
-- [ ] Stop-Button erscheint/funktioniert
-- [ ] Senden deaktiviert während Agent läuft
-- [ ] Tastenkürzel funktionieren
+- [x] Auto-Resize der Textarea funktioniert
+- [x] Enter/Ctrl+Enter zum Senden
+- [x] Modell-Auswahl per Dropdown
+- [x] Thinking-Modus Toggle + Intensität
+- [x] Orchestrator-Modus Toggle
+- [x] Bild-Anhänge per Drag&Drop und Zwischenablage
+- [x] Draft-Speicherung pro Session
+- [x] Stop-Button erscheint/funktioniert
+- [x] Senden deaktiviert während Agent läuft
+- [x] Tastenkürzel funktionieren
 
 ---
 

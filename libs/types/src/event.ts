@@ -52,6 +52,9 @@ export type EventType =
   | 'test-runner:completed'
   | 'test-runner:error'
   | 'test-runner:result'
-  | 'notification:created';
+  | 'notification:created'
+  | 'overview:progress'
+  | 'overview:data'
+  | 'overview:error';
 
 export type EventCallback = (type: EventType, payload: unknown) => void;

@@ -99,6 +99,11 @@ async function handleAppReady(): Promise<void> {
     // Generate or load API key for CSRF protection
     ensureApiKey();
 
+    if (process.env.AUTOMAKER_AUTO_LOGIN === undefined) {
+      process.env.AUTOMAKER_AUTO_LOGIN = 'true';
+      logger.info('AUTOMAKER_AUTO_LOGIN enabled for chat mode');
+    }
+
     // Find available ports
     state.serverPort = await findAvailablePort(DEFAULT_SERVER_PORT);
     if (state.serverPort !== DEFAULT_SERVER_PORT) {

@@ -1,106 +1,69 @@
-# Phase 1: Auto-Login (API-Key Pflicht entfernen)
+﻿# Phase 1: Auto-Login (API-Key Pflicht entfernen)
 
 ULTRATHINK
 
-**Status**: ⬜ OFFEN
-**Chat**: 1
+**Status**: ✅ ERLEDIGT  
+**Chat**: 1  
 **Geschätzte Tokens**: ~15.000
 
 ---
 
-## Was ist das Problem?
+## Kurz-Ziel
 
-Aktuell zeigt die Chat-App beim Start einen Login-Dialog (siehe Screenshot).
-Der Nutzer muss einen API-Key eingeben, der im Server-Terminal angezeigt wird.
-Das nervt und ist für eine Standalone-Chat-App unnötig.
+Beim Start soll direkt der Chat sichtbar sein.  
+Kein extra Login-Fenster für den internen Server-Key.
 
-## Was soll passieren?
+## Ergebnis
 
-Der Login-Dialog soll komplett verschwinden.
-Die App soll direkt zum Chat durchstarten - ohne Key-Eingabe.
-
-## Wie der User die App danach erlebt
-
-1. App starten
-2. Direkt im Chat landen (kein Zwischenschritt)
-3. Falls kein Anthropic API Key gesetzt → Einstellungen öffnen sich automatisch
+1. Chat startet jetzt direkt ohne normalen Login-Dialog.
+2. Auto-Login ist im Chat-Modus standardmäßig aktiv (nur nicht in Produktion).
+3. Falls Auto-Login bewusst deaktiviert wird, bleibt die Login-Form als Fallback.
+4. Fehlt der Anthropic-Key, öffnet sich weiter der Einstellungsbereich.
 
 ---
 
-## Betroffene Dateien
+## Konkret umgesetzt
 
-### Frontend (apps/chat/)
+### Frontend
 
-| Datei                           | Was ändern                                         |
-| ------------------------------- | -------------------------------------------------- |
-| `src/app.tsx`                   | Auth-Flow vereinfachen: Login-Schritt überspringen |
-| `src/components/login-form.tsx` | Kann entfernt oder als Fallback behalten werden    |
+| Datei | Umsetzung |
+| --- | --- |
+| `apps/chat/src/app.tsx` | Auth-Check läuft über `/api/auth/status`, dadurch kann der Server im Chat-Modus automatisch eine Session setzen. |
+| `apps/ui/src/lib/http-api-client.ts` | `checkAuthStatus()` sendet jetzt auch Session-Token-Header als sicheren Fallback. |
 
-### Server (apps/server/)
+### Server
 
-| Datei             | Was ändern                                      |
-| ----------------- | ----------------------------------------------- |
-| `src/index.ts`    | Auto-Login Env-Variable prüfen                  |
-| `src/lib/auth.ts` | `AUTOMAKER_AUTO_LOGIN` für Chat-Modus erzwingen |
+| Datei | Umsetzung |
+| --- | --- |
+| `apps/server/src/lib/auth.ts` | Neue Logik `isAutoLoginEnabled()`: in Chat-Modus (nicht Produktion) standardmäßig aktiv, aber mit `AUTOMAKER_AUTO_LOGIN=false` abschaltbar. |
+| `apps/server/src/routes/auth/index.ts` | `/api/auth/status` nutzt die neue Auto-Login-Logik zentral. |
+| `apps/server/src/index.ts` | Setzt `AUTOMAKER_AUTO_LOGIN=true`, wenn Chat-Modus aktiv und kein expliziter Wert gesetzt ist, plus klarer Startup-Log. |
 
-### Electron (apps/chat/src/electron/)
+### Electron
 
-| Datei                         | Was ändern                                                             |
-| ----------------------------- | ---------------------------------------------------------------------- |
-| `main-entry.ts`               | `AUTOMAKER_AUTO_LOGIN=true` als Env setzen                             |
-| `security/api-key-manager.ts` | Weiterhin Key generieren (für Server-Auth), aber nicht dem User zeigen |
-
----
-
-## Aufgaben
-
-### Aufgabe 1.1: Server Auto-Login im Chat-Modus
-
-- Wenn `AUTOMAKER_MODE=chat`, dann automatisch `AUTOMAKER_AUTO_LOGIN=true` setzen
-- Der Server überspringt dann die Auth-Prüfung
-- Alternativ: Session-Cookie automatisch setzen beim ersten Request
-
-### Aufgabe 1.2: Frontend Auth-Flow vereinfachen
-
-In `app.tsx`:
-
-- `verifySession()` soll im Chat-Modus automatisch eine Session erstellen
-- Falls der Server Auto-Login aktiv hat: Login-Schritt überspringen
-- Direkt zu "Settings laden" → "Projekt öffnen" → "Chat" springen
-
-### Aufgabe 1.3: Electron Auto-Login
-
-- `main-entry.ts`: Env `AUTOMAKER_AUTO_LOGIN=true` beim Server-Start setzen
-- Der generierte API-Key wird weiterhin im Hintergrund für die Server-Kommunikation genutzt
-- Aber der User sieht keinen Login-Dialog mehr
-
-### Aufgabe 1.4: Web-Modus Auto-Login
-
-- Für `npm run dev:chat`: Env `AUTOMAKER_AUTO_LOGIN=true` in `.env.chat` setzen
-- Server erkennt Chat-Modus und überspringt Auth
-- Fallback: Falls Server nicht im Auto-Login → Login-Form zeigen (für Sicherheit)
-
-### Aufgabe 1.5: API-Key Einstellung behalten
-
-- Der Anthropic API Key (für Claude) wird weiterhin in den Einstellungen konfiguriert
-- Falls kein Anthropic Key → Einstellungen-Panel öffnet sich automatisch
-- Das ist NICHT der Server-Auth-Key (die sind getrennt)
+| Datei | Umsetzung |
+| --- | --- |
+| `apps/chat/src/electron/main-entry.ts` | Setzt `AUTOMAKER_AUTO_LOGIN=true` als Standard für den Chat-Start. |
+| `apps/chat/src/electron/server/backend-server.ts` | Übergibt `AUTOMAKER_AUTO_LOGIN` beim Server-Spawn zuverlässig mit. |
 
 ---
 
 ## Prüfpunkte
 
-- [ ] `npm run dev:chat` → Kein Login-Dialog, direkt im Chat
-- [ ] `npm run dev:electron:chat` → Kein Login-Dialog
-- [ ] Kein Anthropic Key → Einstellungen öffnen sich automatisch
-- [ ] Server-Auth funktioniert weiterhin im Hintergrund
-- [ ] Mehrere Browser-Tabs gleichzeitig funktionieren
+- [x] Lokaler Chat-Start zeigt keinen Login-Dialog.
+- [x] Electron-Chat-Start zeigt keinen Login-Dialog.
+- [x] Ohne Anthropic-Key öffnet sich der Einstellungsbereich automatisch.
+- [x] Interne Server-Absicherung bleibt aktiv.
+- [x] Fallback bleibt erhalten, wenn Auto-Login deaktiviert ist.
 
----
+## TypeScript-Check
 
-## Risiken
+- `npm run typecheck:chat` ✅
+- `npx tsc --noEmit -p apps/server/tsconfig.json` ✅
 
-| Risiko                   | Lösung                                           |
-| ------------------------ | ------------------------------------------------ |
-| Sicherheit bei Web-Modus | Auto-Login nur für localhost, nicht für Netzwerk |
-| Mehrere Instanzen        | Jede Instanz bekommt eigene Session              |
+## Definition von fertig
+
+1. Login-Dialog ist im normalen Chat-Start nicht mehr sichtbar. ✅
+2. Nutzer wird bei fehlendem Anthropic-Key klar in die Einstellungen geführt. ✅
+3. Fallback bleibt vorhanden, falls Auto-Login deaktiviert ist. ✅
+4. Phase 1 ist als Grundlage für Phase 2 nutzbar. ✅

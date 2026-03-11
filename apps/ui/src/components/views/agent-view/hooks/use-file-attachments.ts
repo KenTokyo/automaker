@@ -22,6 +22,8 @@ interface UseFileAttachmentsOptions {
   isProcessing: boolean;
   isConnected: boolean;
   projectPath?: string | null;
+  maxImageFileSizeBytes?: number;
+  maxFiles?: number;
   /** Callback to insert text into the input field (e.g., image path) */
   onInsertText?: (text: string) => void;
 }
@@ -51,12 +53,22 @@ export function useFileAttachments({
   isProcessing,
   isConnected,
   projectPath,
+  maxImageFileSizeBytes,
+  maxFiles,
   onInsertText,
 }: UseFileAttachmentsOptions): UseFileAttachmentsResult {
   const [selectedImages, setSelectedImages] = useState<ImageAttachment[]>([]);
   const [selectedTextFiles, setSelectedTextFiles] = useState<TextFileAttachment[]>([]);
   const [showImageDropZone, setShowImageDropZone] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const effectiveMaxImageFileSize =
+    typeof maxImageFileSizeBytes === 'number' && maxImageFileSizeBytes > 0
+      ? maxImageFileSizeBytes
+      : DEFAULT_MAX_FILE_SIZE;
+  const effectiveMaxFiles =
+    typeof maxFiles === 'number' && Number.isFinite(maxFiles) && maxFiles > 0
+      ? Math.floor(maxFiles)
+      : DEFAULT_MAX_FILES;
 
   const handleImagesSelected = useCallback((images: ImageAttachment[]) => {
     setSelectedImages(images);
@@ -90,8 +102,8 @@ export function useFileAttachments({
             selectedImages.length +
             newTextFiles.length +
             selectedTextFiles.length;
-          if (totalFiles >= DEFAULT_MAX_FILES) {
-            errors.push(`Maximum ${DEFAULT_MAX_FILES} files allowed.`);
+          if (totalFiles >= effectiveMaxFiles) {
+            errors.push(`Maximum ${effectiveMaxFiles} files allowed.`);
             break;
           }
 
@@ -111,7 +123,7 @@ export function useFileAttachments({
         }
         // Check if it's an image file
         else if (isImageFile(file)) {
-          const validation = validateImageFile(file, DEFAULT_MAX_FILE_SIZE);
+          const validation = validateImageFile(file, effectiveMaxImageFileSize);
           if (!validation.isValid) {
             errors.push(validation.error!);
             continue;
@@ -123,8 +135,8 @@ export function useFileAttachments({
             selectedImages.length +
             newTextFiles.length +
             selectedTextFiles.length;
-          if (totalFiles >= DEFAULT_MAX_FILES) {
-            errors.push(`Maximum ${DEFAULT_MAX_FILES} files allowed.`);
+          if (totalFiles >= effectiveMaxFiles) {
+            errors.push(`Maximum ${effectiveMaxFiles} files allowed.`);
             break;
           }
 
@@ -191,7 +203,15 @@ export function useFileAttachments({
         setSelectedTextFiles((prev) => [...prev, ...newTextFiles]);
       }
     },
-    [isProcessing, onInsertText, projectPath, selectedImages, selectedTextFiles]
+    [
+      effectiveMaxFiles,
+      effectiveMaxImageFileSize,
+      isProcessing,
+      onInsertText,
+      projectPath,
+      selectedImages,
+      selectedTextFiles,
+    ]
   );
 
   // Remove individual image

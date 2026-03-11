@@ -30,7 +30,12 @@ const LOG_LEVEL_MAP: Record<string, LogLevel> = {
   info: LogLevel.INFO,
   debug: LogLevel.DEBUG,
 };
-import { authMiddleware, validateWsConnectionToken, checkRawAuthentication } from './lib/auth.js';
+import {
+  authMiddleware,
+  validateWsConnectionToken,
+  checkRawAuthentication,
+  isAutoLoginEnabled,
+} from './lib/auth.js';
 import { requireJsonContentType } from './middleware/require-json-content-type.js';
 import { createAuthRoutes } from './routes/auth/index.js';
 import { createFsRoutes } from './routes/fs/index.js';
@@ -79,6 +84,7 @@ import { createIdeationRoutes } from './routes/ideation/index.js';
 import { IdeationService } from './services/ideation-service.js';
 import { createAgentPromptsRoutes } from './routes/agent-prompts/index.js';
 import { createChatImagesRoutes } from './routes/chat-images/index.js';
+import { createMarkdownExplorerRoutes } from './routes/markdown-explorer/index.js';
 import { getDevServerService } from './services/dev-server-service.js';
 import { eventHookService } from './services/event-hook-service.js';
 import { createNotificationsRoutes } from './routes/notifications/index.js';
@@ -87,6 +93,7 @@ import { createEventHistoryRoutes } from './routes/event-history/index.js';
 import { getEventHistoryService } from './services/event-history-service.js';
 import { getTestRunnerService } from './services/test-runner-service.js';
 import { createProjectsRoutes } from './routes/projects/index.js';
+import { createOverviewRoutes } from './routes/overview/index.js';
 
 // Load environment variables
 dotenv.config();
@@ -99,8 +106,20 @@ const DATA_DIR = process.env.DATA_DIR || './data';
 // Server mode: 'full' (default) = all features, 'chat' = chat-only (lighter)
 const AUTOMAKER_MODE = (process.env.AUTOMAKER_MODE || 'full') as 'full' | 'chat';
 const isChatOnlyMode = AUTOMAKER_MODE === 'chat';
+
+if (
+  isChatOnlyMode &&
+  process.env.NODE_ENV !== 'production' &&
+  process.env.AUTOMAKER_AUTO_LOGIN === undefined
+) {
+  process.env.AUTOMAKER_AUTO_LOGIN = 'true';
+}
+
 logger.info(
   `[SERVER_STARTUP] Mode: ${AUTOMAKER_MODE}${isChatOnlyMode ? ' (chat-only, lightweight)' : ' (all features)'}`
+);
+logger.info(
+  `[SERVER_STARTUP] Auto-login: ${isAutoLoginEnabled() ? 'enabled' : 'disabled'} (AUTOMAKER_AUTO_LOGIN=${process.env.AUTOMAKER_AUTO_LOGIN ?? 'auto'})`
 );
 logger.info('[SERVER_STARTUP] process.env.DATA_DIR:', process.env.DATA_DIR);
 logger.info('[SERVER_STARTUP] Resolved DATA_DIR:', DATA_DIR);
@@ -382,7 +401,9 @@ app.use('/api/chat-images', createChatImagesRoutes());
 app.use('/api/claude', createClaudeRoutes(claudeUsageService));
 app.use('/api/codex', createCodexRoutes(codexUsageService, codexModelCacheService));
 app.use('/api/docs', createDocsRoutes(settingsService));
+app.use('/api/markdown-explorer', createMarkdownExplorerRoutes());
 app.use('/api/mcp', createMCPRoutes(mcpTestService));
+app.use('/api/overview', createOverviewRoutes(events, DATA_DIR));
 app.use(
   '/api/projects',
   createProjectsRoutes(featureLoader, autoModeService, settingsService, notificationService)

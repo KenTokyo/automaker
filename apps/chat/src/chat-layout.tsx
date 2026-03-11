@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppStore } from '@/store/app-store';
-import { AgentView } from '@/components/views/agent-view';
 import { ChatNoProjectState } from './components/chat-no-project-state';
+import { ChatView } from './components/chat-view';
 import { SettingsPanel } from './components/settings-panel';
-import { Button } from '@/components/ui/button';
-import { Settings2 } from 'lucide-react';
 
 interface ChatLayoutProps {
   autoOpenSettings?: boolean;
@@ -42,19 +40,7 @@ export function ChatLayout({ autoOpenSettings }: ChatLayoutProps) {
 
   return (
     <>
-      {/* Floating settings button */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={openSettings}
-        className="fixed top-2.5 right-14 z-40 h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-        aria-label="Open settings (Ctrl+,)"
-        title="Settings (Ctrl+,)"
-      >
-        <Settings2 className="w-4 h-4" />
-      </Button>
-
-      {currentProject ? <AgentView /> : <ChatNoProjectState />}
+      {currentProject ? <ChatView onOpenSettings={openSettings} /> : <ChatNoProjectState />}
 
       <SettingsPanel
         open={settingsOpen}

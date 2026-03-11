@@ -8,10 +8,9 @@ import { initializeProject } from '@/lib/project-init';
 import type { Project } from '@/lib/electron';
 import {
   initApiKey,
-  verifySession,
+  checkAuthStatus,
   getServerUrlSync,
   getHttpApiClient,
-  handleServerOffline,
 } from '@/lib/http-api-client';
 import {
   hydrateStoreFromSettings,
@@ -27,6 +26,8 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from 'sonner';
 import { LoginForm } from './components/login-form';
 import { ChatLayout } from './chat-layout';
+import { useSessionStore } from './stores/session-store';
+import { useSessionHydration } from './hooks/use-session-hydration';
 import './index.css';
 // Import theme and font CSS from shared UI
 import '@/styles/theme-imports';
@@ -34,10 +35,11 @@ import '@/styles/font-imports';
 
 const logger = createLogger('ChatApp');
 
-const SERVER_READY_MAX_ATTEMPTS = 8;
-const SERVER_READY_BACKOFF_BASE_MS = 250;
-const SERVER_READY_MAX_DELAY_MS = 1500;
+const SERVER_READY_MAX_ATTEMPTS = 40;
+const SERVER_READY_BACKOFF_BASE_MS = 500;
+const SERVER_READY_MAX_DELAY_MS = 2000;
 const SERVER_READY_TIMEOUT_MS = 2000;
+const SERVER_RETRY_INTERVAL_MS = 3000;
 const NO_STORE_CACHE_MODE: RequestCache = 'no-store';
 
 // Apply stored theme immediately (before React hydration)
@@ -132,6 +134,8 @@ function selectAutoOpenProject(
 // ─── Inner App Content (has access to stores) ──────────────────────────────
 
 function AppContent() {
+  const setSessionProjectContext = useSessionStore((state) => state.setProjectContext);
+  const sessionsHydrated = useSessionHydration();
   const authChecked = useAuthStore((s) => s.authChecked);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const settingsLoaded = useAuthStore((s) => s.settingsLoaded);
@@ -151,6 +155,7 @@ function AppContent() {
   } = useAppStore();
 
   const [autoOpenDone, setAutoOpenDone] = useState(false);
+  const [serverOffline, setServerOffline] = useState(false);
 
   // Subscribe to trigger re-renders
   void theme;
@@ -173,10 +178,15 @@ function AppContent() {
   // Load project-specific settings when project changes
   useProjectSettingsLoader();
 
+  useEffect(() => {
+    if (!currentProject?.path) return;
+    setSessionProjectContext(currentProject.path, currentProject.path);
+  }, [currentProject?.path, setSessionProjectContext]);
+
   // ─── Auth initialization ─────────────────────────────────────────────
 
   useEffect(() => {
-    if (authCheckRunning.current) return;
+    if (authCheckRunning.current || serverOffline) return;
 
     const initAuth = async () => {
       authCheckRunning.current = true;
@@ -186,15 +196,17 @@ function AppContent() {
 
         const serverReady = await waitForServerReady();
         if (!serverReady) {
-          handleServerOffline();
+          logger.warn('Server not reachable after initial retries, entering offline retry mode');
+          setServerOffline(true);
           return;
         }
 
         let isValid = false;
         try {
-          isValid = await verifySession();
+          const authStatus = await checkAuthStatus();
+          isValid = authStatus.authenticated;
         } catch (error) {
-          logger.warn('Session verification failed:', error);
+          logger.warn('Auth status check failed:', error);
           isValid = false;
         }
 
@@ -265,7 +277,38 @@ function AppContent() {
     };
 
     initAuth();
-  }, []);
+    // Re-run when serverOffline flips back to false (server came online)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverOffline]);
+
+  // ─── Background retry when server is offline ────────────────────────
+
+  useEffect(() => {
+    if (!serverOffline) return;
+
+    const retryInterval = setInterval(async () => {
+      const serverUrl = getServerUrlSync();
+      try {
+        const response = await fetch(`${serverUrl}/api/health`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(SERVER_READY_TIMEOUT_MS),
+          cache: 'no-store' as RequestCache,
+        });
+
+        if (response.ok) {
+          logger.info('Server came online, running auth check...');
+          clearInterval(retryInterval);
+          setServerOffline(false);
+          // Reset auth ref so the auth init effect can run again
+          authCheckRunning.current = false;
+        }
+      } catch {
+        // Still offline, keep trying
+      }
+    }, SERVER_RETRY_INTERVAL_MS);
+
+    return () => clearInterval(retryInterval);
+  }, [serverOffline]);
 
   // ─── Fallback settings load ──────────────────────────────────────────
 
@@ -305,7 +348,7 @@ function AppContent() {
 
     const handleOffline = () => {
       logger.warn('automaker:server-offline event received');
-      useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
+      setServerOffline(true);
     };
 
     window.addEventListener('automaker:logged-out', handleLoggedOut);
@@ -403,6 +446,15 @@ function AppContent() {
 
   // ─── Conditional rendering (replaces TanStack Router) ────────────────
 
+  // Server offline - show connecting spinner with auto-retry
+  if (serverOffline) {
+    return (
+      <main className="flex h-screen items-center justify-center" data-testid="chat-app">
+        <LoadingState message="Verbinde mit Server..." />
+      </main>
+    );
+  }
+
   // Loading state - auth not yet checked
   if (!authChecked) {
     return (
@@ -426,6 +478,14 @@ function AppContent() {
     return (
       <main className="flex h-screen items-center justify-center" data-testid="chat-app">
         <LoadingState message="Loading settings..." />
+      </main>
+    );
+  }
+
+  if (!sessionsHydrated) {
+    return (
+      <main className="flex h-screen items-center justify-center" data-testid="chat-app">
+        <LoadingState message="Chats werden geladen..." />
       </main>
     );
   }

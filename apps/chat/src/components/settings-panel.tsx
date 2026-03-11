@@ -50,6 +50,7 @@ import { ProjectIdentitySection } from '@/components/views/project-settings-view
 import { ProjectThemeSection } from '@/components/views/project-settings-view/project-theme-section';
 import { ProjectModelsSection } from '@/components/views/project-settings-view/project-models-section';
 import type { Theme } from '@/components/views/settings-view/shared/types';
+import { SoundSettingsPanel } from './sound-settings-panel';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,7 @@ type ChatSettingsViewId =
   | 'mcp-servers'
   | 'prompts'
   | 'appearance'
+  | 'chat-sounds'
   | 'audio'
   | 'account';
 
@@ -108,6 +110,7 @@ const CHAT_NAV_ITEMS: NavItem[] = [
   { id: 'mcp-servers', label: 'MCP Servers', icon: Plug },
   { id: 'prompts', label: 'Prompts', icon: MessageSquareText },
   { id: 'appearance', label: 'Appearance', icon: Palette },
+  { id: 'chat-sounds', label: 'Chat Sounds', icon: Bell },
   { id: 'audio', label: 'Notifications', icon: Bell },
   { id: 'account', label: 'Account', icon: User },
 ];
@@ -346,6 +349,9 @@ function SettingsPanelContent({ activeView }: { activeView: ChatSettingsViewId }
           onThemeChange={(newTheme) => setTheme(newTheme as typeof theme)}
         />
       );
+
+    case 'chat-sounds':
+      return <SoundSettingsPanel />;
 
     case 'audio':
       return (

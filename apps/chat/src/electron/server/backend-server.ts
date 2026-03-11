@@ -117,6 +117,7 @@ export async function startServer(): Promise<void> {
     AUTOMAKER_API_KEY: state.apiKey!,
     // Chat mode - server will gate off board/terminal routes
     AUTOMAKER_MODE: 'chat',
+    AUTOMAKER_AUTO_LOGIN: process.env.AUTOMAKER_AUTO_LOGIN ?? 'true',
     ...(process.env.ALLOWED_ROOT_DIRECTORY && {
       ALLOWED_ROOT_DIRECTORY: process.env.ALLOWED_ROOT_DIRECTORY,
     }),

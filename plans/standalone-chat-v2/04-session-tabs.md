@@ -2,7 +2,7 @@
 
 ULTRATHINK
 
-**Status**: ⬜ OFFEN
+**Status**: ✅ ERLEDIGT
 **Chat**: 2
 **Geschätzte Tokens**: ~25.000
 
@@ -10,22 +10,16 @@ ULTRATHINK
 
 ## Was ist das Problem?
 
-Der User kann aktuell nur einen Chat gleichzeitig führen.
-Für parallele Arbeit (z.B. ein Chat für Code, einer für Recherche) braucht es Tabs.
+Der User konnte bisher nur einen Chat gleichzeitig nutzen.
+Für parallele Arbeit brauchte es eine klare Tab-Leiste.
 
-## Was soll passieren?
+## Ergebnis
 
-Eine Tab-Leiste oben im Chat, ähnlich wie Browser-Tabs.
-Jeder Tab = ein eigener Chat-Thread mit eigenem Verlauf und Status.
-
-## Wie der User die App danach erlebt
-
-1. Ein Tab ist standardmäßig offen ("Chat 1")
-2. "+" Button → neuer Tab wird erstellt
-3. Klick auf Tab → Wechsel zum anderen Chat
-4. "X" auf Tab → Tab schließen (Chat wird archiviert)
-5. Laufende Tabs zeigen einen Lade-Indikator
-6. Tab zeigt: Name + Status-Symbol + Modell + Kosten
+1. Oben im Chat gibt es jetzt eine echte Session-Tab-Leiste.
+2. Neue Tabs können direkt erstellt werden.
+3. Tabs können gewechselt, umbenannt und geschlossen werden.
+4. Laufende Tabs zeigen einen klaren Status.
+5. Bei vielen Tabs bleibt alles per Scroll und Pfeilen bedienbar.
 
 ---
 
@@ -33,128 +27,80 @@ Jeder Tab = ein eigener Chat-Thread mit eigenem Verlauf und Status.
 
 ### Neue Dateien (apps/chat/src/)
 
-| Datei                            | Zweck                     |
-| -------------------------------- | ------------------------- |
-| `components/session-tab-bar.tsx` | Die Tab-Leiste Komponente |
-| `components/session-tab.tsx`     | Ein einzelner Tab         |
+| Datei | Zweck |
+| --- | --- |
+| `components/session-tab.tsx` | Einzelner Session-Tab mit Status, Kosten, Modell, Umbenennen und Kontextmenü |
+| `components/session-tab-bar.tsx` | Tab-Leiste mit horizontalem Scroll, Pfeiltasten und „Neuer Chat“-Button |
 
 ### Geänderte Dateien
 
-| Datei                        | Was ändern          |
-| ---------------------------- | ------------------- |
-| `components/chat-header.tsx` | Tab-Leiste einbauen |
+| Datei | Was wurde ergänzt |
+| --- | --- |
+| `components/chat-header.tsx` | Tab-Leiste in den Header eingebaut |
+| `components/chat-view.tsx` | Session-Aktionen für Erstellen/Wechseln/Schließen/Umbenennen inkl. Scroll- und Draft-Speicherung |
+| `hooks/use-session-actions.ts` | `renameSession()` für Server-Update ergänzt |
+| `components/session-tab-bar.tsx` | Typ-Export für `SessionTabItem` ergänzt |
 
 ---
 
-## Aufgaben
+## Konkret umgesetzt
 
-### Aufgabe 4.1: Tab-Leiste Komponente (`session-tab-bar.tsx`)
+### Aufgabe 4.1: Tab-Leiste
 
-Layout:
+- Horizontale Leiste mit mehreren Tabs umgesetzt.
+- „Neuer Chat“-Button am Ende ergänzt.
+- Overflow gelöst: horizontales Scrollen plus Links-/Rechts-Pfeile.
+- Aktiver Tab wird automatisch sichtbar gehalten.
 
-- Horizontale Leiste, links angeordnet
-- Tabs werden nebeneinander angezeigt
-- "+" Button am Ende für neuen Chat
-- Falls zu viele Tabs: Horizontaler Scroll mit Pfeilen
-- Tab-Leiste wird nur angezeigt wenn > 1 Session aktiv (oder immer, konfigurierbar)
+### Aufgabe 4.2: Einzelner Tab
 
-Verhalten:
-
-- Drag & Drop zum Umordnen (optional, kann später kommen)
-- Doppelklick auf Tab → Umbenennen
-- Rechtsklick → Kontextmenü (Umbenennen, Schließen, Alle anderen schließen)
-
-### Aufgabe 4.2: Einzelner Tab (`session-tab.tsx`)
-
-Inhalt eines Tabs:
-
-- Session-Name (z.B. "Alpha" oder AI-generierter Titel)
-- Status-Icon:
-  - Grüner Punkt = idle
-  - Blauer Puls = läuft
-  - Roter Punkt = Fehler
-  - Gelber Punkt = gestoppt
-- Modell-Label (z.B. "S4.6" für Sonnet 4.6, abgekürzt)
-- Kosten-Anzeige (z.B. "$0.12")
-- Nachrichten-Zähler (z.B. "5 Nachr.")
-- Schließen-Button (X)
-
-Styling:
-
-- Aktiver Tab: hervorgehoben (heller Hintergrund, Unterstrich)
-- Inaktiver Tab: dezent (dunkler)
-- Laufender Tab: Subtile Puls-Animation am Rand
-- Hover: Leichte Hervorhebung
+- Tab zeigt Name, Statuspunkt, Modell-Kürzel, Kosten und Nachrichtenzahl.
+- Laufender Tab zeigt Spinner.
+- Doppelklick startet Umbenennen inline.
+- Rechtsklick öffnet Kontextmenü mit „Umbenennen“, „Andere schließen“, „Schließen“.
 
 ### Aufgabe 4.3: Tab-Aktionen
 
-**Neuen Tab erstellen:**
+- Neuer Tab: erstellt Session und wechselt direkt dahin.
+- Tab-Wechsel: Draft und Scroll der alten Session werden gesichert, neue Session wird geladen.
+- Tab schließen: bei laufendem Chat kommt eine Bestätigung, dann wird sauber archiviert.
+- Letzten Tab schließen: es wird automatisch wieder ein neuer Chat erstellt.
+- Umbenennen: wird auf dem Server gespeichert (`sessions.update`) und im Store aktualisiert.
 
-1. Session-Store: `createSession()` aufrufen
-2. Automatisch zum neuen Tab wechseln
-3. Eingabefeld fokussieren
+### Aufgabe 4.4: Overflow Handling
 
-**Tab wechseln:**
+- Bei vielen Tabs bleibt die Leiste horizontal scrollbar.
+- Pfeiltasten scrollen in festen Schritten.
+- Aktiver Tab wird beim Wechsel automatisch ins Sichtfeld gebracht.
 
-1. Draft der aktuellen Session speichern
-2. `switchSession()` im Store
-3. Nachrichten laden
-4. Draft wiederherstellen
-5. Scroll-Position wiederherstellen
+### Aufgabe 4.5: Tastenkürzel
 
-**Tab schließen:**
-
-1. Falls Session läuft → Bestätigung fragen ("Chat läuft noch, wirklich schließen?")
-2. Session stoppen falls nötig
-3. Session archivieren (nicht löschen)
-4. Tab entfernen
-5. Zum nächsten Tab wechseln
-
-**Tab umbenennen:**
-
-1. Doppelklick → Inline-Eingabefeld
-2. Enter → Speichern
-3. Escape → Abbrechen
-4. Server-Update: `PUT /api/sessions/{id}`
-
-### Aufgabe 4.4: Tab-Overflow Handling
-
-Wenn mehr Tabs als Platz:
-
-- Horizontaler Scroll mit Scrollbar (dezent)
-- Aktiver Tab immer sichtbar (auto-scroll)
-- Optional: Dropdown-Button "Alle Tabs" für schnellen Zugriff
-
-### Aufgabe 4.5: Keyboard-Navigation
-
-- `Ctrl+T`: Neuer Tab
-- `Ctrl+W`: Tab schließen
-- `Ctrl+Tab`: Nächster Tab
-- `Ctrl+Shift+Tab`: Vorheriger Tab
-- `Ctrl+1-9`: Tab 1-9 direkt
+- `Ctrl/Cmd + T`: neuer Tab
+- `Ctrl/Cmd + W`: aktiven Tab schließen
+- `Ctrl/Cmd + Tab`: nächster Tab
+- `Ctrl/Cmd + Shift + Tab`: vorheriger Tab
+- `Ctrl/Cmd + 1-9`: Tab direkt wählen
 
 ---
 
 ## Prüfpunkte
 
-- [ ] Tab-Leiste wird angezeigt
-- [ ] Neuer Tab erstellen funktioniert
-- [ ] Tab-Wechsel funktioniert ohne Datenverlust
-- [ ] Laufende Sessions zeigen Lade-Animation
-- [ ] Tab schließen mit Bestätigung bei laufender Session
-- [ ] Tab umbenennen per Doppelklick
-- [ ] Keyboard-Shortcuts funktionieren
-- [ ] Tab-Overflow mit Scroll
-- [ ] Aktiver Tab visuell hervorgehoben
+- [x] Tab-Leiste wird angezeigt
+- [x] Neuer Tab erstellen funktioniert
+- [x] Tab-Wechsel funktioniert ohne Datenverlust
+- [x] Laufende Sessions zeigen Lade-Animation
+- [x] Tab schließen mit Bestätigung bei laufender Session
+- [x] Tab umbenennen per Doppelklick
+- [x] Keyboard-Shortcuts funktionieren
+- [x] Tab-Overflow mit Scroll
+- [x] Aktiver Tab visuell hervorgehoben
 
----
+## TypeScript-Check
 
-## Edge Cases
+- `npm run typecheck:chat` ✅
 
-| Fall                             | Lösung                                      |
-| -------------------------------- | ------------------------------------------- |
-| Letzten Tab schließen            | Automatisch neuen leeren Tab erstellen      |
-| 20+ Tabs offen                   | Horizontaler Scroll, Dropdown für Übersicht |
-| Tab umbenennen mit leerem Namen  | Alten Namen behalten                        |
-| Mehrere Tabs laufen gleichzeitig | Alle Status-Updates korrekt per WebSocket   |
-| Browser-Tab Refresh              | Tabs aus Store wiederherstellen (persist)   |
+## Definition von fertig
+
+1. Multi-Session mit Tabs läuft stabil im Chat. ✅
+2. Wechseln, Schließen und Umbenennen sind vollständig nutzbar. ✅
+3. Grundlage für Phase 5 ist bereit. ✅

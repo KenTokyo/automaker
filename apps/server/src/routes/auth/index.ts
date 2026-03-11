@@ -22,6 +22,7 @@ import {
   getSessionCookieName,
   isRequestAuthenticated,
   createWsConnectionToken,
+  isAutoLoginEnabled,
 } from '../../lib/auth.js';
 
 // Rate limiting configuration
@@ -118,19 +119,15 @@ export function createAuthRoutes(): Router {
    * Returns whether the current request is authenticated.
    * Used by the UI to determine if login is needed.
    *
-   * If AUTOMAKER_AUTO_LOGIN=true is set, automatically creates a session
-   * for unauthenticated requests (useful for development).
+   * Auto-login creates a session for unauthenticated requests.
+   * In chat mode this is enabled by default in non-production.
    */
   router.get('/status', async (req, res) => {
     let authenticated = isRequestAuthenticated(req);
 
     // Auto-login for development: create session automatically if enabled
     // Only works in non-production environments as a safeguard
-    if (
-      !authenticated &&
-      process.env.AUTOMAKER_AUTO_LOGIN === 'true' &&
-      process.env.NODE_ENV !== 'production'
-    ) {
+    if (!authenticated && isAutoLoginEnabled()) {
       const sessionToken = await createSession();
       const cookieOptions = getSessionCookieOptions();
       const cookieName = getSessionCookieName();
