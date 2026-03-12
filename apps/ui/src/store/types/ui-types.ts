@@ -97,6 +97,89 @@ export interface ShortcutKey {
   alt?: boolean; // Alt/Option key modifier
 }
 
+// Chat display settings
+export interface ChatDisplaySettings {
+  fontSize: number; // 10-20px
+  fontWeight: number; // 300-600
+  fontOpacity: number; // 0.5-1.0
+  lineHeight: number; // 1.2-2.0
+  codeBlockRelativeSize: number; // offset in px relative to fontSize
+}
+
+export type ChatDisplayPresetName = 'standard' | 'gedaempft' | 'kraeftig' | 'kompakt' | 'gross';
+
+export interface ChatDisplayPreset {
+  name: ChatDisplayPresetName;
+  label: string;
+  settings: ChatDisplaySettings;
+}
+
+export const DEFAULT_CHAT_DISPLAY_SETTINGS: ChatDisplaySettings = {
+  fontSize: 14,
+  fontWeight: 400,
+  fontOpacity: 1.0,
+  lineHeight: 1.6,
+  codeBlockRelativeSize: 0,
+};
+
+export const CHAT_DISPLAY_PRESETS: ChatDisplayPreset[] = [
+  {
+    name: 'standard',
+    label: 'Standard',
+    settings: {
+      fontSize: 14,
+      fontWeight: 400,
+      fontOpacity: 1.0,
+      lineHeight: 1.6,
+      codeBlockRelativeSize: 0,
+    },
+  },
+  {
+    name: 'gedaempft',
+    label: 'Gedämpft',
+    settings: {
+      fontSize: 13,
+      fontWeight: 400,
+      fontOpacity: 0.8,
+      lineHeight: 1.6,
+      codeBlockRelativeSize: 0,
+    },
+  },
+  {
+    name: 'kraeftig',
+    label: 'Kräftig',
+    settings: {
+      fontSize: 14,
+      fontWeight: 500,
+      fontOpacity: 1.0,
+      lineHeight: 1.5,
+      codeBlockRelativeSize: 0,
+    },
+  },
+  {
+    name: 'kompakt',
+    label: 'Kompakt',
+    settings: {
+      fontSize: 12,
+      fontWeight: 400,
+      fontOpacity: 0.9,
+      lineHeight: 1.4,
+      codeBlockRelativeSize: 0,
+    },
+  },
+  {
+    name: 'gross',
+    label: 'Groß & Lesbar',
+    settings: {
+      fontSize: 16,
+      fontWeight: 400,
+      fontOpacity: 1.0,
+      lineHeight: 1.8,
+      codeBlockRelativeSize: 0,
+    },
+  },
+];
+
 // Board background settings
 export interface BackgroundSettings {
   imagePath: string | null;

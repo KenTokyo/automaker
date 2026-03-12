@@ -58,6 +58,7 @@ export function OrchestratorRunHeader({
       runningSessions.has(session.id) ||
       (currentSessionId === session.id && isCurrentSessionThinking)
   );
+  const wasStopped = !isRunning && group.sessions.some((session) => session.status === 'stopped');
 
   const totalMessages = group.sessions.reduce((sum, session) => sum + session.messageCount, 0);
   const title = group.leadSession.name.trim() || 'Orchestrator Workflow';
@@ -73,7 +74,9 @@ export function OrchestratorRunHeader({
         'bg-muted/30 px-3 py-2 text-left',
         'transition-[background-color,border-color,transform,box-shadow] duration-200 ease-out',
         'hover:-translate-y-[1px] hover:bg-muted/50 hover:shadow-sm active:translate-y-0 active:scale-[0.995]',
-        isCurrentGroup && 'border-primary bg-primary/10',
+        isRunning && 'border-l-amber-500/70 border-amber-500/40 bg-amber-500/5',
+        wasStopped && 'border-l-red-500/70 border-red-500/40 bg-red-500/5',
+        isCurrentGroup && !isRunning && !wasStopped && 'border-primary bg-primary/10',
         isMultiselectMode && allSessionsSelected && 'border-primary bg-primary/20'
       )}
       data-testid={`orchestrator-run-${group.runId}`}
@@ -98,11 +101,13 @@ export function OrchestratorRunHeader({
             <span
               className={cn(
                 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
-                isRunning ? 'bg-blue-500/10 text-blue-500' : 'bg-green-500/10 text-green-500'
+                isRunning && 'bg-amber-500/10 text-amber-500',
+                wasStopped && 'bg-red-500/10 text-red-500',
+                !isRunning && !wasStopped && 'bg-green-500/10 text-green-500'
               )}
             >
               {isRunning && <Spinner size="sm" className="h-3 w-3" />}
-              {isRunning ? 'Running' : 'Completed'}
+              {isRunning ? 'Läuft' : wasStopped ? 'Gestoppt' : 'Abgeschlossen'}
             </span>
 
             <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">

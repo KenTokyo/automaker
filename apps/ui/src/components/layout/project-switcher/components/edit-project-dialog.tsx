@@ -15,36 +15,40 @@ import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 
-/** Predefined colors for quick selection */
+/** Predefined colors for quick selection (no state colors: red, orange, yellow, green) */
 const PROJECT_COLORS = [
-  { value: '#ef4444', label: 'Red' },
-  { value: '#f97316', label: 'Orange' },
-  { value: '#eab308', label: 'Yellow' },
-  { value: '#22c55e', label: 'Green' },
-  { value: '#06b6d4', label: 'Cyan' },
+  { value: '#94a3b8', label: 'Slate' },
+  { value: '#78909c', label: 'Steel' },
+  { value: '#60a5fa', label: 'Sky Blue' },
   { value: '#3b82f6', label: 'Blue' },
-  { value: '#8b5cf6', label: 'Purple' },
-  { value: '#ec4899', label: 'Pink' },
-  { value: '#f43f5e', label: 'Rose' },
+  { value: '#06b6d4', label: 'Cyan' },
   { value: '#14b8a6', label: 'Teal' },
-  { value: '#84cc16', label: 'Lime' },
-  { value: '#a855f7', label: 'Violet' },
+  { value: '#6366f1', label: 'Indigo' },
+  { value: '#818cf8', label: 'Lavender' },
+  { value: '#8b5cf6', label: 'Violet' },
+  { value: '#a855f7', label: 'Purple' },
+  { value: '#c084fc', label: 'Mauve' },
+  { value: '#d946ef', label: 'Fuchsia' },
+  { value: '#ec4899', label: 'Pink' },
+  { value: '#a78bfa', label: 'Periwinkle' },
 ];
 
-/** Background colors with transparency options */
+/** Background colors with transparency (no state colors: red, orange, yellow, green) */
 const BACKGROUND_COLORS = [
-  { value: '#ef444420', label: 'Red (subtle)' },
-  { value: '#f9731620', label: 'Orange (subtle)' },
-  { value: '#eab30820', label: 'Yellow (subtle)' },
-  { value: '#22c55e20', label: 'Green (subtle)' },
-  { value: '#06b6d420', label: 'Cyan (subtle)' },
-  { value: '#3b82f620', label: 'Blue (subtle)' },
-  { value: '#8b5cf620', label: 'Purple (subtle)' },
-  { value: '#ec489920', label: 'Pink (subtle)' },
-  { value: '#ef4444', label: 'Red' },
-  { value: '#f97316', label: 'Orange' },
-  { value: '#eab308', label: 'Yellow' },
-  { value: '#22c55e', label: 'Green' },
+  { value: '#94a3b815', label: 'Slate' },
+  { value: '#78909c15', label: 'Steel' },
+  { value: '#60a5fa18', label: 'Sky Blue' },
+  { value: '#3b82f618', label: 'Blue' },
+  { value: '#06b6d418', label: 'Cyan' },
+  { value: '#14b8a618', label: 'Teal' },
+  { value: '#6366f118', label: 'Indigo' },
+  { value: '#818cf818', label: 'Lavender' },
+  { value: '#8b5cf618', label: 'Violet' },
+  { value: '#a855f718', label: 'Purple' },
+  { value: '#c084fc18', label: 'Mauve' },
+  { value: '#d946ef18', label: 'Fuchsia' },
+  { value: '#ec489918', label: 'Pink' },
+  { value: '#a78bfa18', label: 'Periwinkle' },
 ];
 
 interface ColorPickerProps {

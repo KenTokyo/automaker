@@ -1,4 +1,5 @@
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState, type CSSProperties } from 'react';
+import type { ChatDisplaySettings } from '@/store/types/ui-types';
 import {
   Bot,
   User,
@@ -40,12 +41,12 @@ interface Message {
 
 interface MessageBubbleProps {
   message: Message;
-  chatFontSize: number;
+  chatDisplaySettings: ChatDisplaySettings;
 }
 
 export const MessageBubble = memo(function MessageBubble({
   message,
-  chatFontSize,
+  chatDisplaySettings,
 }: MessageBubbleProps) {
   const isError = message.isError && message.role === 'assistant';
   const normalizedMessageContent =
@@ -102,7 +103,18 @@ export const MessageBubble = memo(function MessageBubble({
               : 'bg-card border border-border'
         )}
       >
-        <div style={{ fontSize: `${chatFontSize}px` }}>
+        <div
+          className="chat-display-styled"
+          style={
+            {
+              fontSize: `${chatDisplaySettings.fontSize}px`,
+              fontWeight: chatDisplaySettings.fontWeight,
+              opacity: chatDisplaySettings.fontOpacity,
+              lineHeight: chatDisplaySettings.lineHeight,
+              '--code-font-size': `${chatDisplaySettings.fontSize + chatDisplaySettings.codeBlockRelativeSize}px`,
+            } as CSSProperties
+          }
+        >
           {preMessage && (
             <OrchestratorContentDropdown title="Orchestrator Text Preview" content={preMessage} />
           )}

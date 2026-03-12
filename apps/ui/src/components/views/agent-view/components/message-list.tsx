@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { ImageAttachment } from '@/store/app-store';
 import type { ToolUse } from '@/types/electron';
+import type { ChatDisplaySettings } from '@/store/types/ui-types';
 import { MessageBubble } from './message-bubble';
 import { ThinkingIndicator } from './thinking-indicator';
 import { ToolCallGroup } from './tool-call-group';
@@ -20,7 +21,7 @@ interface MessageListProps {
   messagesContainerRef: React.RefObject<HTMLDivElement | null>;
   onScroll: () => void;
   chatBackgroundColor?: string;
-  chatFontSize: number;
+  chatDisplaySettings: ChatDisplaySettings;
 }
 
 export const MessageList = memo(function MessageList({
@@ -29,7 +30,7 @@ export const MessageList = memo(function MessageList({
   messagesContainerRef,
   onScroll,
   chatBackgroundColor,
-  chatFontSize,
+  chatDisplaySettings,
 }: MessageListProps) {
   const mutedChatBackground = chatBackgroundColor
     ? `color-mix(in oklch, ${chatBackgroundColor} 18%, var(--background) 82%)`
@@ -51,7 +52,7 @@ export const MessageList = memo(function MessageList({
               <ToolCallGroup toolCalls={message.toolCalls} />
             </div>
           )}
-          <MessageBubble message={message} chatFontSize={chatFontSize} />
+          <MessageBubble message={message} chatDisplaySettings={chatDisplaySettings} />
         </div>
       ))}
 

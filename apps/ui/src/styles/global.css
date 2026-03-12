@@ -425,6 +425,12 @@
   }
 }
 
+/* Chat display settings: propagate font size to code blocks */
+.chat-display-styled code,
+.chat-display-styled pre code {
+  font-size: var(--code-font-size) !important;
+}
+
 /* Universal scrollbar styling using theme CSS variables */
 ::-webkit-scrollbar {
   width: 8px;

@@ -1,4 +1,15 @@
-import { Archive, ArchiveRestore, Check, Edit2, MessageSquare, Trash2, X } from 'lucide-react';
+import {
+  AlertCircle,
+  Archive,
+  ArchiveRestore,
+  Check,
+  Edit2,
+  Info,
+  MessageSquare,
+  StopCircle,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -62,7 +73,11 @@ export function SessionListItemRow({
 
   const isCurrentSession = currentSessionId === session.id;
   const isRunning =
-    (isCurrentSession && isCurrentSessionThinking) || runningSessions.has(session.id);
+    session.status === 'running' ||
+    (isCurrentSession && isCurrentSessionThinking) ||
+    runningSessions.has(session.id);
+  const hasFailed = session.status === 'failed' && !isRunning;
+  const wasStopped = session.status === 'stopped' && !isRunning;
 
   const project = getProject(session.projectPath);
   const sessionBadgeColor = getBadgeColor(session.projectPath);
@@ -76,7 +91,21 @@ export function SessionListItemRow({
         'animate-in fade-in slide-in-from-left-1 duration-200',
         'transition-[transform,box-shadow,background-color,border-color,opacity] duration-200 ease-out',
         'hover:-translate-y-[1px] hover:bg-accent/60 hover:shadow-sm active:translate-y-0 active:scale-[0.99]',
-        isCurrentSession &&
+        isRunning &&
+          !isCurrentSession &&
+          'border-amber-500/70 bg-amber-500/5 shadow-[0_8px_20px_-16px_theme(colors.amber.500)]',
+        isRunning &&
+          isCurrentSession &&
+          'border-amber-500 bg-amber-500/10 shadow-[0_8px_20px_-16px_theme(colors.amber.500)]',
+        wasStopped &&
+          !isCurrentSession &&
+          'border-red-500/70 bg-red-500/5 shadow-[0_8px_20px_-16px_theme(colors.red.500)]',
+        wasStopped &&
+          isCurrentSession &&
+          'border-red-500 bg-red-500/10 shadow-[0_8px_20px_-16px_theme(colors.red.500)]',
+        !isRunning &&
+          !wasStopped &&
+          isCurrentSession &&
           'border-primary bg-primary/10 shadow-[0_8px_20px_-16px_hsl(var(--primary))]',
         session.isArchived && 'opacity-60',
         isMultiselectMode &&
@@ -151,7 +180,23 @@ export function SessionListItemRow({
             <>
               <div className="mb-0.5 flex items-center gap-1.5">
                 {isRunning ? (
-                  <Spinner size="sm" className="shrink-0" />
+                  <Spinner size="sm" className="shrink-0 text-amber-500" />
+                ) : wasStopped ? (
+                  <StopCircle
+                    style={{
+                      width: `${sessionFontSize}px`,
+                      height: `${sessionFontSize}px`,
+                    }}
+                    className="shrink-0 text-red-500"
+                  />
+                ) : hasFailed ? (
+                  <AlertCircle
+                    style={{
+                      width: `${sessionFontSize}px`,
+                      height: `${sessionFontSize}px`,
+                    }}
+                    className="shrink-0 text-destructive"
+                  />
                 ) : (
                   <MessageSquare
                     style={{
@@ -174,27 +219,65 @@ export function SessionListItemRow({
 
                 {isRunning && (
                   <span
-                    className="rounded-full bg-primary/10 px-1.5 py-0.5 text-primary"
+                    className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-amber-500"
                     style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
                   >
-                    thinking...
+                    läuft
+                  </span>
+                )}
+
+                {wasStopped && (
+                  <span
+                    className="rounded-full bg-red-500/10 px-1.5 py-0.5 text-red-500"
+                    style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
+                  >
+                    Gestoppt
+                  </span>
+                )}
+
+                {hasFailed && (
+                  <span
+                    className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-destructive"
+                    style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
+                  >
+                    Fehler
                   </span>
                 )}
               </div>
 
               {session.description && (
-                <p
+                <div
                   className={cn(
-                    'overflow-hidden whitespace-pre-line text-foreground/80',
-                    'transition-[max-height,color] duration-300 ease-out',
+                    'mt-1 rounded-md border border-muted-foreground/25 bg-muted/35 px-2 py-1.5',
+                    'transition-colors duration-200',
                     isCurrentSession
-                      ? 'line-clamp-none max-h-40 text-foreground'
-                      : 'line-clamp-2 max-h-14 group-hover:line-clamp-4 group-hover:max-h-28 group-hover:text-foreground/95'
+                      ? 'bg-muted/45'
+                      : 'group-hover:border-muted-foreground/35 group-hover:bg-muted/45'
                   )}
-                  style={{ fontSize: `${Math.max(10, sessionFontSize - 2)}px` }}
                 >
-                  {session.description}
-                </p>
+                  <div className="flex items-start gap-1.5">
+                    <Info
+                      className="mt-0.5 shrink-0 text-muted-foreground"
+                      style={{
+                        width: `${Math.max(10, sessionFontSize - 3)}px`,
+                        height: `${Math.max(10, sessionFontSize - 3)}px`,
+                      }}
+                      aria-hidden
+                    />
+                    <p
+                      className={cn(
+                        'overflow-hidden whitespace-pre-line italic text-foreground/85',
+                        'transition-[max-height,color] duration-300 ease-out',
+                        isCurrentSession
+                          ? 'line-clamp-none max-h-44 text-foreground'
+                          : 'line-clamp-2 max-h-14 group-hover:line-clamp-4 group-hover:max-h-28 group-hover:text-foreground/95'
+                      )}
+                      style={{ fontSize: `${Math.max(10, sessionFontSize - 2)}px` }}
+                    >
+                      {session.description}
+                    </p>
+                  </div>
+                </div>
               )}
 
               {!session.description && session.preview && (
@@ -203,6 +286,15 @@ export function SessionListItemRow({
                   style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
                 >
                   {session.preview}
+                </p>
+              )}
+
+              {session.lastError && (
+                <p
+                  className="mt-1 overflow-hidden text-destructive/90 transition-[max-height] duration-200 line-clamp-2 group-hover:line-clamp-4"
+                  style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
+                >
+                  Fehler: {session.lastError}
                 </p>
               )}
 

@@ -12,6 +12,10 @@ interface FileSearchProps {
   selectedFilePath: string | null;
   onSelectFile: (filePath: string) => void;
   sinceHours?: number;
+  /** When set, filter results to only show folders. Default: true (show all). */
+  filterFolders?: boolean;
+  /** When set, filter results to only show files. Default: true (show all). */
+  filterFiles?: boolean;
 }
 
 interface SearchResultEntry {
@@ -35,6 +39,8 @@ export function FileSearch({
   selectedFilePath,
   onSelectFile,
   sinceHours,
+  filterFolders = true,
+  filterFiles = true,
 }: FileSearchProps) {
   const [results, setResults] = useState<SearchResultEntry[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -114,7 +120,14 @@ export function FileSearch({
     );
   }
 
-  if (hasSearched && results.length === 0) {
+  // Apply folder/file type filter
+  const visibleResults = results.filter((entry) => {
+    if (entry.isDirectory && !filterFolders) return false;
+    if (!entry.isDirectory && !filterFiles) return false;
+    return true;
+  });
+
+  if (hasSearched && visibleResults.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-8 text-center text-muted-foreground">
         <SearchX className="h-6 w-6 opacity-40" />
@@ -126,9 +139,9 @@ export function FileSearch({
   return (
     <div className="space-y-px py-1">
       <p className="px-2 pb-1 text-[10px] text-muted-foreground">
-        {results.length} Treffer{results.length >= 100 ? ' (max.)' : ''}
+        {visibleResults.length} Treffer{results.length >= 100 ? ' (max.)' : ''}
       </p>
-      {results.map((entry) => {
+      {visibleResults.map((entry) => {
         const Icon = entry.isDirectory ? FolderOpen : FileText;
         const iconColor = entry.isDirectory ? 'text-blue-400' : 'text-emerald-400';
         const key = entry.matchLine ? `${entry.path}:${entry.matchLine}` : entry.path;

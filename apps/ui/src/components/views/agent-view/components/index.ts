@@ -7,3 +7,4 @@ export { ChatArea } from './chat-area';
 export { BrowserPanel } from './browser-panel';
 export { RightPanelShell } from './right-panel-shell';
 export { ToolCallGroup } from './tool-call-group';
+export { ChatSettingsPopover } from './chat-settings-popover';

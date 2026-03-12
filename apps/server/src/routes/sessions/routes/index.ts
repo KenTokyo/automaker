@@ -6,6 +6,12 @@ import type { Request, Response } from 'express';
 import { AgentService } from '../../../services/agent-service.js';
 import { getErrorMessage, logError } from '../common.js';
 
+function getLastErrorPreview(content: string | undefined): string | undefined {
+  if (!content) return undefined;
+  const normalized = content.replace(/^Error:\s*/i, '').trim();
+  return normalized || undefined;
+}
+
 export function createIndexHandler(agentService: AgentService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
@@ -17,6 +23,10 @@ export function createIndexHandler(agentService: AgentService) {
         sessionsRaw.map(async (s) => {
           const messages = await agentService.loadSession(s.id);
           const lastMessage = messages[messages.length - 1];
+          const lastError = lastMessage?.isError
+            ? getLastErrorPreview(lastMessage.content)
+            : undefined;
+          const isRunning = agentService.isSessionRunning(s.id);
           const preview = lastMessage?.content?.slice(0, 100) || '';
 
           return {
@@ -32,6 +42,14 @@ export function createIndexHandler(agentService: AgentService) {
             orchestratorRunId: s.orchestratorRunId,
             messageCount: messages.length,
             preview,
+            status: isRunning
+              ? 'running'
+              : agentService.isSessionStopped(s.id)
+                ? 'stopped'
+                : lastError
+                  ? 'failed'
+                  : 'idle',
+            lastError,
           };
         })
       );

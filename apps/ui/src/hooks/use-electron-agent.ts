@@ -1,4 +1,3 @@
-// @ts-nocheck - Electron IPC boundary typing with stream events and message queuing
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Message, StreamEvent } from '@/types/electron';
 import { useMessageQueue } from './use-message-queue';
@@ -6,6 +5,7 @@ import type { ImageAttachment, TextFileAttachment } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
 import { sanitizeFilename } from '@/lib/image-utils';
 import { createLogger } from '@automaker/utils/logger';
+import type { ReasoningEffort } from '@automaker/types';
 
 const logger = createLogger('ElectronAgent');
 
@@ -91,6 +91,34 @@ export function useElectronAgent({
   useEffect(() => {
     onToolUseRef.current = onToolUse;
   }, [onToolUse]);
+
+  const appendLocalErrorMessage = useCallback((errorText: string) => {
+    const normalizedError = errorText.trim();
+    if (!normalizedError) {
+      return;
+    }
+
+    const nextMessage: Message = {
+      id: `err_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      role: 'assistant',
+      content: `Fehler: ${normalizedError}`,
+      timestamp: new Date().toISOString(),
+      isError: true,
+    };
+
+    setMessages((prev) => {
+      const lastMessage = prev[prev.length - 1];
+      if (
+        lastMessage?.isError &&
+        lastMessage.role === 'assistant' &&
+        lastMessage.content === nextMessage.content
+      ) {
+        return prev;
+      }
+
+      return [...prev, nextMessage];
+    });
+  }, []);
 
   const resolveImagePaths = useCallback(
     async (
@@ -194,18 +222,22 @@ export function useElectronAgent({
           imagePaths,
           model,
           thinkingLevel,
-          reasoningEffort
+          reasoningEffort as ReasoningEffort | undefined
         );
 
         if (!result.success) {
-          setError(result.error || 'Failed to send message');
+          const errorText = result.error || 'Senden hat nicht geklappt.';
+          setError(errorText);
+          appendLocalErrorMessage(errorText);
           setIsProcessing(false);
         }
         // Note: We don't set isProcessing to false here because
         // it will be set by the "complete" or "error" stream event
       } catch (err) {
         logger.error('Failed to send message:', err);
-        setError(err instanceof Error ? err.message : 'Failed to send message');
+        const errorText = err instanceof Error ? err.message : 'Senden hat nicht geklappt.';
+        setError(errorText);
+        appendLocalErrorMessage(errorText);
         setIsProcessing(false);
         throw err;
       }
@@ -219,6 +251,7 @@ export function useElectronAgent({
       isProcessing,
       resolveImagePaths,
       logExecutionConfig,
+      appendLocalErrorMessage,
     ]
   );
 
@@ -252,9 +285,12 @@ export function useElectronAgent({
 
     let mounted = true;
 
-    // Reset connection status immediately when switching sessions.
-    // This prevents transient stale "connected" state from the previous session.
+    // Reset connection and processing status immediately when switching sessions.
+    // This prevents stale state from the previous session blocking the new one
+    // (e.g. isProcessing=true from session A would cause sendMessage to silently
+    // drop messages in session B).
     setIsConnected(false);
+    setIsProcessing(false);
 
     const initialize = async () => {
       // Reset error state when switching sessions
@@ -441,6 +477,12 @@ export function useElectronAgent({
           setError(event.error);
           break;
 
+        case 'stopped':
+          // Session was manually stopped by the user
+          logger.info('Session stopped for:', sessionId);
+          setIsProcessing(false);
+          break;
+
         case 'session_metadata_updated':
           // Session title/description updated from first Claude response
           // Query invalidation hook handles the sessions list refresh
@@ -506,18 +548,22 @@ export function useElectronAgent({
           imagePaths,
           model,
           thinkingLevel,
-          reasoningEffort
+          reasoningEffort as ReasoningEffort | undefined
         );
 
         if (!result.success) {
-          setError(result.error || 'Failed to send message');
+          const errorText = result.error || 'Senden hat nicht geklappt.';
+          setError(errorText);
+          appendLocalErrorMessage(errorText);
           setIsProcessing(false);
         }
         // Note: We don't set isProcessing to false here because
         // it will be set by the "complete" or "error" stream event
       } catch (err) {
         logger.error('Failed to send message:', err);
-        setError(err instanceof Error ? err.message : 'Failed to send message');
+        const errorText = err instanceof Error ? err.message : 'Senden hat nicht geklappt.';
+        setError(errorText);
+        appendLocalErrorMessage(errorText);
         setIsProcessing(false);
       }
     },
@@ -530,6 +576,7 @@ export function useElectronAgent({
       isProcessing,
       resolveImagePaths,
       logExecutionConfig,
+      appendLocalErrorMessage,
     ]
   );
 
@@ -610,7 +657,7 @@ export function useElectronAgent({
           imagePaths,
           model,
           thinkingLevel,
-          reasoningEffort
+          reasoningEffort as ReasoningEffort | undefined
         );
 
         if (!result.success) {

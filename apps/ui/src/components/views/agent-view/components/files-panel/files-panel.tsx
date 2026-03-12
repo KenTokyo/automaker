@@ -8,11 +8,14 @@
 import { useCallback, useEffect, useRef } from 'react';
 import {
   ArrowDownAZ,
+  ChevronDown,
+  ChevronRight,
   ChevronsDownUp,
   Clock,
   Highlighter,
   RefreshCw,
   Search,
+  SlidersHorizontal,
   Star,
   TreePine,
 } from 'lucide-react';
@@ -22,7 +25,7 @@ import { cn } from '@/lib/utils';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
-import type { ExplorerTab } from '@/store/explorer-store';
+import type { ExplorerTab, SearchFilters } from '@/store/explorer-store';
 import {
   useExplorerStore,
   TIME_FILTER_OPTIONS,
@@ -64,6 +67,8 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
     highlightWindow,
     terminalOpen,
     terminalSize,
+    searchFilters,
+    searchFiltersOpen,
   } = useExplorerStore(
     useShallow((state) => ({
       activeTab: state.activeTab,
@@ -80,6 +85,8 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
       highlightWindow: state.highlightWindow,
       terminalOpen: state.terminalOpenByProject[projectPath] ?? false,
       terminalSize: state.terminalSizeByProject[projectPath] ?? DEFAULT_TERMINAL_SIZE,
+      searchFilters: state.searchFilters,
+      searchFiltersOpen: state.searchFiltersOpen,
     }))
   );
 
@@ -224,15 +231,6 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
             handleTabChange('favorites');
           }}
         />
-        <TabButton
-          active={activeTab === 'search' && !showPreview}
-          icon={<Search className="h-3.5 w-3.5" />}
-          label="Suche"
-          onClick={() => {
-            useExplorerStore.getState().selectFile(null);
-            handleTabChange('search');
-          }}
-        />
       </div>
 
       {/* Toolbar (visible when not previewing a file) */}
@@ -315,19 +313,43 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
         </div>
       )}
 
-      {/* Search input (visible when search tab is active) */}
-      {activeTab === 'search' && !showPreview && (
-        <div className="border-b border-border px-3 py-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Datei suchen..."
-              className="h-8 border-border pl-8 text-sm"
-              autoFocus
-            />
+      {/* Inline search bar (visible in tree tab when not previewing) */}
+      {activeTab === 'tree' && !showPreview && (
+        <div className="border-b border-border px-2 py-1.5 space-y-1">
+          <div className="flex items-center gap-1">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Suchen..."
+                className="h-6 border-border pl-7 text-[11px]"
+              />
+            </div>
+            <button
+              type="button"
+              className={cn(
+                'flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] transition-colors',
+                searchFiltersOpen
+                  ? 'bg-muted text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              )}
+              onClick={() => useExplorerStore.getState().setSearchFiltersOpen(!searchFiltersOpen)}
+              title="Suchfilter"
+            >
+              <SlidersHorizontal className="h-3 w-3" />
+            </button>
           </div>
+
+          {/* Collapsible search filters */}
+          {searchFiltersOpen && (
+            <TreeSearchFilters
+              filters={searchFilters}
+              onFilterChange={(key, value) =>
+                useExplorerStore.getState().setSearchFilter(key, value)
+              }
+            />
+          )}
         </div>
       )}
 
@@ -347,6 +369,7 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
               activeTab={activeTab}
               projectPath={projectPath}
               searchQuery={searchQuery}
+              searchFilters={searchFilters}
               favorites={favorites}
               timeFilter={timeFilter}
               isFiltered={isFiltered}
@@ -371,6 +394,7 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
               activeTab={activeTab}
               projectPath={projectPath}
               searchQuery={searchQuery}
+              searchFilters={searchFilters}
               favorites={favorites}
               timeFilter={timeFilter}
               onSelectFile={handleSelectFile}
@@ -408,6 +432,7 @@ interface FilesMainContentProps {
   activeTab: ExplorerTab;
   projectPath: string;
   searchQuery: string;
+  searchFilters: SearchFilters;
   favorites: string[];
   timeFilter: number;
   onSelectFile: (fp: string) => Promise<void>;
@@ -425,6 +450,7 @@ function FilesMainContent({
   activeTab,
   projectPath,
   searchQuery,
+  searchFilters,
   favorites,
   timeFilter,
   onSelectFile,
@@ -443,9 +469,26 @@ function FilesMainContent({
     );
   }
   if (activeTab === 'tree') {
+    // Content search active → show backend search results
+    if (searchQuery.trim() && searchFilters.byContent) {
+      return (
+        <FileSearch
+          query={searchQuery}
+          projectPath={projectPath}
+          selectedFilePath={selectedFilePath}
+          onSelectFile={(fp) => void onSelectFile(fp)}
+          sinceHours={timeFilter > 0 ? timeFilter : undefined}
+          filterFolders={searchFilters.folders}
+          filterFiles={searchFilters.files}
+        />
+      );
+    }
+    // Name-only search or no search → tree with client-side filtering
     return (
       <FileTree
         projectPath={projectPath}
+        searchQuery={searchFilters.byName ? searchQuery : ''}
+        searchFilters={searchFilters}
         onSelectFile={(fp) => void onSelectFile(fp)}
         onToggleFolder={onToggleFolder}
         onToggleFavorite={onToggleFavorite}
@@ -462,13 +505,15 @@ function FilesMainContent({
       />
     );
   }
+  // Fallback (shouldn't normally reach here)
   return (
-    <FileSearch
-      query={searchQuery}
+    <FileTree
       projectPath={projectPath}
-      selectedFilePath={selectedFilePath}
+      searchQuery=""
+      searchFilters={searchFilters}
       onSelectFile={(fp) => void onSelectFile(fp)}
-      sinceHours={timeFilter > 0 ? timeFilter : undefined}
+      onToggleFolder={onToggleFolder}
+      onToggleFavorite={onToggleFavorite}
     />
   );
 }
@@ -515,6 +560,7 @@ function FilesContent({
   activeTab,
   projectPath,
   searchQuery,
+  searchFilters,
   favorites,
   timeFilter,
   isFiltered,
@@ -541,6 +587,7 @@ function FilesContent({
           activeTab={activeTab}
           projectPath={projectPath}
           searchQuery={searchQuery}
+          searchFilters={searchFilters}
           favorites={favorites}
           timeFilter={timeFilter}
           onSelectFile={onSelectFile}
@@ -587,5 +634,61 @@ function TabButton({ active, icon, label, onClick }: TabButtonProps) {
       {icon}
       {label}
     </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Search filter checkboxes (collapsible)
+// ---------------------------------------------------------------------------
+
+interface TreeSearchFiltersProps {
+  filters: SearchFilters;
+  onFilterChange: (key: keyof SearchFilters, value: boolean) => void;
+}
+
+function TreeSearchFilters({ filters, onFilterChange }: TreeSearchFiltersProps) {
+  return (
+    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 pt-0.5">
+      <FilterCheckbox
+        checked={filters.folders}
+        onChange={(v) => onFilterChange('folders', v)}
+        label="Ordner"
+      />
+      <FilterCheckbox
+        checked={filters.files}
+        onChange={(v) => onFilterChange('files', v)}
+        label="Dateien"
+      />
+      <FilterCheckbox
+        checked={filters.byName}
+        onChange={(v) => onFilterChange('byName', v)}
+        label="Name"
+      />
+      <FilterCheckbox
+        checked={filters.byContent}
+        onChange={(v) => onFilterChange('byContent', v)}
+        label="Inhalt"
+      />
+    </div>
+  );
+}
+
+interface FilterCheckboxProps {
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  label: string;
+}
+
+function FilterCheckbox({ checked, onChange, label }: FilterCheckboxProps) {
+  return (
+    <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-muted-foreground hover:text-foreground transition-colors py-0.5">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-3 w-3 rounded border-border accent-primary"
+      />
+      {label}
+    </label>
   );
 }

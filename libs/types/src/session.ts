@@ -13,6 +13,8 @@ export interface AgentSession {
   isArchived: boolean;
   isDirty?: boolean; // Indicates session has completed work that needs review
   tags?: string[];
+  status?: 'idle' | 'running' | 'failed' | 'stopped';
+  lastError?: string;
 }
 
 export interface SessionListItem extends AgentSession {

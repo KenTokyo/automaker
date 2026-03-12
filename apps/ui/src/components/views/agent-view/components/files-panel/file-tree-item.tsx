@@ -3,6 +3,7 @@ import {
   Calendar,
   ChevronDown,
   ChevronRight,
+  ClipboardCopy,
   FileText,
   Folder,
   FolderOpen,
@@ -59,6 +60,14 @@ export function FileTreeItem({
       onToggleFavorite(node.path);
     },
     [node.path, onToggleFavorite]
+  );
+
+  const handleCopyPath = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
+      window.dispatchEvent(new CustomEvent('docs:insert-path', { detail: node.path }));
+    },
+    [node.path]
   );
 
   const paddingLeft = 8 + depth * 16;
@@ -164,21 +173,36 @@ export function FileTreeItem({
         )}
       </div>
 
-      {/* Favorite star */}
+      {/* Action buttons for files */}
       {!node.isDirectory && (
-        <button
-          type="button"
-          className={cn(
-            'mt-0.5 h-4 w-4 shrink-0 transition-opacity',
-            isFavorite
-              ? 'text-yellow-400 opacity-100'
-              : 'text-muted-foreground opacity-0 group-hover:opacity-60 hover:!opacity-100'
-          )}
-          onClick={handleFavoriteClick}
-          title={isFavorite ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufuegen'}
-        >
-          <Star className={cn('h-3.5 w-3.5', isFavorite && 'fill-current')} />
-        </button>
+        <div className="flex items-center gap-0.5 shrink-0">
+          {/* Copy Path - large, always visible on hover */}
+          <button
+            type="button"
+            className="mt-0.5 flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0 transition-all
+              text-blue-400 opacity-0 group-hover:opacity-100 hover:!bg-blue-500/20 hover:!text-blue-300"
+            onClick={handleCopyPath}
+            title="Pfad in Chat einfuegen"
+          >
+            <ClipboardCopy className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Path</span>
+          </button>
+
+          {/* Favorite star */}
+          <button
+            type="button"
+            className={cn(
+              'mt-0.5 h-4 w-4 shrink-0 transition-opacity',
+              isFavorite
+                ? 'text-yellow-400 opacity-100'
+                : 'text-muted-foreground opacity-0 group-hover:opacity-60 hover:!opacity-100'
+            )}
+            onClick={handleFavoriteClick}
+            title={isFavorite ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufuegen'}
+          >
+            <Star className={cn('h-3.5 w-3.5', isFavorite && 'fill-current')} />
+          </button>
+        </div>
       )}
     </button>
   );

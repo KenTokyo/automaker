@@ -801,6 +801,19 @@ export interface ElectronAPI {
       }>;
       error?: string;
     }>;
+    queueAdd: (
+      sessionId: string,
+      message: string,
+      imagePaths?: string[],
+      model?: string,
+      thinkingLevel?: string,
+      reasoningEffort?: ReasoningEffort
+    ) => Promise<{ success: boolean; error?: string }>;
+    queueRemove: (
+      sessionId: string,
+      promptId: string
+    ) => Promise<{ success: boolean; error?: string }>;
+    queueClear: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     onStream: (callback: (data: unknown) => void) => () => void;
   };
   sessions?: {

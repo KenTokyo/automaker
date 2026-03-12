@@ -866,10 +866,19 @@ export class CodexProvider extends BaseProvider {
 
         if (eventType === CODEX_EVENT_TYPES.error) {
           const errorText = extractText(event.error ?? event.message) || 'Codex CLI error';
+          const exitCodeMatch = errorText.match(/^Process exited with code (\d+)$/i);
 
           // Enhance error message with helpful context
           let enhancedError = errorText;
-          if (errorText.toLowerCase().includes('rate limit')) {
+          if (exitCodeMatch) {
+            const exitCode = exitCodeMatch[1];
+            enhancedError = [
+              `Codex wurde mit Code ${exitCode} beendet.`,
+              'Was das für dich bedeutet: Dieser Task wurde vor der fertigen Antwort abgebrochen.',
+              'Technische Details: Die Codex-CLI hat keinen genaueren Fehlertext geschickt.',
+              'Häufige Gründe sind Login-Probleme, Tool-Fehler oder ein interner CLI-Abbruch.',
+            ].join('\n\n');
+          } else if (errorText.toLowerCase().includes('rate limit')) {
             enhancedError = `${errorText}\n\nTip: You're being rate limited. Try reducing concurrent tasks or waiting a few minutes before retrying.`;
           } else if (
             errorText.toLowerCase().includes('authentication') ||

@@ -14,7 +14,6 @@ import {
   Copy,
   FilePlus,
   FileInput,
-  Type,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -39,6 +38,8 @@ import type {
   TestSessionInfo,
   PRInfo,
 } from '@/components/views/board-view/worktree-panel/types';
+import type { ChatDisplaySettings } from '@/store/types/ui-types';
+import { ChatSettingsPopover } from './chat-settings-popover';
 
 interface WorktreeActionsProps {
   mainWorktree: WorktreeInfo;
@@ -101,8 +102,8 @@ interface AgentHeaderProps {
   canSaveToDocs: boolean;
   hasCurrentDocPath: boolean;
   isSavingToDoc: boolean;
-  chatFontSize: number;
-  onChatFontSizeChange: (size: number) => void;
+  chatDisplaySettings: ChatDisplaySettings;
+  onChatDisplaySettingsChange: (settings: ChatDisplaySettings) => void;
   onSaveAsNewDoc: () => void;
   onAppendChatToCurrent: () => void;
   worktreeActions?: WorktreeActionsProps;
@@ -133,8 +134,8 @@ export function AgentHeader({
   canSaveToDocs,
   hasCurrentDocPath,
   isSavingToDoc,
-  chatFontSize,
-  onChatFontSizeChange,
+  chatDisplaySettings,
+  onChatDisplaySettingsChange,
   onSaveAsNewDoc,
   onAppendChatToCurrent,
   worktreeActions,
@@ -233,7 +234,7 @@ export function AgentHeader({
     <>
       <div
         className={cn(
-          'flex items-center justify-between px-4 py-2.5 border-b backdrop-blur-sm',
+          'relative z-50 flex items-center justify-between px-4 py-2.5 border-b backdrop-blur-sm',
           !hasCustomStyling && 'border-border bg-card/50'
         )}
         style={{
@@ -498,22 +499,10 @@ export function AgentHeader({
             <Settings2 className="w-4 h-4" />
           </Button>
 
-          <div className="hidden items-center gap-1 rounded-md border border-border bg-muted/30 px-1.5 py-1 sm:flex">
-            <Type className="h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              type="number"
-              min={10}
-              max={16}
-              value={chatFontSize}
-              onChange={(e) => {
-                const parsed = parseInt(e.target.value, 10);
-                if (Number.isFinite(parsed)) {
-                  onChatFontSizeChange(parsed);
-                }
-              }}
-              className="h-6 w-12 border-none bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
-              aria-label="Chat font size"
-              title="Chat font size (10-16px)"
+          <div className="hidden sm:flex">
+            <ChatSettingsPopover
+              settings={chatDisplaySettings}
+              onChange={onChatDisplaySettingsChange}
             />
           </div>
 
@@ -546,7 +535,7 @@ export function AgentHeader({
                   size="sm"
                   disabled={isSavingToDoc}
                   className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                  title="Klick: Verlauf speichern + Pfad kopieren. Alt+Klick: Optionen."
+                  title="Klick: Verlauf in History/ speichern + Pfad ins Input. Alt+Klick: Optionen."
                   onPointerDown={(event) => {
                     const isAltLeftClick = event.altKey && event.button === 0;
                     if (!isAltLeftClick) {
@@ -594,6 +583,20 @@ export function AgentHeader({
           <Button
             variant="ghost"
             size="sm"
+            onClick={onToggleSessionManager}
+            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+            aria-label={showSessionManager ? 'Hide sessions panel' : 'Show sessions panel'}
+          >
+            {showSessionManager ? (
+              <PanelLeftClose className="w-4 h-4" />
+            ) : (
+              <PanelLeft className="w-4 h-4" />
+            )}
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={toggleBrowserPanel}
             className={cn(
               'h-8 w-8 p-0 hidden lg:inline-flex',
@@ -608,20 +611,6 @@ export function AgentHeader({
               <PanelRightClose className="w-4 h-4" />
             ) : (
               <PanelRight className="w-4 h-4" />
-            )}
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onToggleSessionManager}
-            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-            aria-label={showSessionManager ? 'Hide sessions panel' : 'Show sessions panel'}
-          >
-            {showSessionManager ? (
-              <PanelLeftClose className="w-4 h-4" />
-            ) : (
-              <PanelLeft className="w-4 h-4" />
             )}
           </Button>
         </div>

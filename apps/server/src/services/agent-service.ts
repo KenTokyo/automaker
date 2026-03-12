@@ -60,6 +60,7 @@ interface QueuedPrompt {
 interface Session {
   messages: Message[];
   isRunning: boolean;
+  wasStopped: boolean; // Tracks if the session was manually stopped by the user
   abortController: AbortController | null;
   workingDirectory: string;
   model?: string;
@@ -131,6 +132,7 @@ export class AgentService {
       this.sessions.set(sessionId, {
         messages,
         isRunning: false,
+        wasStopped: false,
         abortController: null,
         workingDirectory: resolvedWorkingDirectory,
         sdkSessionId: sessionMetadata?.sdkSessionId, // Load persisted SDK session ID
@@ -201,6 +203,12 @@ export class AgentService {
       }
     }
 
+    // Reserve the session immediately so a second send can't sneak in
+    // while we are still loading images or building prompt context.
+    session.isRunning = true;
+    session.wasStopped = false;
+    session.abortController = new AbortController();
+
     // Read images and convert to base64
     const images: Message['images'] = [];
     if (imagePaths && imagePaths.length > 0) {
@@ -235,8 +243,6 @@ export class AgentService {
     }));
 
     session.messages.push(userMessage);
-    session.isRunning = true;
-    session.abortController = new AbortController();
 
     // Emit started event so UI can show thinking indicator
     this.emitAgentEvent(sessionId, {
@@ -468,39 +474,53 @@ export class AgentService {
 
         if (msg.type === 'assistant') {
           if (msg.message?.content) {
+            // Add newline separator between assistant turns so multi-turn
+            // responses don't concatenate without breaks
+            let needsTurnSeparator = responseText.length > 0;
+
             for (const block of msg.message.content) {
               if (block.type === 'text') {
+                if (needsTurnSeparator) {
+                  responseText += '\n\n';
+                  needsTurnSeparator = false;
+                }
                 responseText += block.text;
 
                 // For first messages, strip SESSION_INFO block from displayed content during streaming
                 let displayText = responseText;
-                if (isFirstMsg && !sessionInfoParsed) {
-                  // Try to parse and strip SESSION_INFO block as it streams in
-                  const parsed = parseSessionInfo(responseText);
-                  if (parsed.title || parsed.description) {
+                if (isFirstMsg) {
+                  if (!sessionInfoParsed) {
+                    // Try to parse and strip SESSION_INFO block as it streams in
+                    const parsed = parseSessionInfo(responseText);
+                    if (parsed.title || parsed.description) {
+                      displayText = parsed.cleanedContent;
+                      sessionInfoParsed = true;
+
+                      // Update session metadata with extracted title and description
+                      const metadataUpdates: Partial<SessionMetadata> = {};
+                      if (parsed.title) {
+                        metadataUpdates.name = parsed.title;
+                      }
+                      if (parsed.description) {
+                        metadataUpdates.description = parsed.description;
+                      }
+                      await this.updateSession(sessionId, metadataUpdates);
+
+                      // Emit session metadata update event so frontend can refresh
+                      this.emitAgentEvent(sessionId, {
+                        type: 'session_metadata_updated',
+                        name: parsed.title,
+                        description: parsed.description,
+                      });
+                    } else if (responseText.includes('[SESSION_INFO]')) {
+                      // Block is still being written - hide it from display
+                      const infoStart = responseText.indexOf('[SESSION_INFO]');
+                      displayText = responseText.substring(0, infoStart).trim();
+                    }
+                  } else {
+                    // SESSION_INFO already parsed - continue stripping from accumulated text
+                    const parsed = parseSessionInfo(responseText);
                     displayText = parsed.cleanedContent;
-                    sessionInfoParsed = true;
-
-                    // Update session metadata with extracted title and description
-                    const metadataUpdates: Partial<SessionMetadata> = {};
-                    if (parsed.title) {
-                      metadataUpdates.name = parsed.title;
-                    }
-                    if (parsed.description) {
-                      metadataUpdates.description = parsed.description;
-                    }
-                    await this.updateSession(sessionId, metadataUpdates);
-
-                    // Emit session metadata update event so frontend can refresh
-                    this.emitAgentEvent(sessionId, {
-                      type: 'session_metadata_updated',
-                      name: parsed.title,
-                      description: parsed.description,
-                    });
-                  } else if (responseText.includes('[SESSION_INFO]')) {
-                    // Block is still being written - hide it from display
-                    const infoStart = responseText.indexOf('[SESSION_INFO]');
-                    displayText = responseText.substring(0, infoStart).trim();
                   }
                 }
 
@@ -538,14 +558,12 @@ export class AgentService {
           }
         } else if (msg.type === 'result') {
           if (msg.subtype === 'success' && msg.result) {
-            // For first messages, clean the result content of any SESSION_INFO blocks
-            let resultContent = msg.result;
+            // For first messages, ensure SESSION_INFO is parsed from result
+            // if it wasn't caught during streaming
             if (isFirstMsg && !sessionInfoParsed) {
-              const parsed = parseSessionInfo(resultContent);
+              const parsed = parseSessionInfo(msg.result);
               if (parsed.title || parsed.description) {
-                resultContent = parsed.cleanedContent;
                 sessionInfoParsed = true;
-                // Update session metadata if not already done during streaming
                 const metadataUpdates: Partial<SessionMetadata> = {};
                 if (parsed.title) metadataUpdates.name = parsed.title;
                 if (parsed.description) metadataUpdates.description = parsed.description;
@@ -556,13 +574,16 @@ export class AgentService {
                   description: parsed.description,
                 });
               }
-            } else if (isFirstMsg && sessionInfoParsed) {
-              // Already parsed during streaming - just clean the content
-              const parsed = parseSessionInfo(resultContent);
-              resultContent = parsed.cleanedContent;
             }
 
             if (!currentAssistantMessage) {
+              // No streaming happened - use result content as the message
+              let resultContent = msg.result;
+              if (isFirstMsg) {
+                const parsed = parseSessionInfo(resultContent);
+                resultContent = parsed.cleanedContent;
+              }
+
               currentAssistantMessage = {
                 id: this.generateId(),
                 role: 'assistant',
@@ -570,6 +591,7 @@ export class AgentService {
                 timestamp: new Date().toISOString(),
               };
               session.messages.push(currentAssistantMessage);
+              responseText = resultContent;
 
               this.emitAgentEvent(sessionId, {
                 type: 'stream',
@@ -577,11 +599,9 @@ export class AgentService {
                 content: resultContent,
                 isComplete: false,
               });
-            } else {
-              currentAssistantMessage.content = resultContent;
             }
-
-            responseText = resultContent;
+            // When currentAssistantMessage exists, keep the accumulated streaming
+            // content from all turns — msg.result only contains the last turn's text
           }
         } else if (msg.type === 'error') {
           // Some providers (like Codex CLI/SaaS or Cursor CLI) surface failures as
@@ -703,6 +723,19 @@ export class AgentService {
     };
   }
 
+  isSessionRunning(sessionId: string): boolean {
+    return this.sessions.get(sessionId)?.isRunning ?? false;
+  }
+
+  isSessionStopped(sessionId: string): boolean {
+    return this.sessions.get(sessionId)?.wasStopped ?? false;
+  }
+
+  async sessionExists(sessionId: string): Promise<boolean> {
+    const metadata = await this.loadMetadata();
+    return Boolean(metadata[sessionId]);
+  }
+
   /**
    * Stop current agent execution
    */
@@ -715,7 +748,12 @@ export class AgentService {
     if (session.abortController) {
       session.abortController.abort();
       session.isRunning = false;
+      session.wasStopped = true;
       session.abortController = null;
+
+      this.emitAgentEvent(sessionId, {
+        type: 'stopped',
+      });
     }
 
     return { success: true };

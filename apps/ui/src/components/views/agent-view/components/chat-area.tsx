@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { ImageAttachment } from '@/store/app-store';
 import type { ToolUse } from '@/types/electron';
+import type { ChatDisplaySettings } from '@/store/types/ui-types';
 import { MessageList } from './message-list';
 import { NoSessionState } from './empty-states';
 
@@ -23,7 +24,7 @@ interface ChatAreaProps {
   onScroll: () => void;
   onShowSessionManager: () => void;
   chatBackgroundColor?: string;
-  chatFontSize: number;
+  chatDisplaySettings: ChatDisplaySettings;
 }
 
 export const ChatArea = memo(function ChatArea({
@@ -35,7 +36,7 @@ export const ChatArea = memo(function ChatArea({
   onScroll,
   onShowSessionManager,
   chatBackgroundColor,
-  chatFontSize,
+  chatDisplaySettings,
 }: ChatAreaProps) {
   if (!currentSessionId) {
     return (
@@ -53,7 +54,7 @@ export const ChatArea = memo(function ChatArea({
       messagesContainerRef={messagesContainerRef}
       onScroll={onScroll}
       chatBackgroundColor={chatBackgroundColor}
-      chatFontSize={chatFontSize}
+      chatDisplaySettings={chatDisplaySettings}
     />
   );
 });

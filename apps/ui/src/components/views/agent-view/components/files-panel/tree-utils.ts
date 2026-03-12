@@ -97,6 +97,80 @@ export function getNewestModified(node: FileTreeNode): number {
   return newest;
 }
 
+// ---------------------------------------------------------------------------
+// Search filter (client-side name matching)
+// ---------------------------------------------------------------------------
+
+/**
+ * Recursively filters tree nodes by name search query.
+ * Keeps directories that contain matching descendants or whose own name matches.
+ */
+export function filterTreeByName(
+  nodes: FileTreeNode[],
+  query: string,
+  filters: { folders: boolean; files: boolean }
+): FileTreeNode[] {
+  if (!query.trim()) return nodes;
+  const lowerQuery = query.toLowerCase();
+
+  return nodes.reduce<FileTreeNode[]>((acc, node) => {
+    if (node.isDirectory) {
+      const filteredChildren = filterTreeByName(node.children, query, filters);
+      const nameMatches = filters.folders && node.name.toLowerCase().includes(lowerQuery);
+
+      if (filteredChildren.length > 0 || nameMatches) {
+        acc.push({
+          ...node,
+          children: filteredChildren.length > 0 ? filteredChildren : node.children,
+        });
+      }
+    } else {
+      if (filters.files && node.name.toLowerCase().includes(lowerQuery)) {
+        acc.push(node);
+      }
+    }
+    return acc;
+  }, []);
+}
+
+/**
+ * Collects all directory paths that contain search matches (for auto-expand).
+ */
+export function collectMatchingFolderPaths(
+  nodes: FileTreeNode[],
+  query: string,
+  filters: { folders: boolean; files: boolean }
+): Set<string> {
+  const paths = new Set<string>();
+  if (!query.trim()) return paths;
+  const lowerQuery = query.toLowerCase();
+
+  function walk(nodeList: FileTreeNode[], ancestors: string[]): boolean {
+    let hasMatch = false;
+    for (const node of nodeList) {
+      if (node.isDirectory) {
+        const nameMatches = filters.folders && node.name.toLowerCase().includes(lowerQuery);
+        const childMatch = walk(node.children, [...ancestors, node.path]);
+        if (nameMatches || childMatch) {
+          hasMatch = true;
+          // Expand this folder and all ancestors
+          paths.add(node.path);
+          for (const a of ancestors) paths.add(a);
+        }
+      } else {
+        if (filters.files && node.name.toLowerCase().includes(lowerQuery)) {
+          hasMatch = true;
+          for (const a of ancestors) paths.add(a);
+        }
+      }
+    }
+    return hasMatch;
+  }
+
+  walk(nodes, []);
+  return paths;
+}
+
 /**
  * Annotates each directory node with its recursive file count.
  * Mutates nodes in-place (call on freshly created tree from sortTreeChildren).

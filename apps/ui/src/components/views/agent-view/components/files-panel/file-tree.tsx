@@ -1,14 +1,17 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { Loader2, FolderX } from 'lucide-react';
-import type { FileTreeNode } from '@/store/explorer-store';
+import { Loader2, FolderX, SearchX } from 'lucide-react';
+import type { FileTreeNode, SearchFilters } from '@/store/explorer-store';
 import { useExplorerStore } from '@/store/explorer-store';
 import { FileTreeItem } from './file-tree-item';
+import { filterTreeByName, collectMatchingFolderPaths } from './tree-utils';
 
 const EMPTY_FAVORITES: string[] = [];
 
 interface FileTreeProps {
   projectPath: string;
+  searchQuery: string;
+  searchFilters: SearchFilters;
   onSelectFile: (filePath: string) => void;
   onToggleFolder: (dirPath: string) => void;
   onToggleFavorite: (filePath: string) => void;
@@ -16,6 +19,8 @@ interface FileTreeProps {
 
 export function FileTree({
   projectPath,
+  searchQuery,
+  searchFilters,
   onSelectFile,
   onToggleFolder,
   onToggleFavorite,
@@ -37,6 +42,47 @@ export function FileTree({
     [favorites]
   );
 
+  // Client-side name filtering
+  const hasNameSearch = searchQuery.trim().length > 0;
+  const filteredNodes = useMemo(() => {
+    if (!hasNameSearch) return rootNodes;
+    return filterTreeByName(rootNodes, searchQuery, {
+      folders: searchFilters.folders,
+      files: searchFilters.files,
+    });
+  }, [rootNodes, searchQuery, hasNameSearch, searchFilters.folders, searchFilters.files]);
+
+  // Auto-expand folders that contain search matches
+  const prevQueryRef = useRef('');
+  useEffect(() => {
+    if (!hasNameSearch) {
+      prevQueryRef.current = '';
+      return;
+    }
+    if (searchQuery === prevQueryRef.current) return;
+    prevQueryRef.current = searchQuery;
+
+    const matchingPaths = collectMatchingFolderPaths(rootNodes, searchQuery, {
+      folders: searchFilters.folders,
+      files: searchFilters.files,
+    });
+    if (matchingPaths.size > 0) {
+      const store = useExplorerStore.getState();
+      const currentExpanded = store.expandedPaths;
+      const merged = new Set(currentExpanded);
+      let changed = false;
+      for (const p of matchingPaths) {
+        if (!merged.has(p)) {
+          merged.add(p);
+          changed = true;
+        }
+      }
+      if (changed) {
+        useExplorerStore.setState({ expandedPaths: merged });
+      }
+    }
+  }, [searchQuery, hasNameSearch, rootNodes, searchFilters.folders, searchFilters.files]);
+
   if (isLoadingRoot) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -54,10 +100,19 @@ export function FileTree({
     );
   }
 
+  if (hasNameSearch && filteredNodes.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 py-8 text-center text-muted-foreground">
+        <SearchX className="h-6 w-6 opacity-40" />
+        <p className="text-sm">Keine Treffer fuer &ldquo;{searchQuery}&rdquo;.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-px py-1">
       <TreeNodeList
-        nodes={rootNodes}
+        nodes={filteredNodes}
         depth={0}
         expandedPaths={expandedPaths}
         selectedFilePath={selectedFilePath}

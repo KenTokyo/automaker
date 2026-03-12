@@ -20,6 +20,7 @@ import { useSessionGrouping } from '@/hooks/use-session-grouping';
 import { useAppStore } from '@/store/app-store';
 import { useOrchestratorStore } from '@/store/orchestrator-store';
 import { cn } from '@/lib/utils';
+import type { StreamEvent } from '@/types/electron';
 import { SessionManagerHeader } from '@/components/session-manager/session-manager-header';
 import { SessionListControls } from '@/components/session-manager/session-list-controls';
 import { SessionListItemRow } from '@/components/session-manager/session-list-item';
@@ -51,7 +52,6 @@ export function SessionManager({
   const [editingName, setEditingName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
-  const [runningSessions, setRunningSessions] = useState<Set<string>>(new Set());
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<SessionListItem | null>(null);
   const [isDeleteAllArchivedDialogOpen, setIsDeleteAllArchivedDialogOpen] = useState(false);
@@ -84,54 +84,31 @@ export function SessionManager({
     setTimeFilterHours(null);
   }, [projectPath, resetFilter]);
 
-  const hasCheckedInitialRef = useRef(false);
   const cleanupInProgressRef = useRef(false);
-
-  const checkRunningSessions = useCallback(async (sessionList: SessionListItem[]) => {
-    const api = getElectronAPI();
-    if (!api?.agent) return;
-
-    const runningIds = new Set<string>();
-    for (const session of sessionList) {
-      try {
-        const result = await api.agent.getHistory(session.id);
-        if (result.success && result.isRunning) {
-          runningIds.add(session.id);
-        }
-      } catch (err) {
-        logger.warn(`Failed to check running state for ${session.id}:`, err);
-      }
-    }
-
-    setRunningSessions(runningIds);
-  }, []);
 
   const invalidateSessions = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: queryKeys.sessions.all(true) });
-    const result = await refetchSessions();
-    if (result.data) {
-      await checkRunningSessions(result.data);
-    }
-  }, [queryClient, refetchSessions, checkRunningSessions]);
+    await refetchSessions();
+  }, [queryClient, refetchSessions]);
 
   useEffect(() => {
-    if (sessions.length > 0 && !hasCheckedInitialRef.current) {
-      hasCheckedInitialRef.current = true;
-      checkRunningSessions(sessions);
-    }
-  }, [sessions, checkRunningSessions]);
+    const api = getElectronAPI();
+    if (!api?.agent) return;
 
-  useEffect(() => {
-    if (runningSessions.size === 0 && !isCurrentSessionThinking) return;
-
-    const interval = setInterval(async () => {
-      if (sessions.length > 0) {
-        await checkRunningSessions(sessions);
+    const unsubscribe = api.agent.onStream((rawEvent) => {
+      const event = rawEvent as StreamEvent;
+      if (
+        event.type === 'started' ||
+        event.type === 'complete' ||
+        event.type === 'error' ||
+        event.type === 'session_metadata_updated'
+      ) {
+        void invalidateSessions();
       }
-    }, 3000);
+    });
 
-    return () => clearInterval(interval);
-  }, [sessions, runningSessions.size, isCurrentSessionThinking, checkRunningSessions]);
+    return unsubscribe;
+  }, [invalidateSessions]);
 
   const resolveOrchestratorRunIdForSessionCreation = (): string | undefined => {
     const orchestratorState = useOrchestratorStore.getState();
@@ -139,12 +116,13 @@ export function SessionManager({
       return undefined;
     }
 
-    // Auto-continued orchestrator phases must keep the existing run ID.
-    if (orchestratorState.pendingOrchestratorContent) {
-      return orchestratorState.orchestratorRunId ?? orchestratorState.startNewRun() ?? undefined;
+    const persistedRunId = orchestratorState.orchestratorRunId?.trim();
+    if (persistedRunId) {
+      // Keep one stable run ID so all orchestrator phases stay under one parent history block.
+      return persistedRunId;
     }
 
-    // Manual "new chat" starts a fresh orchestrator run and block in history.
+    // Fallback for edge cases where no run ID is stored yet.
     return orchestratorState.startNewRun() ?? undefined;
   };
 
@@ -278,6 +256,13 @@ export function SessionManager({
 
   const activeSessions = sessions.filter((session) => !session.isArchived);
   const archivedSessions = sessions.filter((session) => session.isArchived);
+  const runningSessions = useMemo(
+    () =>
+      new Set(
+        sessions.filter((session) => session.status === 'running').map((session) => session.id)
+      ),
+    [sessions]
+  );
 
   const handleDeleteAllArchivedSessions = async () => {
     const api = getElectronAPI();

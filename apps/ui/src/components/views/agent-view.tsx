@@ -7,6 +7,8 @@ import { useElectronAgent } from '@/hooks/use-electron-agent';
 import { SessionManager } from '@/components/session-manager';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { copyToClipboard, generateChatSummary, generateContextSummary } from '@/lib/copy-all-chat';
+import type { ChatDisplaySettings } from '@/store/types/ui-types';
+import { DEFAULT_CHAT_DISPLAY_SETTINGS } from '@/store/types/ui-types';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { useSessions } from '@/hooks/queries/use-sessions';
 import { useSessionQueryInvalidation } from '@/hooks/use-query-invalidation';
@@ -62,21 +64,42 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
   const [input, setInput] = useState('');
   const [currentTool, setCurrentTool] = useState<string | null>(null);
   const [isDesktop, setIsDesktop] = useState(true);
-  const [chatFontSize, setChatFontSize] = useState(() => {
-    if (typeof window === 'undefined') return 13;
-    const stored = window.localStorage.getItem('automaker:chatFontSize');
-    const parsed = stored ? parseInt(stored, 10) : 13;
-    return Number.isFinite(parsed) ? Math.max(10, Math.min(16, parsed)) : 13;
+  const [chatDisplaySettings, setChatDisplaySettings] = useState<ChatDisplaySettings>(() => {
+    if (typeof window === 'undefined') return DEFAULT_CHAT_DISPLAY_SETTINGS;
+    // Try new key first
+    const stored = window.localStorage.getItem('automaker:chatDisplaySettings');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as ChatDisplaySettings;
+        return { ...DEFAULT_CHAT_DISPLAY_SETTINGS, ...parsed };
+      } catch {
+        // fall through
+      }
+    }
+    // Migration: read old chatFontSize key
+    const oldSize = window.localStorage.getItem('automaker:chatFontSize');
+    if (oldSize) {
+      const parsed = parseInt(oldSize, 10);
+      if (Number.isFinite(parsed)) {
+        const migrated = {
+          ...DEFAULT_CHAT_DISPLAY_SETTINGS,
+          fontSize: Math.max(10, Math.min(20, parsed)),
+        };
+        window.localStorage.setItem('automaker:chatDisplaySettings', JSON.stringify(migrated));
+        window.localStorage.removeItem('automaker:chatFontSize');
+        return migrated;
+      }
+    }
+    return DEFAULT_CHAT_DISPLAY_SETTINGS;
   });
   // Initialize session manager state - starts as true to match SSR
   // Then updates on mount based on actual screen size to prevent hydration mismatch
   const [showSessionManager, setShowSessionManager] = useState(true);
 
-  const handleChatFontSizeChange = useCallback((size: number) => {
-    const clamped = Math.max(10, Math.min(16, size));
-    setChatFontSize(clamped);
+  const handleChatDisplaySettingsChange = useCallback((settings: ChatDisplaySettings) => {
+    setChatDisplaySettings(settings);
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem('automaker:chatFontSize', String(clamped));
+      window.localStorage.setItem('automaker:chatDisplaySettings', JSON.stringify(settings));
     }
   }, []);
 
@@ -542,27 +565,39 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '')
         .slice(0, 100);
-      const docName = `${safeName}-Verlauf.md`;
-      const newDoc = await api.docs.create({
-        projectPath: currentProject.path,
-        name: docName,
-        content: summary.formattedChat,
+      const docName = `${safeName}-history.md`;
+
+      // Save to {projectRoot}/History/ folder instead of .automaker/docs/
+      const historyDir = `${currentProject.path}/History`;
+      const historyFilePath = `${historyDir}/${docName}`;
+
+      // Ensure History/ directory exists
+      await api.mkdir(historyDir);
+
+      // Write the history file
+      await api.writeFile(historyFilePath, summary.formattedChat);
+
+      // Set the file path with prefix into the chat input field
+      setInput((prev) => {
+        const trimmed = prev.replace(/\s+$/, '');
+        const prefix = trimmed.length > 0 ? '\n\n' : '';
+        return `${trimmed}${prefix}Verlaufsdatei: ${historyFilePath}\n`;
       });
-      const pathWasCopied = await copyToClipboard(newDoc.path);
-      if (pathWasCopied) {
-        toast.success('Verlauf gespeichert und Dateipfad kopiert');
-      } else {
-        toast.success(`Verlauf gespeichert: ${docName}`);
-        toast.error('Dateipfad konnte nicht in die Zwischenablage kopiert werden');
-      }
-      setCurrentDocPath(newDoc.path);
+
+      // Focus the input field
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+
+      toast.success(`Verlauf gespeichert: History/${docName}`);
+      setCurrentDocPath(historyFilePath);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Fehler beim Speichern';
       toast.error(msg);
     } finally {
       setIsSavingToDoc(false);
     }
-  }, [currentProject, messages, isSavingToDoc, currentSessionName, setCurrentDocPath]);
+  }, [currentProject, messages, isSavingToDoc, currentSessionName, setCurrentDocPath, setInput]);
 
   const handleAppendChatToCurrent = useCallback(async () => {
     if (!currentProject?.path || !currentDocPath || messages.length === 0 || isSavingToDoc) return;
@@ -570,23 +605,35 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     try {
       const api = getHttpApiClient();
       const summary = generateChatSummary(messages);
-      const docContent = await api.docs.read(currentProject.path, currentDocPath);
-      const existing = docContent.content || '';
+
+      // Read existing content from the current history file
+      const existingResult = await api.readFile(currentDocPath);
+      const existing = existingResult.content || '';
       const separator = existing.trim().length > 0 ? '\n\n---\n\n' : '';
-      await api.docs.update({
-        projectPath: currentProject.path,
-        filePath: currentDocPath,
-        content: existing + separator + summary.formattedChat,
+
+      // Write appended content back to the history file
+      await api.writeFile(currentDocPath, existing + separator + summary.formattedChat);
+
+      // Set the file path with prefix into the chat input field
+      setInput((prev) => {
+        const trimmed = prev.replace(/\s+$/, '');
+        const prefix = trimmed.length > 0 ? '\n\n' : '';
+        return `${trimmed}${prefix}Verlaufsdatei: ${currentDocPath}\n`;
       });
+
+      // Focus the input field
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+
       toast.success('Verlauf zum Dokument hinzugefuegt');
-      setDocsOpen(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Fehler beim Anhaengen';
       toast.error(msg);
     } finally {
       setIsSavingToDoc(false);
     }
-  }, [currentProject, currentDocPath, messages, isSavingToDoc, setDocsOpen]);
+  }, [currentProject, currentDocPath, messages, isSavingToDoc, setInput]);
 
   const handleShowSessionManager = useCallback(() => {
     setShowSessionManager(true);
@@ -755,8 +802,8 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
                   }
                   hasCurrentDocPath={Boolean(currentDocPath)}
                   isSavingToDoc={isSavingToDoc}
-                  chatFontSize={chatFontSize}
-                  onChatFontSizeChange={handleChatFontSizeChange}
+                  chatDisplaySettings={chatDisplaySettings}
+                  onChatDisplaySettingsChange={handleChatDisplaySettingsChange}
                   onSaveAsNewDoc={handleSaveAsNewDoc}
                   onAppendChatToCurrent={handleAppendChatToCurrent}
                   worktreeActions={worktreeActionsProps}
@@ -773,7 +820,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
                 onScroll={handleScroll}
                 onShowSessionManager={handleShowSessionManager}
                 chatBackgroundColor={currentProject?.chatBackgroundColor}
-                chatFontSize={chatFontSize}
+                chatDisplaySettings={chatDisplaySettings}
               />
 
               {/* Input Area */}
@@ -846,8 +893,8 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
               canSaveToDocs={Boolean(currentProject?.path) && messages.length > 0 && isConnected}
               hasCurrentDocPath={Boolean(currentDocPath)}
               isSavingToDoc={isSavingToDoc}
-              chatFontSize={chatFontSize}
-              onChatFontSizeChange={handleChatFontSizeChange}
+              chatDisplaySettings={chatDisplaySettings}
+              onChatDisplaySettingsChange={handleChatDisplaySettingsChange}
               onSaveAsNewDoc={handleSaveAsNewDoc}
               onAppendChatToCurrent={handleAppendChatToCurrent}
             />
@@ -863,7 +910,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
             onScroll={handleScroll}
             onShowSessionManager={handleShowSessionManager}
             chatBackgroundColor={currentProject?.chatBackgroundColor}
-            chatFontSize={chatFontSize}
+            chatDisplaySettings={chatDisplaySettings}
           />
 
           {/* Input Area */}

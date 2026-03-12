@@ -31,6 +31,10 @@ export interface ToolUse {
 
 export type StreamEvent =
   | {
+      type: 'started';
+      sessionId: string;
+    }
+  | {
       type: 'message';
       sessionId: string;
       message: Message;
@@ -65,6 +69,28 @@ export type StreamEvent =
       sessionId: string;
       name?: string;
       description?: string;
+    }
+  | {
+      type: 'queue_updated';
+      sessionId: string;
+      queue?: Array<{
+        id: string;
+        message: string;
+        imagePaths?: string[];
+        model?: string;
+        thinkingLevel?: string;
+        reasoningEffort?: string;
+        addedAt: string;
+      }>;
+    }
+  | {
+      type: 'queue_error';
+      sessionId: string;
+      error: string;
+    }
+  | {
+      type: 'stopped';
+      sessionId: string;
     };
 
 export interface SessionListItem {
@@ -80,6 +106,8 @@ export interface SessionListItem {
   tags: string[];
   orchestratorRunId?: string;
   preview: string;
+  status?: 'idle' | 'running' | 'failed' | 'stopped';
+  lastError?: string;
 }
 
 export interface AgentAPI {

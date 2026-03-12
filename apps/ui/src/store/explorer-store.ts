@@ -43,7 +43,21 @@ export interface FileTreeNode {
   fileCount?: number;
 }
 
-export type ExplorerTab = 'tree' | 'favorites' | 'search';
+export type ExplorerTab = 'tree' | 'favorites';
+
+export interface SearchFilters {
+  folders: boolean;
+  files: boolean;
+  byName: boolean;
+  byContent: boolean;
+}
+
+export const DEFAULT_SEARCH_FILTERS: SearchFilters = {
+  folders: true,
+  files: true,
+  byName: true,
+  byContent: false,
+};
 
 /** 0 = all files, otherwise hours */
 export type ExplorerTimeFilter = number;
@@ -117,6 +131,10 @@ export interface ExplorerStoreState {
   // Recency highlight window (hours, 0 = disabled, default 6)
   highlightWindow: number;
 
+  // Search filters (inline tree search)
+  searchFilters: SearchFilters;
+  searchFiltersOpen: boolean;
+
   // Favorites (per-project, keyed by projectPath)
   favorites: Record<string, string[]>;
 
@@ -143,6 +161,8 @@ export interface ExplorerStoreState {
   setSortBy: (sortBy: SortBy) => void;
   setHighlightWindow: (hours: number) => void;
   collapseAll: () => void;
+  setSearchFilter: (key: keyof SearchFilters, value: boolean) => void;
+  setSearchFiltersOpen: (open: boolean) => void;
   toggleFavorite: (projectPath: string, filePath: string) => void;
   isFavorite: (projectPath: string, filePath: string) => boolean;
   getFavorites: (projectPath: string) => string[];
@@ -157,6 +177,7 @@ export interface ExplorerStoreState {
 // Helpers
 // ---------------------------------------------------------------------------
 
+const SEARCH_FILTERS_STORAGE_KEY = 'automaker-explorer-search-filters';
 const FAVORITES_STORAGE_KEY = 'automaker-explorer-favorites';
 const TIME_FILTER_STORAGE_KEY = 'automaker-explorer-time-filter';
 const HIGHLIGHT_WINDOW_STORAGE_KEY = 'automaker-explorer-highlight-window';
@@ -261,6 +282,25 @@ function loadTerminalSize(): Record<string, number> {
 function saveTerminalSize(data: Record<string, number>): void {
   try {
     localStorage.setItem(TERMINAL_SIZE_STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+function loadSearchFilters(): SearchFilters {
+  try {
+    const raw = localStorage.getItem(SEARCH_FILTERS_STORAGE_KEY);
+    if (!raw) return DEFAULT_SEARCH_FILTERS;
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_SEARCH_FILTERS, ...parsed };
+  } catch {
+    return DEFAULT_SEARCH_FILTERS;
+  }
+}
+
+function saveSearchFilters(filters: SearchFilters): void {
+  try {
+    localStorage.setItem(SEARCH_FILTERS_STORAGE_KEY, JSON.stringify(filters));
   } catch {
     // Ignore storage errors
   }
@@ -457,6 +497,9 @@ export const useExplorerStore = create<ExplorerStoreState>()((set, get) => ({
   sortBy: loadSortBy(),
   highlightWindow: loadHighlightWindow(),
 
+  searchFilters: loadSearchFilters(),
+  searchFiltersOpen: false,
+
   favorites: loadFavorites(),
 
   terminalOpenByProject: loadTerminalOpen(),
@@ -566,6 +609,15 @@ export const useExplorerStore = create<ExplorerStoreState>()((set, get) => ({
   },
 
   collapseAll: () => set({ expandedPaths: new Set() }),
+
+  setSearchFilter: (key, value) =>
+    set((state) => {
+      const next = { ...state.searchFilters, [key]: value };
+      saveSearchFilters(next);
+      return { searchFilters: next };
+    }),
+
+  setSearchFiltersOpen: (open) => set({ searchFiltersOpen: open }),
 
   toggleFavorite: (projectPath, filePath) =>
     set((state) => {

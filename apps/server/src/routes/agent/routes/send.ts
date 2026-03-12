@@ -52,6 +52,29 @@ export function createSendHandler(agentService: AgentService) {
         return;
       }
 
+      const sessionExists = await agentService.sessionExists(sessionId);
+      if (!sessionExists) {
+        logger.warn('Validation failed - unknown sessionId', { sessionId });
+        res.status(404).json({
+          success: false,
+          error: 'Dieser Chat wurde nicht gefunden. Bitte öffne ihn neu und versuche es nochmal.',
+        });
+        return;
+      }
+
+      // Make sure the runtime session exists before we start background work.
+      await agentService.startConversation({ sessionId, workingDirectory });
+      const history = agentService.getHistory(sessionId);
+      if (history.success && history.isRunning) {
+        logger.warn('Validation failed - session already running', { sessionId });
+        res.status(409).json({
+          success: false,
+          error:
+            'Dieser Chat arbeitet gerade schon. Bitte warte kurz oder lege die Nachricht in die Warteschlange.',
+        });
+        return;
+      }
+
       logger.debug('Validation passed, calling agentService.sendMessage()');
 
       // Start the message processing (don't await - it streams via WebSocket)
