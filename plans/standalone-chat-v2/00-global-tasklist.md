@@ -1,4 +1,8 @@
-﻿# UniAI Chat Standalone v2 - Globale Taskliste (Master Plan)
+﻿> **ARCHIV** — Diese Pläne sind nicht mehr aktiv.
+> Der Standalone-Chat (`apps/chat`) wird nicht mehr als eigener Produktweg weiterentwickelt.
+> Aktuelle Planung: `plans/automaker-chat-unification/`
+
+# UniAI Chat Standalone v2 - Globale Taskliste (Master Plan)
 
 ULTRATHINK
 

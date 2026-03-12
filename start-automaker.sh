@@ -118,8 +118,8 @@ MODES:
   electron         Launch as desktop app (Electron)
   docker           Launch in Docker container (dev with live reload)
   docker-electron  Launch Electron with Docker API backend
-  chat             Launch Chat Web app (localhost:3009)
-  chat-electron    Launch Chat as desktop app (Electron)
+  chat             Launch Chat Web app (legacy, localhost:3009)
+  chat-electron    Launch Chat as desktop app (legacy, Electron)
 
 OPTIONS:
   --help           Show this help message
@@ -136,8 +136,8 @@ EXAMPLES:
   start-automaker.sh web --production  # Launch web mode (production)
   start-automaker.sh electron     # Launch desktop app directly
   start-automaker.sh docker       # Launch Docker dev container
-  start-automaker.sh chat         # Launch Chat Web app
-  start-automaker.sh chat-electron # Launch Chat desktop app
+  start-automaker.sh chat         # Launch Chat Web app (legacy)
+  start-automaker.sh chat-electron # Launch Chat desktop app (legacy)
   start-automaker.sh --version    # Show version
 
 KEYBOARD SHORTCUTS (in menu):
@@ -715,8 +715,8 @@ show_menu() {
     printf "%s${border}${sel2}[2]${RESET} 🖥   ${txt2}Electron${RESET}          ${DIM}Desktop App (embedded server)${RESET}       ${border}\n" "$pad"
     printf "%s${border}${sel3}[3]${RESET} 🐳  ${txt3}Docker${RESET}            ${DIM}Full Stack (live reload)${RESET}            ${border}\n" "$pad"
     printf "%s${border}${sel4}[4]${RESET} 🔗  ${txt4}Electron & Docker${RESET} ${DIM}Desktop + Docker Server${RESET}             ${border}\n" "$pad"
-    printf "%s${border}${sel5}[5]${RESET} 💬  ${txt5}Chat Web${RESET}          ${DIM}Standalone Chat (localhost:3009)${RESET}    ${border}\n" "$pad"
-    printf "%s${border}${sel6}[6]${RESET} 💬  ${txt6}Chat Desktop${RESET}      ${DIM}Chat Electron App${RESET}                  ${border}\n" "$pad"
+    printf "%s${border}${sel5}[5]${RESET} 💬  ${txt5}Chat Web${RESET}          ${DIM}Legacy (localhost:3009)${RESET}             ${border}\n" "$pad"
+    printf "%s${border}${sel6}[6]${RESET} 💬  ${txt6}Chat Desktop${RESET}      ${DIM}Legacy Electron App${RESET}                ${border}\n" "$pad"
 
     printf "%s${C_GRAY}├" "$pad"
     draw_line "─" "$C_GRAY" "$MENU_INNER_WIDTH"
@@ -1136,8 +1136,8 @@ case $MODE in
     electron) MODE_NAME="Desktop App" ;;
     docker) MODE_NAME="Docker Dev" ;;
     docker-electron) MODE_NAME="Electron + Docker" ;;
-    chat) MODE_NAME="Chat Web" ;;
-    chat-electron) MODE_NAME="Chat Desktop" ;;
+    chat) MODE_NAME="Chat Web (Legacy)" ;;
+    chat-electron) MODE_NAME="Chat Desktop (Legacy)" ;;
     *)
         echo "${C_RED}Error:${RESET} Invalid mode '$MODE'"
         echo "Valid modes: web, electron, docker, docker-electron, chat, chat-electron"

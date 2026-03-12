@@ -20,8 +20,6 @@ import * as LucideIcons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -145,6 +143,9 @@ export function AgentHeader({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editDialogTab, setEditDialogTab] = useState<'general' | 'appearance' | 'settings'>(
+    'general'
+  );
   const [pathCopied, setPathCopied] = useState(false);
   const [isSaveDocMenuOpen, setIsSaveDocMenuOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -223,8 +224,6 @@ export function AgentHeader({
 
   const browserPanelOpen = useAppStore((s) => s.browserPanelOpen);
   const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
-  const maxSessionsPerProject = useAppStore((s) => s.maxSessionsPerProject);
-  const setMaxSessionsPerProject = useAppStore((s) => s.setMaxSessionsPerProject);
 
   const IconComponent = getProjectIcon(currentProject);
   const hasCustomIcon = !!currentProject.customIconPath;
@@ -245,7 +244,10 @@ export function AgentHeader({
         <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
-            onClick={() => setShowEditDialog(true)}
+            onClick={() => {
+              setEditDialogTab('general');
+              setShowEditDialog(true);
+            }}
             className={cn(
               'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
               'transition-colors border border-transparent hover:border-border hover:bg-accent/40',
@@ -482,52 +484,19 @@ export function AgentHeader({
             />
           )}
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                aria-label="Agent settings"
-                title="Agent settings"
-              >
-                <Settings2 className="w-4 h-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 p-3" align="end">
-              <div className="space-y-3">
-                <div>
-                  <Label htmlFor="max-sessions" className="text-xs font-medium">
-                    Max Sessions per Project
-                  </Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Input
-                      id="max-sessions"
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={maxSessionsPerProject}
-                      onChange={(e) => setMaxSessionsPerProject(parseInt(e.target.value, 10) || 0)}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    0 = unlimited. Oldest sessions auto-deleted when exceeded.
-                  </p>
-                </div>
-                <div className="border-t pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => setShowEditDialog(true)}
-                  >
-                    Edit Project Appearance
-                  </Button>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+            aria-label="Project settings"
+            title="Project settings"
+            onClick={() => {
+              setEditDialogTab('settings');
+              setShowEditDialog(true);
+            }}
+          >
+            <Settings2 className="w-4 h-4" />
+          </Button>
 
           <div className="hidden items-center gap-1 rounded-md border border-border bg-muted/30 px-1.5 py-1 sm:flex">
             <Type className="h-3.5 w-3.5 text-muted-foreground" />
@@ -632,8 +601,8 @@ export function AgentHeader({
                 ? 'text-primary hover:text-primary/80'
                 : 'text-muted-foreground hover:text-foreground'
             )}
-            aria-label={browserPanelOpen ? 'Hide browser panel' : 'Show browser panel'}
-            title={browserPanelOpen ? 'Hide Browser Preview' : 'Show Browser Preview'}
+            aria-label={browserPanelOpen ? 'Hide right panel' : 'Show right panel'}
+            title={browserPanelOpen ? 'Hide Right Panel' : 'Show Right Panel'}
           >
             {browserPanelOpen ? (
               <PanelRightClose className="w-4 h-4" />
@@ -662,6 +631,7 @@ export function AgentHeader({
         project={currentProject}
         open={showEditDialog}
         onOpenChange={setShowEditDialog}
+        defaultTab={editDialogTab}
       />
     </>
   );

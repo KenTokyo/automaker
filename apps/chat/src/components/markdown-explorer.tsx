@@ -14,6 +14,7 @@ import { MarkdownSearch } from './markdown-search';
 import { MarkdownPreview } from './markdown-preview';
 
 const logger = createLogger('MarkdownExplorer');
+const EMPTY_FAVORITES: string[] = [];
 
 // ---------------------------------------------------------------------------
 // Ignore patterns for the tree — skip heavy dirs and dotfiles
@@ -92,7 +93,7 @@ export function MarkdownExplorer({ projectPath, onClose }: MarkdownExplorerProps
       isLoadingContent: state.isLoadingContent,
       fileContentError: state.fileContentError,
       totalFileCount: state.totalFileCount,
-      favorites: projectPath ? (state.favorites[projectPath] ?? []) : [],
+      favorites: projectPath ? (state.favorites[projectPath] ?? EMPTY_FAVORITES) : EMPTY_FAVORITES,
       timeFilter: state.timeFilter,
     }))
   );

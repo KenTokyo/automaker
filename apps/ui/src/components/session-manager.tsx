@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
-import { MessageSquare, FileText } from 'lucide-react';
+import { MessageSquare, FileText, BarChart3 } from 'lucide-react';
 import { createLogger } from '@automaker/utils/logger';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { queryKeys } from '@/lib/query-keys';
 import { DeleteSessionDialog } from '@/components/dialogs/delete-session-dialog';
 import { DeleteAllArchivedSessionsDialog } from '@/components/dialogs/delete-all-archived-sessions-dialog';
 import { DocsPanel } from '@/components/views/agent-view/components/docs-panel';
+import { LeftOverviewPanel } from '@/components/session-manager/left-overview-panel';
 import { useProjectLookup } from '@/hooks/use-project-lookup';
 import { useSessionSearch } from '@/hooks/use-session-search';
 import { useSessionFilter } from '@/hooks/use-session-filter';
@@ -72,8 +73,8 @@ export function SessionManager({
   const expandedOrchestratorRuns = useAppStore((state) => state.expandedOrchestratorRuns);
   const toggleOrchestratorRunExpanded = useAppStore((state) => state.toggleOrchestratorRunExpanded);
 
-  const docsOpen = useAppStore((state) => state.docsOpen);
-  const setDocsOpen = useAppStore((state) => state.setDocsOpen);
+  const leftPanelTab = useAppStore((state) => state.leftPanelTab);
+  const setLeftPanelTab = useAppStore((state) => state.setLeftPanelTab);
   const sessionFontSize = useAppStore((state) => state.sessionFontSize);
   const setSessionFontSize = useAppStore((state) => state.setSessionFontSize);
   const maxSessionsPerProject = useAppStore((state) => state.maxSessionsPerProject);
@@ -447,8 +448,8 @@ export function SessionManager({
     <Card className="flex h-full flex-col gap-0 rounded-none py-2">
       <div className="px-2 pt-2">
         <Tabs
-          value={docsOpen ? 'docs' : 'sessions'}
-          onValueChange={(value) => setDocsOpen(value === 'docs')}
+          value={leftPanelTab}
+          onValueChange={(value) => setLeftPanelTab(value as typeof leftPanelTab)}
           className="w-full gap-1"
         >
           <TabsList className="h-8 w-full rounded-md p-0.5">
@@ -460,13 +461,21 @@ export function SessionManager({
               <FileText className="mr-0.5 h-3.5 w-3.5" />
               Docs
             </TabsTrigger>
+            <TabsTrigger value="overview" className="h-6 flex-1 gap-1 px-2 text-xs font-semibold">
+              <BarChart3 className="mr-0.5 h-3.5 w-3.5" />
+              Übersicht
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
-      {docsOpen ? (
+      {leftPanelTab === 'docs' ? (
         <div className="flex-1 overflow-hidden">
           <DocsPanel projectPath={projectPath} />
+        </div>
+      ) : leftPanelTab === 'overview' ? (
+        <div className="flex-1 overflow-hidden">
+          <LeftOverviewPanel />
         </div>
       ) : (
         <>

@@ -41,6 +41,8 @@ export interface TimeFilteredFile {
   path: string;
   /** Last modified timestamp (ms since epoch) */
   modified: number;
+  /** Created timestamp (ms since epoch) */
+  created: number;
   /** File size in bytes */
   size: number;
 }
@@ -219,9 +221,17 @@ export async function searchProject(options: SearchOptions): Promise<SearchResul
   return results;
 }
 
+const MARKDOWN_EXTENSIONS = new Set(['.md', '.mdx', '.markdown']);
+
+function isMarkdownFile(name: string): boolean {
+  const ext = path.extname(name).toLowerCase();
+  return MARKDOWN_EXTENSIONS.has(ext);
+}
+
 /**
- * Get all files modified within the last N hours.
- * Used by the Dashboard generation (Plan 21) and the Explorer time filter.
+ * Get markdown files, optionally filtered by time.
+ * When sinceHours is 0 or omitted, returns ALL markdown files (no time filter).
+ * Used by the Dashboard generation (Plan 21) and the Explorer file tree.
  * Returns files sorted by modified date (newest first).
  */
 export async function getFilesFilteredByTime(
@@ -229,7 +239,7 @@ export async function getFilesFilteredByTime(
   sinceHours: number,
   limit = 500
 ): Promise<TimeFilteredFile[]> {
-  const cutoffMs = Date.now() - sinceHours * 3600000;
+  const cutoffMs = sinceHours > 0 ? Date.now() - sinceHours * 3600000 : 0;
   const results: TimeFilteredFile[] = [];
 
   async function walk(dirPath: string, depth: number): Promise<void> {
@@ -254,14 +264,19 @@ export async function getFilesFilteredByTime(
         continue;
       }
 
+      // Only include markdown files
+      if (!isMarkdownFile(entry.name)) continue;
+
       try {
         const stat = await secureFs.stat(entryPath);
         const mtimeMs = Number(stat.mtimeMs);
-        if (mtimeMs >= cutoffMs) {
+        // When cutoffMs is 0 (sinceHours=0), include all files
+        if (cutoffMs === 0 || mtimeMs >= cutoffMs) {
           results.push({
             name: entry.name,
             path: entryPath,
             modified: mtimeMs,
+            created: Number(stat.birthtimeMs),
             size: Number(stat.size),
           });
         }

@@ -13,6 +13,8 @@ import { ChatMessages } from './chat-messages';
 import type { ThinkingIntensity } from './mode-toggles';
 import { OrchestratorStatusBar } from './orchestrator-status-bar';
 
+const EMPTY_STORED_MESSAGES: SessionMessage[] = [];
+
 interface ChatCenterProps {
   currentSessionId: string | null;
   currentSessionName: string | null;
@@ -113,7 +115,9 @@ export function ChatCenter({
     currentSessionId && isProcessing && !currentSessionDescription
   );
   const storedMessages = useSessionStore((state) =>
-    currentSessionId ? (state.sessions[currentSessionId]?.messages ?? []) : []
+    currentSessionId
+      ? (state.sessions[currentSessionId]?.messages ?? EMPTY_STORED_MESSAGES)
+      : EMPTY_STORED_MESSAGES
   );
 
   const mergedMessages = useMemo(() => {

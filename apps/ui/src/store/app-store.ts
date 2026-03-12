@@ -72,6 +72,7 @@ import {
   type BackgroundSettings,
   type BrowserTab,
   type RecentDoc,
+  type RightPanelMode,
   // Settings types
   type ApiKeys,
   // Chat types
@@ -523,6 +524,7 @@ const initialState: AppState = {
   initScriptState: {},
   // Docs Panel State
   docsOpen: false,
+  leftPanelTab: 'sessions' as const,
   currentDocPath: null,
   docsViewMode: (getItem('automaker:docsViewMode') as 'rendered' | 'raw') || 'rendered',
   recentDocs: JSON.parse(getItem('automaker:recentDocs') || '[]'),
@@ -535,6 +537,13 @@ const initialState: AppState = {
   // Docs Auto-Save
   docsAutoSave: getItem('automaker:docsAutoSave') !== 'false', // default true
   docsAutoSaveDelay: parseInt(getItem('automaker:docsAutoSaveDelay') || '3000', 10),
+  // Right Panel State
+  rightPanelMode: 'browser' as const,
+  rightPanelSecondaryMode: (getItem('automaker:rightPanelSecondaryMode') || null) as RightPanelMode | null,
+  rightPanelSplitSize: parseInt(getItem('automaker:rightPanelSplitSize') || '50', 10),
+  // Right Panel Font Sizes
+  filesPanelFontSize: parseInt(getItem('automaker:filesPanelFontSize') || '13', 10),
+  dashboardPanelFontSize: parseInt(getItem('automaker:dashboardPanelFontSize') || '13', 10),
   // Browser Panel State
   browserPanelOpen: true,
   browserTabsByProject: storedBrowserPanelState.tabsByProject,
@@ -2934,7 +2943,8 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   },
 
   // Docs Panel actions
-  setDocsOpen: (open) => set({ docsOpen: open }),
+  setDocsOpen: (open) => set({ docsOpen: open, leftPanelTab: open ? 'docs' : 'sessions' }),
+  setLeftPanelTab: (tab) => set({ leftPanelTab: tab, docsOpen: tab === 'docs' }),
   setCurrentDocPath: (path) => set({ currentDocPath: path }),
   setDocsViewMode: (mode) => {
     set({ docsViewMode: mode });
@@ -3003,6 +3013,63 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   setDocsAutoSaveDelay: (ms) => {
     set({ docsAutoSaveDelay: ms });
     setItem('automaker:docsAutoSaveDelay', String(ms));
+  },
+
+  // Right Panel actions
+  setRightPanelMode: (mode) => {
+    const state = get();
+    // If selecting the same mode as secondary, swap primary and secondary
+    if (state.rightPanelSecondaryMode === mode) {
+      const oldPrimary = state.rightPanelMode;
+      set({ rightPanelMode: mode, rightPanelSecondaryMode: oldPrimary });
+      setItem('automaker:rightPanelSecondaryMode', oldPrimary);
+    } else {
+      set({ rightPanelMode: mode });
+    }
+  },
+
+  setRightPanelSecondaryMode: (mode) => {
+    set({ rightPanelSecondaryMode: mode });
+    if (mode) {
+      setItem('automaker:rightPanelSecondaryMode', mode);
+    } else {
+      removeItem('automaker:rightPanelSecondaryMode');
+    }
+  },
+
+  setRightPanelSplitSize: (size) => {
+    const clamped = Math.max(15, Math.min(85, size));
+    set({ rightPanelSplitSize: clamped });
+    setItem('automaker:rightPanelSplitSize', String(clamped));
+  },
+
+  toggleRightPanelSplit: () => {
+    const state = get();
+    if (state.rightPanelSecondaryMode) {
+      // Close split
+      set({ rightPanelSecondaryMode: null });
+      removeItem('automaker:rightPanelSecondaryMode');
+    } else {
+      // Open split with a sensible default: if primary is terminal, show files; otherwise show terminal
+      const defaultSecondary: RightPanelMode =
+        state.rightPanelMode === 'terminal' ? 'files'
+        : state.rightPanelMode === 'files' ? 'terminal'
+        : 'terminal';
+      set({ rightPanelSecondaryMode: defaultSecondary });
+      setItem('automaker:rightPanelSecondaryMode', defaultSecondary);
+    }
+  },
+
+  setFilesPanelFontSize: (size) => {
+    const clamped = Math.max(10, Math.min(20, size));
+    set({ filesPanelFontSize: clamped });
+    setItem('automaker:filesPanelFontSize', String(clamped));
+  },
+
+  setDashboardPanelFontSize: (size) => {
+    const clamped = Math.max(10, Math.min(20, size));
+    set({ dashboardPanelFontSize: clamped });
+    setItem('automaker:dashboardPanelFontSize', String(clamped));
   },
 
   // Browser Panel actions

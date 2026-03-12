@@ -3,6 +3,7 @@
  *
  * POST   /generate   — Start a new overview generation
  * DELETE /generate   — Cancel a running generation
+ * POST   /save       — Save overview as Markdown file
  * GET    /status     — Check which time ranges have data
  * GET    /:timeRange — Load a saved overview (12h, 24h, 4d, 1w)
  */
@@ -13,6 +14,7 @@ import type { EventEmitter } from '../../lib/events.js';
 import { createGenerateHandler } from './routes/generate.js';
 import { createCancelHandler } from './routes/cancel.js';
 import { createLoadHandler } from './routes/load.js';
+import { createSaveHandler } from './routes/save.js';
 import { createStatusHandler } from './routes/status.js';
 
 export function createOverviewRoutes(events: EventEmitter, dataDir: string): Router {
@@ -24,6 +26,7 @@ export function createOverviewRoutes(events: EventEmitter, dataDir: string): Rou
     createGenerateHandler(events, dataDir)
   );
   router.delete('/generate', createCancelHandler());
+  router.post('/save', validatePathParams('projectPath'), createSaveHandler());
   router.get('/status', createStatusHandler(dataDir));
   router.get('/:timeRange', createLoadHandler(dataDir));
 

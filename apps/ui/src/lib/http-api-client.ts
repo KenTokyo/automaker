@@ -1244,7 +1244,7 @@ export class HttpApiClient implements ElectronAPI {
     });
   }
 
-  /** Get files modified within the last N hours. */
+  /** Get markdown files, optionally filtered by time. sinceHours=0 returns all. */
   async explorerFilesByTime(
     projectPath: string,
     sinceHours: number,
@@ -1255,6 +1255,7 @@ export class HttpApiClient implements ElectronAPI {
       name: string;
       path: string;
       modified: number;
+      created: number;
       size: number;
     }>;
     totalCount: number;

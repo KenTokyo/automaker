@@ -5,6 +5,8 @@ import {
   type KeyboardShortcut,
 } from '@/hooks/use-keyboard-shortcuts';
 import { useAppStore } from '@/store/app-store';
+import { useExplorerStore } from '@/store/explorer-store';
+import type { RightPanelMode } from '@/store/types/ui-types';
 
 interface UseAgentShortcutsOptions {
   currentProject: { path: string; name: string } | null;
@@ -16,9 +18,11 @@ export function useAgentShortcuts({
   quickCreateSessionRef,
 }: UseAgentShortcutsOptions): void {
   const shortcuts = useKeyboardShortcutsConfig();
-  const docsOpen = useAppStore((s) => s.docsOpen);
-  const setDocsOpen = useAppStore((s) => s.setDocsOpen);
+  const leftPanelTab = useAppStore((s) => s.leftPanelTab);
+  const setLeftPanelTab = useAppStore((s) => s.setLeftPanelTab);
   const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
+  const rightPanelMode = useAppStore((s) => s.rightPanelMode);
+  const setRightPanelMode = useAppStore((s) => s.setRightPanelMode);
 
   // Keyboard shortcuts for agent view
   const agentShortcuts: KeyboardShortcut[] = useMemo(() => {
@@ -36,11 +40,11 @@ export function useAgentShortcuts({
         description: 'Create new session',
       });
 
-      // Toggle docs panel
+      // Toggle docs panel (cycles sessions -> docs -> sessions)
       shortcutsList.push({
         key: 'ctrl+shift+d',
         action: () => {
-          setDocsOpen(!docsOpen);
+          setLeftPanelTab(leftPanelTab === 'docs' ? 'sessions' : 'docs');
         },
         description: 'Toggle docs panel',
       });
@@ -53,10 +57,46 @@ export function useAgentShortcuts({
         },
         description: 'Toggle browser panel',
       });
+
+      // Switch right panel to terminal tab
+      shortcutsList.push({
+        key: 'ctrl+shift+t',
+        action: () => {
+          setRightPanelMode(
+            rightPanelMode === 'terminal' ? 'files' : ('terminal' as RightPanelMode),
+          );
+        },
+        description: 'Switch to terminal tab',
+      });
+
+      // Switch right panel to files tab
+      shortcutsList.push({
+        key: 'ctrl+shift+f',
+        action: () => {
+          setRightPanelMode('files' as RightPanelMode);
+        },
+        description: 'Switch to files tab',
+      });
+
+      // Toggle embedded terminal in files panel
+      shortcutsList.push({
+        key: 'ctrl+shift+e',
+        action: () => {
+          const projectPath = currentProject.path;
+          const store = useExplorerStore.getState();
+          const isOpen = store.terminalOpenByProject[projectPath] ?? false;
+          store.setTerminalOpen(projectPath, !isOpen);
+          // Also switch to files tab if not already there
+          if (!isOpen) {
+            setRightPanelMode('files' as RightPanelMode);
+          }
+        },
+        description: 'Toggle embedded terminal in files panel',
+      });
     }
 
     return shortcutsList;
-  }, [currentProject, shortcuts, quickCreateSessionRef, docsOpen, setDocsOpen, toggleBrowserPanel]);
+  }, [currentProject, shortcuts, quickCreateSessionRef, leftPanelTab, setLeftPanelTab, toggleBrowserPanel, rightPanelMode, setRightPanelMode]);
 
   // Register keyboard shortcuts
   useKeyboardShortcuts(agentShortcuts);

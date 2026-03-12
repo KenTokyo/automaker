@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Overview API - HTTP-Client für Dashboard-Overview-Endpunkte.
  */
 
@@ -7,7 +7,9 @@ import type {
   DashboardMode,
   DashboardOverviewData,
   DashboardTimeRange,
-} from '../stores/dashboard-types';
+  GenerateOverviewOptions,
+  OverviewStatusMap,
+} from '@automaker/types';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -31,11 +33,6 @@ function baseUrl(): string {
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
-
-export interface GenerateOverviewOptions {
-  mode?: DashboardMode;
-  modelOverride?: string;
-}
 
 export async function generateOverview(
   projectPath: string,
@@ -82,13 +79,6 @@ export async function loadOverview(
   }
   return json.data as DashboardOverviewData;
 }
-
-export interface OverviewStatusEntry {
-  exists: boolean;
-  generatedAt?: string;
-}
-
-export type OverviewStatusMap = Record<DashboardTimeRange, OverviewStatusEntry>;
 
 export async function getOverviewStatus(projectPath: string): Promise<OverviewStatusMap> {
   const url = `${baseUrl()}/status?projectPath=${encodeURIComponent(projectPath)}`;

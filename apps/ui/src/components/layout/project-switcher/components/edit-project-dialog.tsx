@@ -3,7 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Upload, X, ImageIcon, Check, Folder, Palette } from 'lucide-react';
+import { Upload, X, ImageIcon, Check, Folder, Palette, Settings2 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAppStore } from '@/store/app-store';
@@ -116,9 +116,15 @@ interface EditProjectDialogProps {
   project: Project;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultTab?: 'general' | 'appearance' | 'settings';
 }
 
-export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDialogProps) {
+export function EditProjectDialog({
+  project,
+  open,
+  onOpenChange,
+  defaultTab = 'general',
+}: EditProjectDialogProps) {
   const {
     setProjectName,
     setProjectIcon,
@@ -128,6 +134,8 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
     setProjectTextColor,
     setProjectIconColor,
     setProjectChatBackgroundColor,
+    maxSessionsPerProject,
+    setMaxSessionsPerProject,
   } = useAppStore();
   const [name, setName] = useState(project.name);
   const [icon, setIcon] = useState<string | null>(project.icon || null);
@@ -135,6 +143,7 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
     project.customIconPath || null
   );
   const [isUploadingIcon, setIsUploadingIcon] = useState(false);
+  const [activeTab, setActiveTab] = useState(defaultTab);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Reset local state when the project changes (component stays mounted across project switches)
@@ -143,6 +152,11 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
     setIcon(project.icon || null);
     setCustomIconPath(project.customIconPath || null);
   }, [project.id]);
+
+  // Sync active tab when defaultTab prop changes (e.g. opening from different buttons)
+  useEffect(() => {
+    setActiveTab(defaultTab);
+  }, [defaultTab]);
 
   // Read appearance values directly from project (auto-save)
   const badgeColor = project.badgeColor || null;
@@ -297,12 +311,20 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
           <SheetTitle>Edit Project</SheetTitle>
         </SheetHeader>
 
-        <Tabs defaultValue="general" className="flex-1 overflow-hidden flex flex-col px-5">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as typeof activeTab)}
+          className="flex-1 overflow-hidden flex flex-col px-5"
+        >
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="appearance" className="flex items-center gap-1.5">
               <Palette className="w-3.5 h-3.5" />
               Appearance
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-1.5">
+              <Settings2 className="w-3.5 h-3.5" />
+              Settings
             </TabsTrigger>
           </TabsList>
 
@@ -512,6 +534,33 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
               >
                 Reset All Colors
               </Button>
+            </TabsContent>
+
+            <TabsContent value="settings" className="space-y-4 m-0">
+              {/* Max Sessions per Project */}
+              <div className="space-y-2">
+                <Label htmlFor="max-sessions-sidebar">Max Sessions per Project</Label>
+                <p className="text-xs text-muted-foreground">
+                  Limit the number of chat sessions kept per project. Oldest sessions are
+                  automatically deleted when exceeded.
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Input
+                    id="max-sessions-sidebar"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={maxSessionsPerProject}
+                    onChange={(e) => setMaxSessionsPerProject(parseInt(e.target.value, 10) || 0)}
+                    className="h-8 text-sm w-24"
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {maxSessionsPerProject === 0
+                      ? 'Unlimited'
+                      : `${maxSessionsPerProject} sessions`}
+                  </span>
+                </div>
+              </div>
             </TabsContent>
           </div>
         </Tabs>

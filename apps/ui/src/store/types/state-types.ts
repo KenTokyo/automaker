@@ -32,6 +32,8 @@ import type {
   ViewMode,
   ThemeMode,
   BoardViewMode,
+  RightPanelMode,
+  LeftPanelTab,
   KeyboardShortcuts,
   BackgroundSettings,
   BrowserTab,
@@ -359,7 +361,8 @@ export interface AppState {
   selectedAgentModel: PhaseModelEntry;
 
   // Docs Panel State
-  docsOpen: boolean;
+  docsOpen: boolean; // Legacy: kept for backward compat, derived from leftPanelTab
+  leftPanelTab: LeftPanelTab; // Which tab is active on the left ('sessions' | 'docs' | 'overview')
   currentDocPath: string | null;
   docsViewMode: 'rendered' | 'raw';
   recentDocs: RecentDoc[];
@@ -374,6 +377,15 @@ export interface AppState {
 
   // Session Panel Font Size (10-18px, default 14)
   sessionFontSize: number;
+
+  // Right Panel State
+  rightPanelMode: RightPanelMode; // Which content the right panel shows ('browser' | 'files' | 'terminal' | 'dashboard')
+  rightPanelSecondaryMode: RightPanelMode | null; // Secondary panel in split mode (null = no split)
+  rightPanelSplitSize: number; // Primary (top) panel percentage when split is active (default 50)
+
+  // Right Panel Font Sizes (per content type)
+  filesPanelFontSize: number; // Font size for Files panel content (10-20, default 13)
+  dashboardPanelFontSize: number; // Font size for Dashboard panel content (10-20, default 13)
 
   // Browser Panel State
   browserPanelOpen: boolean;
@@ -845,7 +857,8 @@ export interface AppActions {
   setSelectedAgentModel: (entry: PhaseModelEntry) => void;
 
   // Docs Panel actions
-  setDocsOpen: (open: boolean) => void;
+  setDocsOpen: (open: boolean) => void; // Legacy: sets leftPanelTab to 'docs' or 'sessions'
+  setLeftPanelTab: (tab: LeftPanelTab) => void;
   setCurrentDocPath: (path: string | null) => void;
   setDocsViewMode: (mode: 'rendered' | 'raw') => void;
   addRecentDoc: (doc: RecentDoc) => void;
@@ -863,6 +876,14 @@ export interface AppActions {
 
   // Session Panel Font Size actions
   setSessionFontSize: (size: number) => void;
+
+  // Right Panel actions
+  setRightPanelMode: (mode: RightPanelMode) => void;
+  setRightPanelSecondaryMode: (mode: RightPanelMode | null) => void;
+  setRightPanelSplitSize: (size: number) => void;
+  toggleRightPanelSplit: () => void; // Toggle split on/off
+  setFilesPanelFontSize: (size: number) => void;
+  setDashboardPanelFontSize: (size: number) => void;
 
   // Browser Panel actions
   setBrowserPanelOpen: (open: boolean) => void;

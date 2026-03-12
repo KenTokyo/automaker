@@ -75,6 +75,20 @@ export type ThemeMode =
 
 export type BoardViewMode = 'kanban' | 'graph';
 
+/** Which content the right panel shows in Agent View */
+export type RightPanelMode = 'browser' | 'files' | 'terminal' | 'dashboard';
+
+/** Font size limits for right-panel content areas */
+export const RIGHT_PANEL_FONT_SIZE_MIN = 10;
+export const RIGHT_PANEL_FONT_SIZE_MAX = 20;
+export const RIGHT_PANEL_FONT_SIZE_DEFAULT = 13;
+
+/** Default split size (primary panel percentage) */
+export const RIGHT_PANEL_SPLIT_SIZE_DEFAULT = 50;
+
+/** Which content the left panel shows in Agent View */
+export type LeftPanelTab = 'sessions' | 'docs' | 'overview';
+
 // Keyboard Shortcut with optional modifiers
 export interface ShortcutKey {
   key: string; // The main key (e.g., "K", "N", "1")

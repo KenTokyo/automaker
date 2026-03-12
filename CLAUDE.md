@@ -163,6 +163,15 @@ Use `resolveModelString()` from `@automaker/model-resolver` to convert model ali
 - `sonnet` → `claude-sonnet-4-6`
 - `opus` → `claude-opus-4-6`
 
+## Chat-Zusammenführung
+
+`apps/ui` ist der Haupt-Chat. `apps/chat` ist nur noch eine Übergangs-Quelle.
+
+- Keine neuen Features in `apps/chat` bauen
+- Neue Chat-Funktionen gehören nach `apps/ui`
+- Dashboard, Dateien und Übersicht sind bereits in `apps/ui` portiert
+- Siehe `plans/automaker-chat-unification/` für den vollständigen Plan
+
 ## Environment Variables
 
 - `ANTHROPIC_API_KEY` - Anthropic API key (or use Claude Code CLI auth)

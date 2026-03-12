@@ -385,6 +385,34 @@ export {
 // Test runner types
 export type { TestRunnerInfo } from './test-runner.js';
 
+// Dashboard / Overview types (AI-powered project overview)
+export type {
+  DashboardTimeRange,
+  DashboardMode,
+  OverviewMarkdownData,
+  OverviewGitData,
+  OverviewGitCommit,
+  GenerateOverviewOptions,
+  DashboardSection,
+  DashboardItem,
+  DashboardImprovement,
+  DashboardSecurityItem,
+  DashboardStats,
+  DashboardMetadata,
+  DashboardOverviewData,
+  OverviewStatusEntry,
+  OverviewStatusMap,
+  DashboardTimeRangeOption,
+} from './dashboard.js';
+export { DASHBOARD_TIME_RANGES, getTimeRangeHours } from './dashboard.js';
+
+// Markdown Explorer types (project file browser)
+export type {
+  ExplorerSearchResult,
+  ExplorerSearchOptions,
+  ExplorerTimeFilteredFile,
+} from './explorer.js';
+
 // Project overview types (multi-project dashboard)
 export type {
   ProjectHealthStatus,

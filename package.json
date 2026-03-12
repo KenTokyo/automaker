@@ -28,7 +28,7 @@
     "dev:electron:debug": "npm run build:packages && npm run _dev:electron:debug",
     "dev:electron:wsl": "npm run build:packages && npm run _dev:electron:wsl",
     "dev:electron:wsl:gpu": "npm run build:packages && npm run _dev:electron:wsl:gpu",
-    "dev:chat": "npm run build:packages && npx --yes concurrently -n server,chat -c blue,magenta \"npm run _dev:server:chat\" \"npm run _dev:chat\"",
+    "dev:chat": "npm run build:packages && node scripts/check-port-available.mjs && node scripts/dev-chat.mjs",
     "dev:server": "npm run build:packages && npm run _dev:server",
     "dev:docker": "docker compose up",
     "dev:docker:rebuild": "docker compose build --no-cache && docker compose up",

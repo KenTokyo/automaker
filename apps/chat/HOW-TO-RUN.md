@@ -1,5 +1,14 @@
 # UniAI Chat - Startanleitung
 
+> **Hinweis: Legacy-Übergang**
+>
+> Diese App (`apps/chat`) ist nicht mehr der Hauptweg.
+> Der Automaker-Chat (`apps/ui`) ist jetzt die zentrale Oberfläche.
+> Diese App bleibt vorerst als Übergangs-Quelle erhalten, wird aber nicht mehr aktiv weiterentwickelt.
+> Neue Features sollen in `apps/ui` gebaut werden.
+>
+> Siehe: `plans/automaker-chat-unification/legacy-audit.md`
+
 ## Voraussetzung
 
 Immer zuerst in den Projekt-Root wechseln:

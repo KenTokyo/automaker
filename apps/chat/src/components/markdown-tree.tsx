@@ -5,6 +5,8 @@ import type { FileTreeNode } from '../stores/explorer-store';
 import { useExplorerStore } from '../stores/explorer-store';
 import { MarkdownTreeItem } from './markdown-tree-item';
 
+const EMPTY_FAVORITES: string[] = [];
+
 interface MarkdownTreeProps {
   projectPath: string;
   onSelectFile: (filePath: string) => void;
@@ -24,7 +26,7 @@ export function MarkdownTree({
       expandedPaths: state.expandedPaths,
       selectedFilePath: state.selectedFilePath,
       isLoadingRoot: state.isLoadingRoot,
-      favorites: state.favorites[projectPath] ?? [],
+      favorites: state.favorites[projectPath] ?? EMPTY_FAVORITES,
     }))
   );
 

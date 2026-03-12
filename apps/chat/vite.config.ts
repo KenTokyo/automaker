@@ -19,6 +19,9 @@ export default defineConfig(({ command }) => {
   // Skip electron plugin in web-only mode or CI
   const skipElectron =
     command === 'serve' && (process.env.CI === 'true' || process.env.VITE_SKIP_ELECTRON === 'true');
+  const backendHost = process.env.CHAT_API_HOST || '127.0.0.1';
+  const backendPort = parseInt(process.env.AUTOMAKER_SERVER_PORT || process.env.PORT || '3008', 10);
+  const backendTarget = process.env.CHAT_API_TARGET || `http://${backendHost}:${backendPort}`;
 
   return {
     plugins: [
@@ -68,7 +71,7 @@ export default defineConfig(({ command }) => {
       allowedHosts: true,
       proxy: {
         '/api': {
-          target: 'http://localhost:3008',
+          target: backendTarget,
           changeOrigin: true,
           ws: true,
         },

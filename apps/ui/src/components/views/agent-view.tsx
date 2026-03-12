@@ -23,7 +23,7 @@ import {
 } from './agent-view/hooks';
 
 // Extracted components
-import { NoProjectState, AgentHeader, ChatArea, BrowserPanel } from './agent-view/components';
+import { NoProjectState, AgentHeader, ChatArea, RightPanelShell } from './agent-view/components';
 import { AgentInputArea } from './agent-view/input-area';
 import {
   ViewWorktreeChangesDialog,
@@ -814,12 +814,12 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
             </div>
           </ResizablePanel>
 
-          {/* Browser Panel - Desktop (resizable) */}
+          {/* Right Panel - Desktop (resizable): Browser, Files, Terminal, Dashboard */}
           {browserPanelOpen && currentProject && (
             <>
               <ResizableHandle withHandle />
-              <ResizablePanel id="browser-panel" defaultSize={20} minSize={15} maxSize={50}>
-                <BrowserPanel projectPath={currentProject.path} />
+              <ResizablePanel id="right-panel" defaultSize={20} minSize={15} maxSize={50}>
+                <RightPanelShell projectPath={currentProject.path} />
               </ResizablePanel>
             </>
           )}

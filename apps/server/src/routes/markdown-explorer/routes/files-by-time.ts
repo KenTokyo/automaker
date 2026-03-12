@@ -22,14 +22,11 @@ export function createFilesByTimeHandler() {
         return;
       }
 
-      if (!Number.isFinite(sinceHoursRaw) || sinceHoursRaw <= 0) {
-        res.status(400).json({ success: false, error: 'sinceHours must be a positive number' });
-        return;
-      }
-
+      // sinceHours is optional: 0 or omitted = all markdown files (no time filter)
+      const sinceHours = Number.isFinite(sinceHoursRaw) && sinceHoursRaw >= 0 ? sinceHoursRaw : 0;
       const safeLimit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 1000) : 500;
 
-      const files = await getFilesFilteredByTime(projectPath, sinceHoursRaw, safeLimit);
+      const files = await getFilesFilteredByTime(projectPath, sinceHours, safeLimit);
 
       res.json({ success: true, files, totalCount: files.length });
     } catch (error) {
