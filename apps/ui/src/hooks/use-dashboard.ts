@@ -46,7 +46,12 @@ function isOverviewPayload(value: unknown): value is { data: DashboardOverviewDa
   const data = (value as { data?: unknown }).data;
   if (!data || typeof data !== 'object') return false;
   const c = data as Partial<DashboardOverviewData>;
-  return isTimeRange(c.timeRange) && typeof c.generatedAt === 'string' && typeof c.model === 'string' && isMode(c.mode);
+  return (
+    isTimeRange(c.timeRange) &&
+    typeof c.generatedAt === 'string' &&
+    typeof c.model === 'string' &&
+    isMode(c.mode)
+  );
 }
 
 export function useDashboard() {
@@ -77,7 +82,7 @@ export function useDashboard() {
       setActiveTimeRange: s.setActiveTimeRange,
       setModelOverride: s.setModelOverride,
       setLastUsedMode: s.setLastUsedMode,
-    })),
+    }))
   );
 
   const currentProjectPath = useAppStore((s) => s.currentProject?.path ?? null);
@@ -113,7 +118,7 @@ export function useDashboard() {
         if (requestId === requestIdRef.current) state.setLoading(false);
       }
     },
-    [currentProjectPath],
+    [currentProjectPath]
   );
 
   const refreshStatus = useCallback(async () => {
@@ -156,7 +161,7 @@ export function useDashboard() {
         if (generationIdRef.current === generationId) state.setGenerating(false);
       }
     },
-    [currentProjectPath],
+    [currentProjectPath]
   );
 
   const handleCancel = useCallback(async () => {
@@ -164,7 +169,11 @@ export function useDashboard() {
     const state = useDashboardStore.getState();
     state.setGenerating(false);
     state.clearError();
-    try { await cancelOverview(); } catch { /* ignore */ }
+    try {
+      await cancelOverview();
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   const handleRetryLoad = useCallback(() => {
@@ -231,7 +240,7 @@ export function useDashboard() {
 
   const isLoadingCurrentTab = useMemo(
     () => isLoading && currentData === undefined,
-    [currentData, isLoading],
+    [currentData, isLoading]
   );
 
   return {

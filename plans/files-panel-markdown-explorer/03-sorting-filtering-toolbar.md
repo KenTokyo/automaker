@@ -41,6 +41,7 @@ Der Nutzer kann jetzt aktiv steuern, was er sieht: "Zeig mir nur die Dateien der
 ### Filter-Pipeline (aus VSCode Extension uebernommen)
 
 Reihenfolge der Filterung:
+
 1. **Zeitfilter** (nur Dateien innerhalb des gewaehlten Zeitraums)
 2. **Such-Filter** (wenn Suche aktiv)
 3. **Sortierung** (nach gewahltem Kriterium)
@@ -122,7 +123,7 @@ Pfad: `apps/ui/src/components/views/agent-view/components/files-panel/tree-utils
 
 - `filterFilesByTime(files, timeFilterDays)`: Filtert flache Dateiliste nach Zeitraum
   - timeFilterDays=0 → kein Filter (alle Dateien)
-  - timeFilterDays=2 → nur Dateien mit modified >= now - 2 * 86400000
+  - timeFilterDays=2 → nur Dateien mit modified >= now - 2 \* 86400000
 - `sortFiles(files, sortBy)`: Sortiert flache Dateiliste
   - 'modified': absteigend nach modified Timestamp
   - 'created': absteigend nach created Timestamp
@@ -166,6 +167,7 @@ Pfad: `apps/ui/src/components/views/agent-view/components/files-panel/tree-utils
 ### 3.5 TIME_FILTER_OPTIONS anpassen **~10 Zeilen Aenderung**
 
 In `explorer-store.ts`:
+
 - Werte von Stunden auf Tage umstellen (Alignment mit VSCode Extension)
 - Oder: Beibehalten als Stunden, aber Labels anpassen
 - Empfehlung: Intern als Stunden beibehalten (0, 12, 24, 48, 96, 168, 336, 720), Labels bleiben
@@ -177,16 +179,19 @@ In `explorer-store.ts`:
 ### Chat 4 - Phase 3 Implementierung (~80.000-100.000 Tokens)
 
 **Schritt 1:** Utility erstellen (3.2)
+
 - `tree-utils.ts` mit Filter, Sort, CountFiles, NewestModified
 - TypeScript-Check
 
 **Schritt 2:** Store erweitern (3.1)
+
 - `sortBy` Feld und Action
 - `getFilteredAndSortedFiles()` Helper
 - `buildTreeFromFiles()` an Pipeline anbinden
 - TypeScript-Check
 
 **Schritt 3:** FilesPanel Toolbar (3.3)
+
 - Sort-Dropdown einbauen
 - Zeitfilter-Dropdown anpassen
 - Highlight-Window-Dropdown hinzufuegen
@@ -195,10 +200,12 @@ In `explorer-store.ts`:
 - TypeScript-Check
 
 **Schritt 4:** Ordner-Meta (3.4)
+
 - FileTreeItem: Dateianzahl + neuestes Datum pro Ordner
 - TypeScript-Check
 
 **Schritt 5:** TIME_FILTER_OPTIONS (3.5)
+
 - Labels und Werte finalisieren
 - TypeScript-Check
 
@@ -208,13 +215,13 @@ In `explorer-store.ts`:
 
 ## 🔗 Betroffene Dateien
 
-| Datei | Aenderungstyp | Geschaetzte Zeilen |
-| --- | --- | --- |
-| `apps/ui/src/.../files-panel/tree-utils.ts` | **NEU** | ~100 |
-| `apps/ui/src/store/explorer-store.ts` | Erweitern | ~80 |
-| `apps/ui/src/.../files-panel/files-panel.tsx` | Erweitern | ~100 |
-| `apps/ui/src/.../files-panel/file-tree-item.tsx` | Erweitern | ~40 |
-| **Gesamt** | | **~320** |
+| Datei                                            | Aenderungstyp | Geschaetzte Zeilen |
+| ------------------------------------------------ | ------------- | ------------------ |
+| `apps/ui/src/.../files-panel/tree-utils.ts`      | **NEU**       | ~100               |
+| `apps/ui/src/store/explorer-store.ts`            | Erweitern     | ~80                |
+| `apps/ui/src/.../files-panel/files-panel.tsx`    | Erweitern     | ~100               |
+| `apps/ui/src/.../files-panel/file-tree-item.tsx` | Erweitern     | ~40                |
+| **Gesamt**                                       |               | **~320**           |
 
 ---
 

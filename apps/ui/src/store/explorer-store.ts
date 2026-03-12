@@ -291,7 +291,7 @@ function rebuildTree(
   allFiles: MarkdownFileEntry[],
   projectPath: string,
   timeFilter: number,
-  sortBy: SortBy,
+  sortBy: SortBy
 ): { rootNodes: FileTreeNode[]; filteredFileCount: number } {
   const filtered = filterFilesByTime(allFiles, timeFilter);
   const rawNodes = buildTreeFromFiles(filtered, projectPath);
@@ -309,7 +309,7 @@ function rebuildTree(
  */
 export function buildTreeFromFiles(
   files: MarkdownFileEntry[],
-  projectPath: string,
+  projectPath: string
 ): FileTreeNode[] {
   // Normalize project path separator for comparison
   const normalizedProject = projectPath.replace(/\\/g, '/');
@@ -536,7 +536,10 @@ export const useExplorerStore = create<ExplorerStoreState>()((set, get) => ({
       return;
     }
     const { rootNodes, filteredFileCount } = rebuildTree(
-      state.allFiles, state.projectPath, hours, state.sortBy,
+      state.allFiles,
+      state.projectPath,
+      hours,
+      state.sortBy
     );
     set({ timeFilter: hours, rootNodes, filteredFileCount });
   },
@@ -549,7 +552,10 @@ export const useExplorerStore = create<ExplorerStoreState>()((set, get) => ({
       return;
     }
     const { rootNodes, filteredFileCount } = rebuildTree(
-      state.allFiles, state.projectPath, state.timeFilter, sortBy,
+      state.allFiles,
+      state.projectPath,
+      state.timeFilter,
+      sortBy
     );
     set({ sortBy, rootNodes, filteredFileCount });
   },

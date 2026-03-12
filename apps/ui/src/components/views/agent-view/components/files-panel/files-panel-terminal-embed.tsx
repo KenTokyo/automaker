@@ -48,9 +48,7 @@ class EmbeddedTerminalErrorBoundary extends Component<
         <div className="flex h-full flex-col items-center justify-center gap-2 bg-background px-4 text-center">
           <AlertCircle className="h-5 w-5 text-destructive" />
           <p className="text-xs font-medium text-foreground">Terminal abgestuerzt</p>
-          <p className="max-w-[200px] text-[11px] text-muted-foreground">
-            {this.state.message}
-          </p>
+          <p className="max-w-[200px] text-[11px] text-muted-foreground">{this.state.message}</p>
           <button
             type="button"
             className="mt-1 flex items-center gap-1 rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
@@ -82,9 +80,7 @@ export const FilesPanelTerminalEmbed = memo(function FilesPanelTerminalEmbed() {
             fallback={
               <div className="flex h-full items-center justify-center bg-background">
                 <Spinner size="sm" />
-                <span className="ml-2 text-xs text-muted-foreground">
-                  Terminal wird geladen...
-                </span>
+                <span className="ml-2 text-xs text-muted-foreground">Terminal wird geladen...</span>
               </div>
             }
           >

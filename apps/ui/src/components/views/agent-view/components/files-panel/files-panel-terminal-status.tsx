@@ -30,10 +30,7 @@ export const FilesPanelTerminalStatus = memo(function FilesPanelTerminalStatus({
       <AlertCircle className="h-5 w-5 text-destructive" />
     );
 
-  const title =
-    kind === 'disconnected'
-      ? 'Verbindung unterbrochen'
-      : 'Terminal nicht verfuegbar';
+  const title = kind === 'disconnected' ? 'Verbindung unterbrochen' : 'Terminal nicht verfuegbar';
 
   const description =
     message ??

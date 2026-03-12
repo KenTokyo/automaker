@@ -22,13 +22,13 @@ Der Nutzer sieht auf einen Blick, welche Dateien gerade eben geaendert wurden (r
 
 Das System teilt Dateien in 5 Recency-Stufen ein, basierend auf dem Alter der letzten Aenderung:
 
-| Klasse | Zeitfenster | Farbe | Intensitaet |
-| --- | --- | --- | --- |
-| `recency-10m` | ≤ 10 Minuten | Orange-Rot (#ff6b35) | Stark - Border + Background + farbige Daten |
-| `recency-30m` | ≤ 30 Minuten | Gold (#e8a317) | Mittelstark - Border + Background + farbiges Modified-Datum |
-| `recency-1h` | ≤ 1 Stunde | Gelbgruen (#c4a72a) | Mittel - Duenner Border + leichter Background |
-| `recency-2h` | ≤ 2 Stunden | Gruenlich (#8a9a3a) | Subtil - Nur leichter Background |
-| `recency-6h` | ≤ 6 Stunden | Blau (focusBorder) | Minimal - Nur duenner Border |
+| Klasse        | Zeitfenster  | Farbe                | Intensitaet                                                 |
+| ------------- | ------------ | -------------------- | ----------------------------------------------------------- |
+| `recency-10m` | ≤ 10 Minuten | Orange-Rot (#ff6b35) | Stark - Border + Background + farbige Daten                 |
+| `recency-30m` | ≤ 30 Minuten | Gold (#e8a317)       | Mittelstark - Border + Background + farbiges Modified-Datum |
+| `recency-1h`  | ≤ 1 Stunde   | Gelbgruen (#c4a72a)  | Mittel - Duenner Border + leichter Background               |
+| `recency-2h`  | ≤ 2 Stunden  | Gruenlich (#8a9a3a)  | Subtil - Nur leichter Background                            |
+| `recency-6h`  | ≤ 6 Stunden  | Blau (focusBorder)   | Minimal - Nur duenner Border                                |
 
 ### Highlight-Window
 
@@ -36,12 +36,12 @@ Das Highlight-Window bestimmt, **bis zu welchem Alter** Dateien ueberhaupt hervo
 
 ### Smart-Date-Formatting
 
-| Alter | Anzeige |
-| --- | --- |
-| Heute | `14:35` (nur Uhrzeit) |
-| Gestern | `Gestern 14:35` |
-| Innerhalb 7 Tage | `Mo 14:35` (Wochentag) |
-| Aelter | `11.03.2026 14:35` (volles Datum) |
+| Alter            | Anzeige                           |
+| ---------------- | --------------------------------- |
+| Heute            | `14:35` (nur Uhrzeit)             |
+| Gestern          | `Gestern 14:35`                   |
+| Innerhalb 7 Tage | `Mo 14:35` (Wochentag)            |
+| Aelter           | `11.03.2026 14:35` (volles Datum) |
 
 ---
 
@@ -125,6 +125,7 @@ Pfad: `apps/ui/src/components/views/agent-view/components/files-panel/recency-ut
 Entweder als Tailwind-Plugin oder als CSS-in-JS innerhalb der Komponenten. Empfehlung: Eigene CSS-Datei oder Inline-Styles mit `cn()`.
 
 5 Stufen fuer Dateien:
+
 - `recency-10m`: `border-left: 3px solid #ff6b35`, Background-Gradient orange 12%→4%, Modified-Date orange+bold
 - `recency-30m`: `border-left: 3px solid #e8a317`, Background-Gradient gold 10%→3%, Modified-Date gold+semibold
 - `recency-1h`: `border-left: 2px solid #c4a72a/70%`, Background-Gradient gelbgruen 7%→2%, Modified-Date gelbgruen
@@ -132,6 +133,7 @@ Entweder als Tailwind-Plugin oder als CSS-in-JS innerhalb der Komponenten. Empfe
 - `recency-6h`: `border-left: 2px solid focusBorder/25%` (nur Border, kein Background)
 
 5 Stufen fuer Ordner:
+
 - `recency-10m`: Background-Gradient orange 8%, Ordner-Badge orange
 - `recency-30m`: Background-Gradient gold 6%, Ordner-Badge gold
 - `recency-1h`: Background-Gradient gelbgruen 4%
@@ -157,24 +159,29 @@ Entweder als Tailwind-Plugin oder als CSS-in-JS innerhalb der Komponenten. Empfe
 ### Chat 3 - Phase 2 Implementierung (~80.000-100.000 Tokens)
 
 **Schritt 1:** Utility erstellen (2.1)
+
 - `recency-utils.ts` mit `getRecencyClass`, `getFolderRecency`, `formatSmartDate`
 - TypeScript-Check
 
 **Schritt 2:** Store erweitern (2.4)
+
 - `highlightWindow` Feld und Action
 - TypeScript-Check
 
 **Schritt 3:** FileTreeItem umbauen (2.2)
+
 - Datums-Anzeige mit Icons hinzufuegen
 - Recency-Klasse auf Wrapper setzen
 - TypeScript-Check
 
 **Schritt 4:** FileTree anpassen (2.5)
+
 - `highlightWindow` durchreichen
 - Folder-Recency berechnen
 - TypeScript-Check
 
 **Schritt 5:** CSS/Styling (2.3)
+
 - Recency-Klassen als Inline-Styles oder Tailwind-Klassen
 - Visueller Check: Farben korrekt auf Dark-Theme
 
@@ -184,13 +191,13 @@ Entweder als Tailwind-Plugin oder als CSS-in-JS innerhalb der Komponenten. Empfe
 
 ## 🔗 Betroffene Dateien
 
-| Datei | Aenderungstyp | Geschaetzte Zeilen |
-| --- | --- | --- |
-| `apps/ui/src/.../files-panel/recency-utils.ts` | **NEU** | ~80 |
-| `apps/ui/src/.../files-panel/file-tree-item.tsx` | Erweitern | ~80 |
-| `apps/ui/src/.../files-panel/file-tree.tsx` | Erweitern | ~15 |
-| `apps/ui/src/store/explorer-store.ts` | Erweitern | ~15 |
-| **Gesamt** | | **~190** |
+| Datei                                            | Aenderungstyp | Geschaetzte Zeilen |
+| ------------------------------------------------ | ------------- | ------------------ |
+| `apps/ui/src/.../files-panel/recency-utils.ts`   | **NEU**       | ~80                |
+| `apps/ui/src/.../files-panel/file-tree-item.tsx` | Erweitern     | ~80                |
+| `apps/ui/src/.../files-panel/file-tree.tsx`      | Erweitern     | ~15                |
+| `apps/ui/src/store/explorer-store.ts`            | Erweitern     | ~15                |
+| **Gesamt**                                       |               | **~190**           |
 
 ---
 

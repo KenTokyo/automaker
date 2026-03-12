@@ -7,11 +7,7 @@
 
 import { memo, useCallback, useRef } from 'react';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from '@/components/ui/resizable';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { FilesPanelTerminalEmbed } from './files-panel-terminal-embed';
 
 interface FilesPanelTerminalSplitProps {
@@ -37,30 +33,20 @@ export const FilesPanelTerminalSplit = memo(function FilesPanelTerminalSplit({
         onTerminalResize(sizes[1]);
       }
     },
-    [terminalSize, onTerminalResize],
+    [terminalSize, onTerminalResize]
   );
 
   const filesSize = 100 - terminalSize;
 
   return (
-    <ResizablePanelGroup
-      direction="vertical"
-      onLayout={handleLayout}
-    >
+    <ResizablePanelGroup direction="vertical" onLayout={handleLayout}>
       {/* Files content (top) */}
-      <ResizablePanel
-        defaultSize={filesSize}
-        minSize={15}
-        order={1}
-      >
+      <ResizablePanel defaultSize={filesSize} minSize={15} order={1}>
         <div className="h-full min-h-0 overflow-hidden">{children}</div>
       </ResizablePanel>
 
       {/* Resize handle */}
-      <ResizableHandle
-        withHandle
-        aria-label="Trennleiste zwischen Dateien und Terminal"
-      />
+      <ResizableHandle withHandle aria-label="Trennleiste zwischen Dateien und Terminal" />
 
       {/* Terminal (bottom) */}
       <ResizablePanel

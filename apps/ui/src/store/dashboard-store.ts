@@ -6,11 +6,7 @@
  */
 
 import { create } from 'zustand';
-import type {
-  DashboardMode,
-  DashboardOverviewData,
-  DashboardTimeRange,
-} from '@automaker/types';
+import type { DashboardMode, DashboardOverviewData, DashboardTimeRange } from '@automaker/types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -59,7 +55,9 @@ function loadTimeRange(): DashboardTimeRange {
   try {
     const raw = localStorage.getItem(TIME_RANGE_KEY);
     if (raw === '12h' || raw === '24h' || raw === '4d' || raw === '1w') return raw;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return '24h';
 }
 
@@ -67,7 +65,9 @@ function loadModelOverride(): 'sonnet' | 'haiku' | 'opus' {
   try {
     const raw = localStorage.getItem(MODEL_KEY);
     if (raw === 'sonnet' || raw === 'haiku' || raw === 'opus') return raw;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return 'sonnet';
 }
 
@@ -75,7 +75,9 @@ function loadLastMode(): DashboardMode {
   try {
     const raw = localStorage.getItem(MODE_KEY);
     if (raw === 'standard' || raw === 'simplify' || raw === 'detail') return raw;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return 'standard';
 }
 
@@ -95,7 +97,11 @@ export const useDashboardStore = create<DashboardStoreState>()((set, get) => ({
   lastUsedMode: loadLastMode(),
 
   setActiveTimeRange: (range) => {
-    try { localStorage.setItem(TIME_RANGE_KEY, range); } catch { /* ignore */ }
+    try {
+      localStorage.setItem(TIME_RANGE_KEY, range);
+    } catch {
+      /* ignore */
+    }
     set({ activeTimeRange: range, error: null });
   },
 
@@ -130,12 +136,20 @@ export const useDashboardStore = create<DashboardStoreState>()((set, get) => ({
   clearError: () => set({ error: null }),
 
   setModelOverride: (model) => {
-    try { localStorage.setItem(MODEL_KEY, model); } catch { /* ignore */ }
+    try {
+      localStorage.setItem(MODEL_KEY, model);
+    } catch {
+      /* ignore */
+    }
     set({ modelOverride: model });
   },
 
   setLastUsedMode: (mode) => {
-    try { localStorage.setItem(MODE_KEY, mode); } catch { /* ignore */ }
+    try {
+      localStorage.setItem(MODE_KEY, mode);
+    } catch {
+      /* ignore */
+    }
     set({ lastUsedMode: mode });
   },
 

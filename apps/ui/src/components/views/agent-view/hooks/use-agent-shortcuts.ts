@@ -63,7 +63,7 @@ export function useAgentShortcuts({
         key: 'ctrl+shift+t',
         action: () => {
           setRightPanelMode(
-            rightPanelMode === 'terminal' ? 'files' : ('terminal' as RightPanelMode),
+            rightPanelMode === 'terminal' ? 'files' : ('terminal' as RightPanelMode)
           );
         },
         description: 'Switch to terminal tab',
@@ -96,7 +96,16 @@ export function useAgentShortcuts({
     }
 
     return shortcutsList;
-  }, [currentProject, shortcuts, quickCreateSessionRef, leftPanelTab, setLeftPanelTab, toggleBrowserPanel, rightPanelMode, setRightPanelMode]);
+  }, [
+    currentProject,
+    shortcuts,
+    quickCreateSessionRef,
+    leftPanelTab,
+    setLeftPanelTab,
+    toggleBrowserPanel,
+    rightPanelMode,
+    setRightPanelMode,
+  ]);
 
   // Register keyboard shortcuts
   useKeyboardShortcuts(agentShortcuts);

@@ -22,7 +22,7 @@ export const FilesPanelTerminalToggle = memo(function FilesPanelTerminalToggle({
         'flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] transition-colors',
         open
           ? 'text-foreground bg-muted'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
       )}
       onClick={onToggle}
       title={open ? 'Terminal ausblenden' : 'Terminal einblenden'}
@@ -31,11 +31,7 @@ export const FilesPanelTerminalToggle = memo(function FilesPanelTerminalToggle({
     >
       <Terminal className="h-3 w-3" />
       Terminal
-      {open ? (
-        <ChevronDown className="h-2.5 w-2.5" />
-      ) : (
-        <ChevronUp className="h-2.5 w-2.5" />
-      )}
+      {open ? <ChevronDown className="h-2.5 w-2.5" /> : <ChevronUp className="h-2.5 w-2.5" />}
     </button>
   );
 });

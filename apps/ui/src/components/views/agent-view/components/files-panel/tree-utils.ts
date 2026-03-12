@@ -26,7 +26,7 @@ const HOUR_MS = 3_600_000;
  */
 export function filterFilesByTime(
   files: MarkdownFileEntry[],
-  timeFilterHours: number,
+  timeFilterHours: number
 ): MarkdownFileEntry[] {
   if (timeFilterHours <= 0) return files;
   const cutoff = Date.now() - timeFilterHours * HOUR_MS;
@@ -41,10 +41,7 @@ export function filterFilesByTime(
  * Recursively sorts tree children: folders first, then files.
  * Both groups sorted by the chosen criterion. Returns a new tree.
  */
-export function sortTreeChildren(
-  nodes: FileTreeNode[],
-  sortBy: SortBy,
-): FileTreeNode[] {
+export function sortTreeChildren(nodes: FileTreeNode[], sortBy: SortBy): FileTreeNode[] {
   const folders: FileTreeNode[] = [];
   const files: FileTreeNode[] = [];
 
@@ -66,17 +63,14 @@ export function sortTreeChildren(
   return [...folders, ...files];
 }
 
-function getNodeComparator(
-  sortBy: SortBy,
-): (a: FileTreeNode, b: FileTreeNode) => number {
+function getNodeComparator(sortBy: SortBy): (a: FileTreeNode, b: FileTreeNode) => number {
   switch (sortBy) {
     case 'modified':
       return (a, b) => (b.modified ?? 0) - (a.modified ?? 0);
     case 'created':
       return (a, b) => (b.created ?? 0) - (a.created ?? 0);
     case 'name':
-      return (a, b) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      return (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
   }
 }
 
@@ -97,9 +91,7 @@ export function countFilesInFolder(node: FileTreeNode): number {
 export function getNewestModified(node: FileTreeNode): number {
   let newest = node.modified ?? 0;
   for (const child of node.children) {
-    const ts = child.isDirectory
-      ? getNewestModified(child)
-      : (child.modified ?? 0);
+    const ts = child.isDirectory ? getNewestModified(child) : (child.modified ?? 0);
     if (ts > newest) newest = ts;
   }
   return newest;

@@ -46,51 +46,51 @@ Orchestrator = unser Ablauf-Steuerer für mehrere KI-Schritte hintereinander.
 
 ## Phasenübersicht
 
-| Phase | Datei | Was wird verbessert? | Status |
-| --- | --- | --- | --- |
-| 1 | `01-inputfelder-vereinheitlichen.md` | Einheitliche Felder und ruhiger Toolbar-Look | 📝 Geplant |
-| 2 | `02-toolbar-collapse-expand-animation.md` | Zwei Zustände für Auf/Zuklappen mit klarer Animation | 📝 Geplant |
-| 3 | `03-datei-limit-und-anzahlsteuerung.md` | Auswahl + eigenes Feld für sichtbare Dateimenge | 📝 Geplant |
-| 4 | `04-highlight-optionen.md` | Stärke/Farben vom Highlight-System steuerbar machen | 📝 Geplant |
-| 5 | `05-copy-path-edit-delete.md` | Großer Pfad-Button + Bearbeiten/Löschen im Datei-Preview | 📝 Geplant |
-| 6 | `06-markdown-vorschau-und-zurueck.md` | Gerenderte Markdown-Vorschau mit klarer Zurück-Navigation | 📝 Geplant |
+| Phase | Datei                                     | Was wird verbessert?                                      | Status     |
+| ----- | ----------------------------------------- | --------------------------------------------------------- | ---------- |
+| 1     | `01-inputfelder-vereinheitlichen.md`      | Einheitliche Felder und ruhiger Toolbar-Look              | 📝 Geplant |
+| 2     | `02-toolbar-collapse-expand-animation.md` | Zwei Zustände für Auf/Zuklappen mit klarer Animation      | 📝 Geplant |
+| 3     | `03-datei-limit-und-anzahlsteuerung.md`   | Auswahl + eigenes Feld für sichtbare Dateimenge           | 📝 Geplant |
+| 4     | `04-highlight-optionen.md`                | Stärke/Farben vom Highlight-System steuerbar machen       | 📝 Geplant |
+| 5     | `05-copy-path-edit-delete.md`             | Großer Pfad-Button + Bearbeiten/Löschen im Datei-Preview  | 📝 Geplant |
+| 6     | `06-markdown-vorschau-und-zurueck.md`     | Gerenderte Markdown-Vorschau mit klarer Zurück-Navigation | 📝 Geplant |
 
 ## Chat-Aufteilung mit Token-Schätzung
 
 ### CHAT 1 (Planung Teil 1) ~20.000 Tokens
 
-| Inhalt | Status |
-| --- | --- |
+| Inhalt            | Status      |
+| ----------------- | ----------- |
 | Globale Taskliste | ✅ Erstellt |
-| Phase 1 Planung | ✅ Erstellt |
-| Phase 2 Planung | ✅ Erstellt |
-| Phase 3 Planung | ✅ Erstellt |
+| Phase 1 Planung   | ✅ Erstellt |
+| Phase 2 Planung   | ✅ Erstellt |
+| Phase 3 Planung   | ✅ Erstellt |
 
 ### CHAT 2 (Planung Teil 2) ~20.000 Tokens
 
-| Inhalt | Status |
-| --- | --- |
-| Phase 4 Planung | ✅ Erstellt |
-| Phase 5 Planung | ✅ Erstellt |
-| Phase 6 Planung | ✅ Erstellt |
+| Inhalt               | Status      |
+| -------------------- | ----------- |
+| Phase 4 Planung      | ✅ Erstellt |
+| Phase 5 Planung      | ✅ Erstellt |
+| Phase 6 Planung      | ✅ Erstellt |
 | temp.md aktualisiert | ✅ Erledigt |
 
 ### CHAT 3 (Umsetzung Phase 1 + 2) ~80.000-95.000 Tokens
 
-| Phasen | Ziel |
-| --- | --- |
+| Phasen      | Ziel                                                           |
+| ----------- | -------------------------------------------------------------- |
 | Phase 1 + 2 | Neues Feld-Design und Auf/Zuklappen mit Animation live bringen |
 
 ### CHAT 4 (Umsetzung Phase 3 + 4) ~75.000-90.000 Tokens
 
-| Phasen | Ziel |
-| --- | --- |
+| Phasen      | Ziel                                       |
+| ----------- | ------------------------------------------ |
 | Phase 3 + 4 | Dateilimit und Highlight-Optionen umsetzen |
 
 ### CHAT 5 (Umsetzung Phase 5 + 6) ~80.000-100.000 Tokens
 
-| Phasen | Ziel |
-| --- | --- |
+| Phasen      | Ziel                                                            |
+| ----------- | --------------------------------------------------------------- |
 | Phase 5 + 6 | Pfad-in-Chat, Datei-Aktionen und Markdown-Vorschau finalisieren |
 
 ## Was bedeutet das konkret für den Nutzer?

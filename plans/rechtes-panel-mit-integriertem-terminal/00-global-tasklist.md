@@ -29,14 +29,14 @@ Orchestrator = unser Ablauf-Steuerer für mehrere KI-Schritte hintereinander.
 
 ## Phasenübersicht
 
-| Phase | Datei | Was wird gemacht? | Status |
-| --- | --- | --- | --- |
-| Phase 1 | `01-terminal-tab-rechts-basis.md` (bereits umgesetzt) | Terminal-Tab im rechten Panel | Fertig |
-| Phase 2 | `02-terminal-im-dateien-panel.md` | Terminal unten im Dateien-Bereich einblendbar + resizable | Fertig |
-| Phase 3 | `03-terminal-groesse-und-merken.md` | Größe und Sichtbarkeit pro Projekt merken | Fertig |
-| Phase 4 | `04-terminal-status-und-fehlerhilfe.md` | Klare Hinweise bei gesperrt, aus oder Fehler | Fertig |
-| Phase 5 | `05-kleine-breite-und-tastatur.md` | Bedienung auf schmalem Panel und Tastatur verbessern | Fertig |
-| Phase 6 | `06-abschluss-check-und-doku.md` | Abschluss-Check, Doku, Übergabe | Fertig |
+| Phase   | Datei                                                 | Was wird gemacht?                                         | Status |
+| ------- | ----------------------------------------------------- | --------------------------------------------------------- | ------ |
+| Phase 1 | `01-terminal-tab-rechts-basis.md` (bereits umgesetzt) | Terminal-Tab im rechten Panel                             | Fertig |
+| Phase 2 | `02-terminal-im-dateien-panel.md`                     | Terminal unten im Dateien-Bereich einblendbar + resizable | Fertig |
+| Phase 3 | `03-terminal-groesse-und-merken.md`                   | Größe und Sichtbarkeit pro Projekt merken                 | Fertig |
+| Phase 4 | `04-terminal-status-und-fehlerhilfe.md`               | Klare Hinweise bei gesperrt, aus oder Fehler              | Fertig |
+| Phase 5 | `05-kleine-breite-und-tastatur.md`                    | Bedienung auf schmalem Panel und Tastatur verbessern      | Fertig |
+| Phase 6 | `06-abschluss-check-und-doku.md`                      | Abschluss-Check, Doku, Übergabe                           | Fertig |
 
 ## Chat-Aufteilung mit Token-Schätzung
 

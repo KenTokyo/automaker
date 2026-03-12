@@ -29,12 +29,12 @@ export function FileTree({
         isLoadingRoot: state.isLoadingRoot,
         favorites: state.favorites[projectPath] ?? EMPTY_FAVORITES,
         highlightWindow: state.highlightWindow,
-      })),
+      }))
     );
 
   const isFavoriteCheck = useCallback(
     (filePath: string) => favorites.includes(filePath),
-    [favorites],
+    [favorites]
   );
 
   if (isLoadingRoot) {

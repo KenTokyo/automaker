@@ -80,14 +80,14 @@ Stattdessen wird daraus gezielt wiederverwendbare Logik herausgelöst.
 
 ## Komponenten und Dateien, die in dieser Phase vorbereitet oder angepasst werden
 
-| Bereich | Zweck | Geschätzte Zeilen |
-| --- | --- | --- |
-| Gemeinsame Overview-Typen | einheitliche Datenform für Übersicht | 120-180 |
-| Gemeinsame Explorer-Typen | einheitliche Datenform für Dateien und Filter | 80-140 |
-| Gemeinsamer Overview-API-Helfer | Laden, Status, Generieren, Abbrechen | 120-180 |
-| Gemeinsamer Explorer-API-Helfer | Suche und Zeitfilter sauber bündeln | 80-140 |
-| Rechter-Bereich-Zustand | merkt offenen Bereich und aktiven Modus | 120-200 |
-| Extraktions-Liste für UI-Bausteine | klare Zuordnung, was direkt nutzbar ist | 80-120 |
+| Bereich                            | Zweck                                         | Geschätzte Zeilen |
+| ---------------------------------- | --------------------------------------------- | ----------------- |
+| Gemeinsame Overview-Typen          | einheitliche Datenform für Übersicht          | 120-180           |
+| Gemeinsame Explorer-Typen          | einheitliche Datenform für Dateien und Filter | 80-140            |
+| Gemeinsamer Overview-API-Helfer    | Laden, Status, Generieren, Abbrechen          | 120-180           |
+| Gemeinsamer Explorer-API-Helfer    | Suche und Zeitfilter sauber bündeln           | 80-140            |
+| Rechter-Bereich-Zustand            | merkt offenen Bereich und aktiven Modus       | 120-200           |
+| Extraktions-Liste für UI-Bausteine | klare Zuordnung, was direkt nutzbar ist       | 80-120            |
 
 ## Wiederverwendungsliste
 

@@ -76,13 +76,13 @@ Die Aufgabe ist also nicht Neubau, sondern sauberes Zusammenführen.
 
 ## Benötigte Komponenten
 
-| Komponente oder Bereich | Zweck | Geschätzte Zeilen |
-| --- | --- | --- |
-| RightPanelShell | Hülle für Browser und Dateien | 180-260 |
-| RightPanelModeTabs | Umschalter für Modi | 100-160 |
-| AgentFilesPanel | Datei-Fläche im Automaker-Chat | 160-240 |
-| AgentFilesExplorerAdapter | verbindet Store, API und Anzeige | 180-260 |
-| Header-Trigger-Anpassung | bestehender Knopf bleibt verständlich | 80-140 |
+| Komponente oder Bereich   | Zweck                                 | Geschätzte Zeilen |
+| ------------------------- | ------------------------------------- | ----------------- |
+| RightPanelShell           | Hülle für Browser und Dateien         | 180-260           |
+| RightPanelModeTabs        | Umschalter für Modi                   | 100-160           |
+| AgentFilesPanel           | Datei-Fläche im Automaker-Chat        | 160-240           |
+| AgentFilesExplorerAdapter | verbindet Store, API und Anzeige      | 180-260           |
+| Header-Trigger-Anpassung  | bestehender Knopf bleibt verständlich | 80-140            |
 
 ## Wiederverwendung aus dem Standalone-Chat
 

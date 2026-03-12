@@ -106,13 +106,13 @@ Das heißt:
 
 ## Benötigte Komponenten
 
-| Komponente oder Bereich | Zweck | Geschätzte Zeilen |
-| --- | --- | --- |
-| LeftSidebarTabs | schaltet zwischen `Sessions`, `Docs` und `Übersicht` | 60-100 |
-| SessionManagerShell | hält linken Gesamtaufbau zusammen | 120-180 |
-| SessionListPanel | kapselt die heutige Sessions-Logik besser ab | 120-180 |
-| LeftOverviewPanel | zeigt die Übersicht links als Schnellzugriff | 140-220 |
-| LeftOverviewAdapter | nutzt dieselbe Datenbasis wie rechts | 100-160 |
+| Komponente oder Bereich | Zweck                                                | Geschätzte Zeilen |
+| ----------------------- | ---------------------------------------------------- | ----------------- |
+| LeftSidebarTabs         | schaltet zwischen `Sessions`, `Docs` und `Übersicht` | 60-100            |
+| SessionManagerShell     | hält linken Gesamtaufbau zusammen                    | 120-180           |
+| SessionListPanel        | kapselt die heutige Sessions-Logik besser ab         | 120-180           |
+| LeftOverviewPanel       | zeigt die Übersicht links als Schnellzugriff         | 140-220           |
+| LeftOverviewAdapter     | nutzt dieselbe Datenbasis wie rechts                 | 100-160           |
 
 ## Wiederverwendung
 

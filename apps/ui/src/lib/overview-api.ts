@@ -23,7 +23,7 @@ export async function generateOverview(
   projectPath: string,
   sinceHours: number,
   timeRange: DashboardTimeRange,
-  options: GenerateOverviewOptions = {},
+  options: GenerateOverviewOptions = {}
 ): Promise<DashboardOverviewData> {
   const res = await apiFetch(`${BASE}/generate`, 'POST', {
     body: {
@@ -45,11 +45,11 @@ export async function generateOverview(
 /** Load a previously generated overview. Returns null if none exists. */
 export async function loadOverview(
   projectPath: string,
-  timeRange: DashboardTimeRange,
+  timeRange: DashboardTimeRange
 ): Promise<DashboardOverviewData | null> {
   const res = await apiFetch(
     `${BASE}/${timeRange}?projectPath=${encodeURIComponent(projectPath)}`,
-    'GET',
+    'GET'
   );
 
   if (res.status === 404) return null;
@@ -65,7 +65,7 @@ export async function loadOverview(
 export async function getOverviewStatus(projectPath: string): Promise<OverviewStatusMap> {
   const res = await apiFetch(
     `${BASE}/status?projectPath=${encodeURIComponent(projectPath)}`,
-    'GET',
+    'GET'
   );
 
   const json = await res.json();
@@ -84,7 +84,7 @@ export async function cancelOverview(): Promise<void> {
 export async function saveOverviewAsFile(
   projectPath: string,
   markdown: string,
-  fileName: string,
+  fileName: string
 ): Promise<{ filePath: string }> {
   const res = await apiFetch(`${BASE}/save`, 'POST', {
     body: { projectPath, markdown, fileName },

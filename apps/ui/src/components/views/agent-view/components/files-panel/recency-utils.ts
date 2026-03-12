@@ -40,10 +40,7 @@ const HOUR = 3_600_000;
  * @param timestamp File modification time in ms
  * @param highlightWindowHours Maximum age (in hours) for any highlight. 0 = disabled.
  */
-export function getRecencyClass(
-  timestamp: number,
-  highlightWindowHours: number,
-): RecencyClass {
+export function getRecencyClass(timestamp: number, highlightWindowHours: number): RecencyClass {
   if (highlightWindowHours <= 0 || !timestamp) return '';
 
   const age = Date.now() - timestamp;
@@ -61,10 +58,7 @@ export function getRecencyClass(
 /**
  * Returns the strongest recency class among all descendants of a folder node.
  */
-export function getFolderRecency(
-  node: FileTreeNode,
-  highlightWindowHours: number,
-): RecencyClass {
+export function getFolderRecency(node: FileTreeNode, highlightWindowHours: number): RecencyClass {
   if (highlightWindowHours <= 0) return '';
 
   let best: RecencyClass = '';
@@ -164,22 +158,19 @@ interface RecencyFolderStyle {
 const FILE_STYLES: Record<RecencyClass, RecencyFileStyle | null> = {
   'recency-10m': {
     borderLeft: '3px solid #ff6b35',
-    background:
-      'linear-gradient(90deg, rgba(255,107,53,0.12) 0%, rgba(255,107,53,0.04) 100%)',
+    background: 'linear-gradient(90deg, rgba(255,107,53,0.12) 0%, rgba(255,107,53,0.04) 100%)',
     dateColor: '#ff6b35',
     dateFontWeight: '600',
   },
   'recency-30m': {
     borderLeft: '3px solid #e8a317',
-    background:
-      'linear-gradient(90deg, rgba(232,163,23,0.10) 0%, rgba(232,163,23,0.03) 100%)',
+    background: 'linear-gradient(90deg, rgba(232,163,23,0.10) 0%, rgba(232,163,23,0.03) 100%)',
     dateColor: '#e8a317',
     dateFontWeight: '500',
   },
   'recency-1h': {
     borderLeft: '2px solid rgba(196,167,42,0.70)',
-    background:
-      'linear-gradient(90deg, rgba(196,167,42,0.07) 0%, rgba(196,167,42,0.02) 100%)',
+    background: 'linear-gradient(90deg, rgba(196,167,42,0.07) 0%, rgba(196,167,42,0.02) 100%)',
     dateColor: '#c4a72a',
   },
   'recency-2h': {
@@ -195,16 +186,13 @@ const FILE_STYLES: Record<RecencyClass, RecencyFileStyle | null> = {
 
 const FOLDER_STYLES: Record<RecencyClass, RecencyFolderStyle | null> = {
   'recency-10m': {
-    background:
-      'linear-gradient(90deg, rgba(255,107,53,0.08) 0%, transparent 100%)',
+    background: 'linear-gradient(90deg, rgba(255,107,53,0.08) 0%, transparent 100%)',
   },
   'recency-30m': {
-    background:
-      'linear-gradient(90deg, rgba(232,163,23,0.06) 0%, transparent 100%)',
+    background: 'linear-gradient(90deg, rgba(232,163,23,0.06) 0%, transparent 100%)',
   },
   'recency-1h': {
-    background:
-      'linear-gradient(90deg, rgba(196,167,42,0.04) 0%, transparent 100%)',
+    background: 'linear-gradient(90deg, rgba(196,167,42,0.04) 0%, transparent 100%)',
   },
   'recency-2h': null,
   'recency-6h': null,
@@ -212,33 +200,25 @@ const FOLDER_STYLES: Record<RecencyClass, RecencyFolderStyle | null> = {
 };
 
 /** Returns inline style object for a file item based on its recency. */
-export function getFileRecencyStyle(
-  recency: RecencyClass,
-): React.CSSProperties | undefined {
+export function getFileRecencyStyle(recency: RecencyClass): React.CSSProperties | undefined {
   const style = FILE_STYLES[recency];
   if (!style) return undefined;
   return { borderLeft: style.borderLeft, background: style.background };
 }
 
 /** Returns inline style object for a folder item based on its recency. */
-export function getFolderRecencyStyle(
-  recency: RecencyClass,
-): React.CSSProperties | undefined {
+export function getFolderRecencyStyle(recency: RecencyClass): React.CSSProperties | undefined {
   const style = FOLDER_STYLES[recency];
   if (!style) return undefined;
   return { background: style.background };
 }
 
 /** Returns the accent color for the modified-date text. */
-export function getDateRecencyColor(
-  recency: RecencyClass,
-): string | undefined {
+export function getDateRecencyColor(recency: RecencyClass): string | undefined {
   return FILE_STYLES[recency]?.dateColor;
 }
 
 /** Returns the font weight for the modified-date text. */
-export function getDateRecencyFontWeight(
-  recency: RecencyClass,
-): string | undefined {
+export function getDateRecencyFontWeight(recency: RecencyClass): string | undefined {
   return FILE_STYLES[recency]?.dateFontWeight;
 }

@@ -85,13 +85,13 @@ bestehende Logik wiederverwenden, aber die Kopplung an `apps/chat` auflösen.
 
 ## Benötigte Komponenten
 
-| Komponente oder Bereich | Zweck | Geschätzte Zeilen |
-| --- | --- | --- |
-| AgentOverviewPanel | sichtbare Übersicht im rechten Bereich | 180-260 |
-| AgentOverviewAdapter | verbindet Store, API und Panel | 180-260 |
-| RightPanelModeTabs Erweiterung | dritter Modus `Übersicht` | 80-140 |
-| OverviewStatusHint | kleiner Hinweis für Laden oder vorhandene Daten | 60-120 |
-| Reused Dashboard Cards | Anzeige von Inhalt, Verbesserungen und Sicherheit | 140-220 |
+| Komponente oder Bereich        | Zweck                                             | Geschätzte Zeilen |
+| ------------------------------ | ------------------------------------------------- | ----------------- |
+| AgentOverviewPanel             | sichtbare Übersicht im rechten Bereich            | 180-260           |
+| AgentOverviewAdapter           | verbindet Store, API und Panel                    | 180-260           |
+| RightPanelModeTabs Erweiterung | dritter Modus `Übersicht`                         | 80-140            |
+| OverviewStatusHint             | kleiner Hinweis für Laden oder vorhandene Daten   | 60-120            |
+| Reused Dashboard Cards         | Anzeige von Inhalt, Verbesserungen und Sicherheit | 140-220           |
 
 ## Wiederverwendung aus dem Standalone-Chat
 

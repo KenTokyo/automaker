@@ -100,14 +100,14 @@ Gerade deshalb braucht es am Ende eine klare Abschluss-Schicht.
 
 ## Benötigte Bereiche
 
-| Bereich | Zweck | Geschätzte Zeilen |
-| --- | --- | --- |
-| FinalChecklist | Abschluss-Liste für rechts, links und Altlasten | 80-140 |
-| ValidationNotes | Nutzerwege, Fehlerfälle und Projektwechsel prüfen | 80-140 |
-| TypeCheckStep | TypeScript-Endprüfung festhalten | 20-40 |
-| Utf8Review | Umlaute und verständliche Texte prüfen | 40-80 |
-| OpenRisksList | bewusst offene Restpunkte sammeln | 60-100 |
-| HandoverBlock | klare Übergabe für Folge-Chat oder Team | 60-100 |
+| Bereich         | Zweck                                             | Geschätzte Zeilen |
+| --------------- | ------------------------------------------------- | ----------------- |
+| FinalChecklist  | Abschluss-Liste für rechts, links und Altlasten   | 80-140            |
+| ValidationNotes | Nutzerwege, Fehlerfälle und Projektwechsel prüfen | 80-140            |
+| TypeCheckStep   | TypeScript-Endprüfung festhalten                  | 20-40             |
+| Utf8Review      | Umlaute und verständliche Texte prüfen            | 40-80             |
+| OpenRisksList   | bewusst offene Restpunkte sammeln                 | 60-100            |
+| HandoverBlock   | klare Übergabe für Folge-Chat oder Team           | 60-100            |
 
 ## Was genau geprüft werden soll
 

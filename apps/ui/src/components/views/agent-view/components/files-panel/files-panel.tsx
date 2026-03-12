@@ -80,7 +80,7 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
       highlightWindow: state.highlightWindow,
       terminalOpen: state.terminalOpenByProject[projectPath] ?? false,
       terminalSize: state.terminalSizeByProject[projectPath] ?? DEFAULT_TERMINAL_SIZE,
-    })),
+    }))
   );
 
   const prevProjectRef = useRef<string | null>(null);
@@ -147,14 +147,14 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
     (filePath: string) => {
       useExplorerStore.getState().toggleFavorite(projectPath, filePath);
     },
-    [projectPath],
+    [projectPath]
   );
 
   const handleRemoveFavorite = useCallback(
     (filePath: string) => {
       useExplorerStore.getState().toggleFavorite(projectPath, filePath);
     },
-    [projectPath],
+    [projectPath]
   );
 
   // Tab & search
@@ -194,7 +194,7 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
     (size: number) => {
       useExplorerStore.getState().setTerminalSize(projectPath, size);
     },
-    [projectPath],
+    [projectPath]
   );
 
   const filesFontSize = useAppStore((s) => s.filesPanelFontSize);
@@ -248,7 +248,9 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
               aria-label="Sortierung"
             >
               {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
               ))}
             </select>
 
@@ -260,7 +262,9 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
               aria-label="Zeitfilter"
             >
               {TIME_FILTER_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
               ))}
             </select>
 
@@ -272,7 +276,9 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
               aria-label="Highlight-Fenster"
             >
               {HIGHLIGHT_WINDOW_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
               ))}
             </select>
           </div>
@@ -297,10 +303,7 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
               <RefreshCw className="h-3 w-3" />
               Refresh
             </button>
-            <FilesPanelTerminalToggle
-              open={terminalOpen}
-              onToggle={handleTerminalToggle}
-            />
+            <FilesPanelTerminalToggle open={terminalOpen} onToggle={handleTerminalToggle} />
             {totalFileCount > 0 && (
               <span className="ml-auto text-[10px] text-muted-foreground whitespace-nowrap">
                 {isFiltered
@@ -477,7 +480,12 @@ interface FilesFooterProps {
   totalFileCount: number;
 }
 
-function FilesFooter({ showPreview, isFiltered, filteredFileCount, totalFileCount }: FilesFooterProps) {
+function FilesFooter({
+  showPreview,
+  isFiltered,
+  filteredFileCount,
+  totalFileCount,
+}: FilesFooterProps) {
   return (
     <p className="text-[10px] text-muted-foreground">
       {showPreview ? (
@@ -516,7 +524,11 @@ function FilesContent({
   onToggleFolder,
   onToggleFavorite,
   onRemoveFavorite,
-}: FilesMainContentProps & { isFiltered: boolean; totalFileCount: number; filteredFileCount: number }) {
+}: FilesMainContentProps & {
+  isFiltered: boolean;
+  totalFileCount: number;
+  filteredFileCount: number;
+}) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -568,7 +580,7 @@ function TabButton({ active, icon, label, onClick }: TabButtonProps) {
         'flex items-center gap-1 rounded-sm px-2 py-1 text-xs transition-colors',
         active
           ? 'bg-muted text-foreground font-medium'
-          : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+          : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
       )}
       onClick={onClick}
     >

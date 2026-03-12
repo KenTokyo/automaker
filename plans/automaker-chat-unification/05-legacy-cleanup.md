@@ -106,13 +106,13 @@ Das heißt:
 
 ## Benötigte Bereiche
 
-| Bereich | Zweck | Geschätzte Zeilen |
-| --- | --- | --- |
-| Legacy-Audit-Liste | alle alten Standalone-Wege sammeln | 80-120 |
-| Startweg-Bereinigung | Scripts, Launcher, Hinweise ordnen | 80-160 |
-| Übergangs-Regeln | klare Ansage für neue Arbeiten | 40-80 |
-| Quellen-Map | was aus `apps/chat` noch gebraucht wird | 60-120 |
-| Rückbau-Risiken | spätere Stolperstellen festhalten | 60-100 |
+| Bereich              | Zweck                                   | Geschätzte Zeilen |
+| -------------------- | --------------------------------------- | ----------------- |
+| Legacy-Audit-Liste   | alle alten Standalone-Wege sammeln      | 80-120            |
+| Startweg-Bereinigung | Scripts, Launcher, Hinweise ordnen      | 80-160            |
+| Übergangs-Regeln     | klare Ansage für neue Arbeiten          | 40-80             |
+| Quellen-Map          | was aus `apps/chat` noch gebraucht wird | 60-120            |
+| Rückbau-Risiken      | spätere Stolperstellen festhalten       | 60-100            |
 
 ## Wiederverwendung und Vorsicht
 

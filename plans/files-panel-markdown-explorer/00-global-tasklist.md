@@ -32,13 +32,13 @@ Der aktuelle Ansatz (lazy-loading per `readdir`) wird **ersetzt** durch einen Ba
 
 ### Warum Batch statt Lazy-Loading?
 
-| Aspekt | Lazy-Loading (aktuell) | Batch (neu) |
-| --- | --- | --- |
-| Sortierung ueber ganzen Baum | Nicht moeglich | Ja |
-| Recency auf Ordnern | Nicht moeglich | Ja |
-| Zeitfilter | Muesste pro Ordner filtern | Ein Filter auf alle Dateien |
-| Dateianzahl | Nur pro sichtbarem Ordner | Gesamt korrekt |
-| Performance bei .md only | Uebermaessig (laedt alle Dateien) | Effizient (nur .md Dateien) |
+| Aspekt                       | Lazy-Loading (aktuell)            | Batch (neu)                 |
+| ---------------------------- | --------------------------------- | --------------------------- |
+| Sortierung ueber ganzen Baum | Nicht moeglich                    | Ja                          |
+| Recency auf Ordnern          | Nicht moeglich                    | Ja                          |
+| Zeitfilter                   | Muesste pro Ordner filtern        | Ein Filter auf alle Dateien |
+| Dateianzahl                  | Nur pro sichtbarem Ordner         | Gesamt korrekt              |
+| Performance bei .md only     | Uebermaessig (laedt alle Dateien) | Effizient (nur .md Dateien) |
 
 ## Wiederverwendung vor Neubau
 
@@ -62,40 +62,40 @@ Der aktuelle Ansatz (lazy-loading per `readdir`) wird **ersetzt** durch einen Ba
 
 ## Phasenuebersicht
 
-| Phase | Datei | Titel | Ziel | Status |
-| --- | --- | --- | --- | --- |
-| 1 | `01-markdown-only-tree.md` | Markdown-Only Tree mit Timestamps | Backend erweitern, Store umbauen, Tree client-seitig bauen, nur .md Dateien | ✅ Fertig |
-| 2 | `02-recency-highlighting.md` | Recency-Highlighting & Date-Display | Farbliche Zeitmarkierungen, Datums-Anzeige pro Datei, Smart-Date-Formatting | ✅ Fertig |
-| 3 | `03-sorting-filtering-toolbar.md` | Sortierung, Filter & Toolbar | Sort-Dropdown, funktionaler Zeitfilter, Collapse/Refresh, Ordner-Meta, File Count | ✅ Fertig |
+| Phase | Datei                             | Titel                               | Ziel                                                                              | Status    |
+| ----- | --------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------- | --------- |
+| 1     | `01-markdown-only-tree.md`        | Markdown-Only Tree mit Timestamps   | Backend erweitern, Store umbauen, Tree client-seitig bauen, nur .md Dateien       | ✅ Fertig |
+| 2     | `02-recency-highlighting.md`      | Recency-Highlighting & Date-Display | Farbliche Zeitmarkierungen, Datums-Anzeige pro Datei, Smart-Date-Formatting       | ✅ Fertig |
+| 3     | `03-sorting-filtering-toolbar.md` | Sortierung, Filter & Toolbar        | Sort-Dropdown, funktionaler Zeitfilter, Collapse/Refresh, Ordner-Meta, File Count | ✅ Fertig |
 
 ## Aufteilung nach Chats
 
 ### Chat 1 (Planung) ✅ ABGESCHLOSSEN
 
-| Phase | Datei | Schwerpunkt | Status |
-| --- | --- | --- | --- |
-| 0 | `00-global-tasklist.md` | Globale Taskliste | ✅ Erstellt |
-| 1 | `01-markdown-only-tree.md` | Backend + Store + Tree-Umbau | ✅ Planung fertig |
-| 2 | `02-recency-highlighting.md` | Recency + Dates | ✅ Planung fertig |
-| 3 | `03-sorting-filtering-toolbar.md` | Sort, Filter, Toolbar | ✅ Planung fertig |
+| Phase | Datei                             | Schwerpunkt                  | Status            |
+| ----- | --------------------------------- | ---------------------------- | ----------------- |
+| 0     | `00-global-tasklist.md`           | Globale Taskliste            | ✅ Erstellt       |
+| 1     | `01-markdown-only-tree.md`        | Backend + Store + Tree-Umbau | ✅ Planung fertig |
+| 2     | `02-recency-highlighting.md`      | Recency + Dates              | ✅ Planung fertig |
+| 3     | `03-sorting-filtering-toolbar.md` | Sort, Filter, Toolbar        | ✅ Planung fertig |
 
 ### Chat 2 (Implementierung Phase 1)
 
-| Phase | Datei | Schwerpunkt | Geschaetzte Tokens |
-| --- | --- | --- | --- |
-| 1 | `01-markdown-only-tree.md` | Backend-Erweiterung, Store-Umbau, Tree client-seitig aufbauen, Markdown-only Filter | ~100.000-120.000 |
+| Phase | Datei                      | Schwerpunkt                                                                         | Geschaetzte Tokens |
+| ----- | -------------------------- | ----------------------------------------------------------------------------------- | ------------------ |
+| 1     | `01-markdown-only-tree.md` | Backend-Erweiterung, Store-Umbau, Tree client-seitig aufbauen, Markdown-only Filter | ~100.000-120.000   |
 
 ### Chat 3 (Implementierung Phase 2)
 
-| Phase | Datei | Schwerpunkt | Geschaetzte Tokens |
-| --- | --- | --- | --- |
-| 2 | `02-recency-highlighting.md` | Recency-Klassen, Farbsystem, Date-Display, Smart-Formatting | ~80.000-100.000 |
+| Phase | Datei                        | Schwerpunkt                                                 | Geschaetzte Tokens |
+| ----- | ---------------------------- | ----------------------------------------------------------- | ------------------ |
+| 2     | `02-recency-highlighting.md` | Recency-Klassen, Farbsystem, Date-Display, Smart-Formatting | ~80.000-100.000    |
 
 ### Chat 4 (Implementierung Phase 3)
 
-| Phase | Datei | Schwerpunkt | Geschaetzte Tokens |
-| --- | --- | --- | --- |
-| 3 | `03-sorting-filtering-toolbar.md` | Sort-Dropdown, Zeitfilter, Toolbar-Buttons, Ordner-Meta, File Count | ~80.000-100.000 |
+| Phase | Datei                             | Schwerpunkt                                                         | Geschaetzte Tokens |
+| ----- | --------------------------------- | ------------------------------------------------------------------- | ------------------ |
+| 3     | `03-sorting-filtering-toolbar.md` | Sort-Dropdown, Zeitfilter, Toolbar-Buttons, Ordner-Meta, File Count | ~80.000-100.000    |
 
 ## Reihenfolge und Abhaengigkeiten
 

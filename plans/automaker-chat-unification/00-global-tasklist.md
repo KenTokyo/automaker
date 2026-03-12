@@ -80,37 +80,37 @@ Diese Dinge sollen weiterverwendet werden:
 
 ## Phasenübersicht
 
-| Phase | Datei | Titel | Ziel | Status |
-| --- | --- | --- | --- | --- |
-| 1 | `01-shared-foundation.md` | Gemeinsame Basis und Wiederverwendung | doppelte Typen, API-Helfer und Zustände sauber zusammenziehen | ✅ Datei erstellt |
-| 2 | `02-right-panel-files.md` | Rechte Seite: Browser und Dateien | rechter Bereich bekommt einen sauberen Umschalter und den Datei-Bereich | ✅ Datei erstellt |
-| 3 | `03-right-panel-dashboard.md` | Rechte Seite: Übersicht | Dashboard im Automaker-Chat rechts nutzbar machen | ✅ Datei erstellt |
-| 4 | `04-left-panel-overview-docs.md` | Linke Seite: Sessions, Docs, Übersicht | linke Seitenleiste klar erweitern, ohne neue Doppel-Logik | ✅ Fertig |
-| 5 | `05-legacy-cleanup.md` | Altlasten abbauen | Standalone-spezifische Doppelungen stoppen und Übergänge dokumentieren | ✅ Fertig |
-| 6 | `06-validation-handover.md` | Abschluss und Übergabe | Prüfung, Rest-Risiken, Übergabe und klare Abschluss-Checkliste | ✅ Fertig |
+| Phase | Datei                            | Titel                                  | Ziel                                                                    | Status            |
+| ----- | -------------------------------- | -------------------------------------- | ----------------------------------------------------------------------- | ----------------- |
+| 1     | `01-shared-foundation.md`        | Gemeinsame Basis und Wiederverwendung  | doppelte Typen, API-Helfer und Zustände sauber zusammenziehen           | ✅ Datei erstellt |
+| 2     | `02-right-panel-files.md`        | Rechte Seite: Browser und Dateien      | rechter Bereich bekommt einen sauberen Umschalter und den Datei-Bereich | ✅ Datei erstellt |
+| 3     | `03-right-panel-dashboard.md`    | Rechte Seite: Übersicht                | Dashboard im Automaker-Chat rechts nutzbar machen                       | ✅ Datei erstellt |
+| 4     | `04-left-panel-overview-docs.md` | Linke Seite: Sessions, Docs, Übersicht | linke Seitenleiste klar erweitern, ohne neue Doppel-Logik               | ✅ Fertig         |
+| 5     | `05-legacy-cleanup.md`           | Altlasten abbauen                      | Standalone-spezifische Doppelungen stoppen und Übergänge dokumentieren  | ✅ Fertig         |
+| 6     | `06-validation-handover.md`      | Abschluss und Übergabe                 | Prüfung, Rest-Risiken, Übergabe und klare Abschluss-Checkliste          | ✅ Fertig         |
 
 ## Aufteilung nach Chats
 
 ### Chat 1
 
-| Phase | Datei | Schwerpunkt | Status |
-| --- | --- | --- | --- |
-| 1 | `01-shared-foundation.md` | gemeinsame Grundlage | ✅ Datei erstellt |
-| 2 | `02-right-panel-files.md` | rechter Bereich mit Dateien | ✅ Datei erstellt |
-| 3 | `03-right-panel-dashboard.md` | rechter Bereich mit Übersicht | ✅ Datei erstellt |
+| Phase | Datei                         | Schwerpunkt                   | Status            |
+| ----- | ----------------------------- | ----------------------------- | ----------------- |
+| 1     | `01-shared-foundation.md`     | gemeinsame Grundlage          | ✅ Datei erstellt |
+| 2     | `02-right-panel-files.md`     | rechter Bereich mit Dateien   | ✅ Datei erstellt |
+| 3     | `03-right-panel-dashboard.md` | rechter Bereich mit Übersicht | ✅ Datei erstellt |
 
 ### Chat 2
 
-| Phase | Datei | Schwerpunkt | Status |
-| --- | --- | --- | --- |
-| 4 | `04-left-panel-overview-docs.md` | linke Seitenleiste ordnen | ✅ Fertig |
-| 5 | `05-legacy-cleanup.md` | doppelte Wege abbauen | ✅ Fertig |
+| Phase | Datei                            | Schwerpunkt               | Status    |
+| ----- | -------------------------------- | ------------------------- | --------- |
+| 4     | `04-left-panel-overview-docs.md` | linke Seitenleiste ordnen | ✅ Fertig |
+| 5     | `05-legacy-cleanup.md`           | doppelte Wege abbauen     | ✅ Fertig |
 
 ### Chat 3
 
-| Phase | Datei | Schwerpunkt | Status |
-| --- | --- | --- | --- |
-| 6 | `06-validation-handover.md` | Abschluss und Übergabe | ✅ Fertig |
+| Phase | Datei                       | Schwerpunkt            | Status    |
+| ----- | --------------------------- | ---------------------- | --------- |
+| 6     | `06-validation-handover.md` | Abschluss und Übergabe | ✅ Fertig |
 
 ## Reihenfolge und Abhängigkeiten
 

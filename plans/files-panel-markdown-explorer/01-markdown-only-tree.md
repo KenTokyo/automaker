@@ -137,25 +137,30 @@ Statt eines ueberladenen Dateibaums mit Docker-Dateien, YAML-Configs und Shell-S
 ### Chat 2 - Phase 1 Implementierung (~100.000-120.000 Tokens)
 
 **Schritt 1:** Backend erweitern (1.1 + 1.2)
+
 - `markdown-explorer-service.ts`: `created` Feld hinzufuegen, sinceHours=0 behandeln
 - `files-by-time.ts`: sinceHours optional machen
 - TypeScript-Check
 
 **Schritt 2:** API-Client anpassen (1.7)
+
 - `http-api-client.ts`: Rueckgabe-Typ erweitern
 - TypeScript-Check
 
 **Schritt 3:** Store umbauen (1.3)
+
 - `explorer-store.ts`: Neue Felder, `buildTreeData()`, Actions anpassen
 - Alte Actions (`setChildren`, `setChildrenLoading`) entfernen
 - TypeScript-Check
 
 **Schritt 4:** FilesPanel umbauen (1.4)
+
 - `files-panel.tsx`: Batch-Loading statt lazy-loading
 - Alte Hilfsfunktionen entfernen
 - TypeScript-Check
 
 **Schritt 5:** FileTree + FileTreeItem anpassen (1.5 + 1.6)
+
 - `file-tree.tsx`: Loading-States vereinfachen
 - `file-tree-item.tsx`: Icon-Logik vereinfachen, Timestamps vorbereiten
 - TypeScript-Check
@@ -166,16 +171,16 @@ Statt eines ueberladenen Dateibaums mit Docker-Dateien, YAML-Configs und Shell-S
 
 ## 🔗 Betroffene Dateien
 
-| Datei | Aenderungstyp | Geschaetzte Zeilen |
-| --- | --- | --- |
-| `apps/server/src/services/markdown-explorer-service.ts` | Erweitern | ~30 |
-| `apps/server/src/routes/markdown-explorer/routes/files-by-time.ts` | Anpassen | ~15 |
-| `apps/ui/src/store/explorer-store.ts` | Umbauen | ~120 |
-| `apps/ui/src/components/.../files-panel/files-panel.tsx` | Umbauen | ~80 |
-| `apps/ui/src/components/.../files-panel/file-tree.tsx` | Anpassen | ~20 |
-| `apps/ui/src/components/.../files-panel/file-tree-item.tsx` | Anpassen | ~40 |
-| `apps/ui/src/lib/http-api-client.ts` | Erweitern | ~10 |
-| **Gesamt** | | **~315** |
+| Datei                                                              | Aenderungstyp | Geschaetzte Zeilen |
+| ------------------------------------------------------------------ | ------------- | ------------------ |
+| `apps/server/src/services/markdown-explorer-service.ts`            | Erweitern     | ~30                |
+| `apps/server/src/routes/markdown-explorer/routes/files-by-time.ts` | Anpassen      | ~15                |
+| `apps/ui/src/store/explorer-store.ts`                              | Umbauen       | ~120               |
+| `apps/ui/src/components/.../files-panel/files-panel.tsx`           | Umbauen       | ~80                |
+| `apps/ui/src/components/.../files-panel/file-tree.tsx`             | Anpassen      | ~20                |
+| `apps/ui/src/components/.../files-panel/file-tree-item.tsx`        | Anpassen      | ~40                |
+| `apps/ui/src/lib/http-api-client.ts`                               | Erweitern     | ~10                |
+| **Gesamt**                                                         |               | **~315**           |
 
 ---
 

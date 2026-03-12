@@ -10,14 +10,14 @@ ULTRATHINK
 
 ## Bereits angelegte Plan-Dateien
 
-| Phase | Datei | Status |
-| --- | --- | --- |
-| 1 | `01-shared-foundation.md` | ✅ Datei erstellt |
-| 2 | `02-right-panel-files.md` | ✅ Datei erstellt |
-| 3 | `03-right-panel-dashboard.md` | ✅ Datei erstellt |
-| 4 | `04-left-panel-overview-docs.md` | ✅ Datei erstellt |
-| 5 | `05-legacy-cleanup.md` | ✅ Datei erstellt |
-| 6 | `06-validation-handover.md` | ✅ Datei erstellt |
+| Phase | Datei                            | Status            |
+| ----- | -------------------------------- | ----------------- |
+| 1     | `01-shared-foundation.md`        | ✅ Datei erstellt |
+| 2     | `02-right-panel-files.md`        | ✅ Datei erstellt |
+| 3     | `03-right-panel-dashboard.md`    | ✅ Datei erstellt |
+| 4     | `04-left-panel-overview-docs.md` | ✅ Datei erstellt |
+| 5     | `05-legacy-cleanup.md`           | ✅ Datei erstellt |
+| 6     | `06-validation-handover.md`      | ✅ Datei erstellt |
 
 ## Wichtigste Architektur-Entscheidung
 

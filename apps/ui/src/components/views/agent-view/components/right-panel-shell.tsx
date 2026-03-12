@@ -23,16 +23,9 @@ import { useAppStore } from '@/store/app-store';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
 import { FontSizeStepper } from '@/components/ui/font-size-stepper';
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from '@/components/ui/resizable';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import type { RightPanelMode } from '@/store/types/ui-types';
-import {
-  RIGHT_PANEL_FONT_SIZE_MIN,
-  RIGHT_PANEL_FONT_SIZE_MAX,
-} from '@/store/types/ui-types';
+import { RIGHT_PANEL_FONT_SIZE_MIN, RIGHT_PANEL_FONT_SIZE_MAX } from '@/store/types/ui-types';
 import { BrowserPanel } from './browser-panel';
 import { DashboardPanel } from './dashboard-panel';
 import { FilesPanel } from './files-panel';
@@ -59,13 +52,7 @@ const MODE_TABS: { mode: RightPanelMode; label: string; icon: typeof Globe }[] =
 // Panel content renderer (reused for primary & secondary)
 // ---------------------------------------------------------------------------
 
-function PanelContent({
-  mode,
-  projectPath,
-}: {
-  mode: RightPanelMode;
-  projectPath: string;
-}) {
+function PanelContent({ mode, projectPath }: { mode: RightPanelMode; projectPath: string }) {
   switch (mode) {
     case 'browser':
       return <BrowserPanel projectPath={projectPath} />;
@@ -110,7 +97,7 @@ function PanelFontSizeControl({ mode }: { mode: RightPanelMode }) {
       setFilesFontSize: s.setFilesPanelFontSize,
       setDashboardFontSize: s.setDashboardPanelFontSize,
       setTerminalFontSize: s.setTerminalDefaultFontSize,
-    })),
+    }))
   );
 
   switch (mode) {
@@ -188,9 +175,9 @@ function SecondaryTabBar({
                 ? 'bg-background text-foreground border-b-2 border-b-primary font-medium'
                 : isPrimaryMode
                   ? 'text-muted-foreground/40 hover:bg-muted/30 hover:text-muted-foreground'
-                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
             )}
-            onClick={() => isPrimaryMode ? onSwapPanels() : onSelectSecondary(mode)}
+            onClick={() => (isPrimaryMode ? onSwapPanels() : onSelectSecondary(mode))}
           >
             <Icon className="w-3 h-3 shrink-0" />
             {!iconOnly && label}
@@ -223,16 +210,12 @@ function SecondaryTabBar({
 export const RightPanelShell = memo(function RightPanelShell({
   projectPath,
 }: RightPanelShellProps) {
-  const {
-    rightPanelMode,
-    rightPanelSecondaryMode,
-    rightPanelSplitSize,
-  } = useAppStore(
+  const { rightPanelMode, rightPanelSecondaryMode, rightPanelSplitSize } = useAppStore(
     useShallow((s) => ({
       rightPanelMode: s.rightPanelMode,
       rightPanelSecondaryMode: s.rightPanelSecondaryMode,
       rightPanelSplitSize: s.rightPanelSplitSize,
-    })),
+    }))
   );
 
   const setRightPanelMode = useAppStore((s) => s.setRightPanelMode);
@@ -266,14 +249,14 @@ export const RightPanelShell = memo(function RightPanelShell({
         setRightPanelSplitSize(sizes[0]);
       }
     },
-    [rightPanelSplitSize, setRightPanelSplitSize],
+    [rightPanelSplitSize, setRightPanelSplitSize]
   );
 
   const handleSelectSecondary = useCallback(
     (mode: RightPanelMode) => {
       setRightPanelSecondaryMode(mode);
     },
-    [setRightPanelSecondaryMode],
+    [setRightPanelSecondaryMode]
   );
 
   // Swap primary ↔ secondary: setRightPanelMode already handles the swap
@@ -288,7 +271,11 @@ export const RightPanelShell = memo(function RightPanelShell({
   }, [setRightPanelSecondaryMode]);
 
   return (
-    <div ref={containerRef} className="h-full flex flex-col overflow-hidden" style={{ minWidth: 220 }}>
+    <div
+      ref={containerRef}
+      className="h-full flex flex-col overflow-hidden"
+      style={{ minWidth: 220 }}
+    >
       {/* Mode tabs */}
       <div
         className="flex items-center gap-0 bg-muted/30 border-b border-border shrink-0"
@@ -310,7 +297,7 @@ export const RightPanelShell = memo(function RightPanelShell({
                 iconOnly ? 'px-2.5' : 'px-3',
                 isActive
                   ? 'bg-background text-foreground border-b-2 border-b-primary font-medium'
-                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
               )}
               onClick={() => setRightPanelMode(mode)}
             >
@@ -332,7 +319,7 @@ export const RightPanelShell = memo(function RightPanelShell({
             'flex items-center justify-center h-6 w-6 mr-1 rounded transition-colors',
             isSplit
               ? 'bg-primary/15 text-primary hover:bg-primary/25'
-              : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
           )}
           onClick={toggleRightPanelSplit}
           title={isSplit ? 'Terminal ausblenden' : 'Terminal unten einblenden'}
@@ -350,20 +337,13 @@ export const RightPanelShell = memo(function RightPanelShell({
           className="flex-1 min-h-0"
         >
           {/* Primary panel (top) */}
-          <ResizablePanel
-            defaultSize={rightPanelSplitSize}
-            minSize={15}
-            order={1}
-          >
+          <ResizablePanel defaultSize={rightPanelSplitSize} minSize={15} order={1}>
             <div className="h-full min-h-0 overflow-hidden" role="tabpanel">
               <PanelContent mode={rightPanelMode} projectPath={projectPath} />
             </div>
           </ResizablePanel>
 
-          <ResizableHandle
-            withHandle
-            aria-label="Trennleiste zwischen den Panels"
-          />
+          <ResizableHandle withHandle aria-label="Trennleiste zwischen den Panels" />
 
           {/* Secondary panel (bottom) */}
           <ResizablePanel

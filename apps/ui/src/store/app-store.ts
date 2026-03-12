@@ -539,7 +539,8 @@ const initialState: AppState = {
   docsAutoSaveDelay: parseInt(getItem('automaker:docsAutoSaveDelay') || '3000', 10),
   // Right Panel State
   rightPanelMode: 'browser' as const,
-  rightPanelSecondaryMode: (getItem('automaker:rightPanelSecondaryMode') || null) as RightPanelMode | null,
+  rightPanelSecondaryMode: (getItem('automaker:rightPanelSecondaryMode') ||
+    null) as RightPanelMode | null,
   rightPanelSplitSize: parseInt(getItem('automaker:rightPanelSplitSize') || '50', 10),
   // Right Panel Font Sizes
   filesPanelFontSize: parseInt(getItem('automaker:filesPanelFontSize') || '13', 10),
@@ -3052,9 +3053,11 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     } else {
       // Open split with a sensible default: if primary is terminal, show files; otherwise show terminal
       const defaultSecondary: RightPanelMode =
-        state.rightPanelMode === 'terminal' ? 'files'
-        : state.rightPanelMode === 'files' ? 'terminal'
-        : 'terminal';
+        state.rightPanelMode === 'terminal'
+          ? 'files'
+          : state.rightPanelMode === 'files'
+            ? 'terminal'
+            : 'terminal';
       set({ rightPanelSecondaryMode: defaultSecondary });
       setItem('automaker:rightPanelSecondaryMode', defaultSecondary);
     }
