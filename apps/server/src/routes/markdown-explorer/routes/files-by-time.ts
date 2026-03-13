@@ -24,7 +24,7 @@ export function createFilesByTimeHandler() {
 
       // sinceHours is optional: 0 or omitted = all markdown files (no time filter)
       const sinceHours = Number.isFinite(sinceHoursRaw) && sinceHoursRaw >= 0 ? sinceHoursRaw : 0;
-      const safeLimit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 1000) : 500;
+      const safeLimit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 5000) : 1000;
 
       const files = await getFilesFilteredByTime(projectPath, sinceHours, safeLimit);
 

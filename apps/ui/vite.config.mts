@@ -78,7 +78,7 @@ export default defineConfig(({ command }) => {
     },
     build: {
       outDir: 'dist',
-      rollupOptions: {
+      rolldownOptions: {
         external: [
           'child_process',
           'fs',

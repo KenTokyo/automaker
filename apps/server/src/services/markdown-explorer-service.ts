@@ -103,7 +103,8 @@ const TEXT_EXTENSIONS = new Set([
 ]);
 
 const MAX_CONTENT_SEARCH_FILE_SIZE = 512 * 1024; // 512 KB
-const MAX_DEPTH = 12;
+const MAX_DEPTH = 20;
+const MAX_MARKDOWN_SCAN_RESULTS = 50_000;
 const DEFAULT_LIMIT = 100;
 
 // ---------------------------------------------------------------------------
@@ -232,18 +233,20 @@ function isMarkdownFile(name: string): boolean {
  * Get markdown files, optionally filtered by time.
  * When sinceHours is 0 or omitted, returns ALL markdown files (no time filter).
  * Used by the Dashboard generation (Plan 21) and the Explorer file tree.
- * Returns files sorted by modified date (newest first).
+ * Returns files sorted by modified date (newest first) and then applies the limit.
  */
 export async function getFilesFilteredByTime(
   projectPath: string,
   sinceHours: number,
   limit = 500
 ): Promise<TimeFilteredFile[]> {
+  const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : 500;
   const cutoffMs = sinceHours > 0 ? Date.now() - sinceHours * 3600000 : 0;
   const results: TimeFilteredFile[] = [];
+  let scanLimitReached = false;
 
   async function walk(dirPath: string, depth: number): Promise<void> {
-    if (depth > MAX_DEPTH || results.length >= limit) return;
+    if (depth > MAX_DEPTH || scanLimitReached) return;
     if (!isPathWithinDirectory(dirPath, projectPath)) return;
 
     let entries;
@@ -254,7 +257,7 @@ export async function getFilesFilteredByTime(
     }
 
     for (const entry of entries) {
-      if (results.length >= limit) return;
+      if (scanLimitReached) return;
       if (shouldIgnore(entry.name)) continue;
 
       const entryPath = path.join(dirPath, entry.name);
@@ -272,6 +275,11 @@ export async function getFilesFilteredByTime(
         const mtimeMs = Number(stat.mtimeMs);
         // When cutoffMs is 0 (sinceHours=0), include all files
         if (cutoffMs === 0 || mtimeMs >= cutoffMs) {
+          if (results.length >= MAX_MARKDOWN_SCAN_RESULTS) {
+            scanLimitReached = true;
+            return;
+          }
+
           results.push({
             name: entry.name,
             path: entryPath,
@@ -292,7 +300,13 @@ export async function getFilesFilteredByTime(
     logger.error('getFilesFilteredByTime failed:', err);
   }
 
-  // Sort newest first
+  if (scanLimitReached) {
+    logger.warn(
+      `Markdown scan capped at ${MAX_MARKDOWN_SCAN_RESULTS} files for project ${projectPath}`
+    );
+  }
+
+  // Sort newest first, then apply limit globally across all folders
   results.sort((a, b) => b.modified - a.modified);
-  return results;
+  return results.slice(0, safeLimit);
 }

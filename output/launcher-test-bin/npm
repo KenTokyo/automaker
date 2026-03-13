@@ -1,0 +1,3 @@
+﻿#!/usr/bin/env bash
+echo "MOCK_NPM $*"
+exit 0

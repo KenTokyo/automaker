@@ -24,7 +24,7 @@ MENU_INNER_WIDTH=64
 LOGO_WIDTH=52
 INPUT_TIMEOUT=30
 SELECTED_OPTION=1
-MAX_OPTIONS=6
+MAX_OPTIONS=7
 
 # Platform detection (set early for cross-platform compatibility)
 IS_WINDOWS=false
@@ -116,6 +116,7 @@ USAGE:
 MODES:
   web              Launch in web browser (localhost:3007)
   electron         Launch as desktop app (Electron)
+  electron-fast    Launch as desktop app (Electron, skip package build)
   docker           Launch in Docker container (dev with live reload)
   docker-electron  Launch Electron with Docker API backend
   chat             Launch Chat Web app (legacy, localhost:3009)
@@ -135,6 +136,7 @@ EXAMPLES:
   start-automaker.sh web          # Launch web mode directly (dev)
   start-automaker.sh web --production  # Launch web mode (production)
   start-automaker.sh electron     # Launch desktop app directly
+  start-automaker.sh electron-fast # Launch desktop app directly (fast mode)
   start-automaker.sh docker       # Launch Docker dev container
   start-automaker.sh chat         # Launch Chat Web app (legacy)
   start-automaker.sh chat-electron # Launch Chat desktop app (legacy)
@@ -143,7 +145,7 @@ EXAMPLES:
 KEYBOARD SHORTCUTS (in menu):
   Up/Down arrows   Navigate between options
   Enter            Select highlighted option
-  1-6              Jump to and select mode
+  1-7              Jump to and select mode
   Q                Exit
 
 HISTORY:
@@ -187,7 +189,7 @@ parse_args() {
             --production)
                 PRODUCTION_MODE=true
                 ;;
-            web|electron|docker|docker-electron|chat|chat-electron)
+            web|electron|electron-fast|docker|docker-electron|chat|chat-electron)
                 MODE="$1"
                 ;;
             *)
@@ -596,11 +598,17 @@ validate_terminal_size() {
 # ============================================================================
 
 hide_cursor() {
-    [ "$USE_COLORS" = true ] && printf "${ESC}[?25l"
+    if [ "$USE_COLORS" = true ]; then
+        printf "${ESC}[?25l"
+    fi
+    return 0
 }
 
 show_cursor() {
-    [ "$USE_COLORS" = true ] && printf "${ESC}[?25h"
+    if [ "$USE_COLORS" = true ]; then
+        printf "${ESC}[?25h"
+    fi
+    return 0
 }
 
 cleanup() {
@@ -691,8 +699,8 @@ show_menu() {
     printf "╮${RESET}\n"
 
     # Menu items with selection indicator
-    local sel1="" sel2="" sel3="" sel4="" sel5="" sel6=""
-    local txt1="${C_MUTE}" txt2="${C_MUTE}" txt3="${C_MUTE}" txt4="${C_MUTE}" txt5="${C_MUTE}" txt6="${C_MUTE}"
+    local sel1="" sel2="" sel3="" sel4="" sel5="" sel6="" sel7=""
+    local txt1="${C_MUTE}" txt2="${C_MUTE}" txt3="${C_MUTE}" txt4="${C_MUTE}" txt5="${C_MUTE}" txt6="${C_MUTE}" txt7="${C_MUTE}"
 
     case $SELECTED_OPTION in
         1) sel1="${C_ACC}▸${RESET} ${C_PRI}"; txt1="${C_WHITE}" ;;
@@ -701,6 +709,7 @@ show_menu() {
         4) sel4="${C_ACC}▸${RESET} ${C_PRI}"; txt4="${C_WHITE}" ;;
         5) sel5="${C_ACC}▸${RESET} ${C_PRI}"; txt5="${C_WHITE}" ;;
         6) sel6="${C_ACC}▸${RESET} ${C_PRI}"; txt6="${C_WHITE}" ;;
+        7) sel7="${C_ACC}▸${RESET} ${C_PRI}"; txt7="${C_WHITE}" ;;
     esac
 
     # Default non-selected prefix
@@ -710,13 +719,15 @@ show_menu() {
     [[ -z "$sel4" ]] && sel4="  ${C_MUTE}"
     [[ -z "$sel5" ]] && sel5="  ${C_MUTE}"
     [[ -z "$sel6" ]] && sel6="  ${C_MUTE}"
+    [[ -z "$sel7" ]] && sel7="  ${C_MUTE}"
 
     printf "%s${border}${sel1}[1]${RESET} 🌐  ${txt1}Web App${RESET}           ${C_MUTE}Server + Browser (localhost:$WEB_PORT)${RESET}   ${border}\n" "$pad"
-    printf "%s${border}${sel2}[2]${RESET} 🖥   ${txt2}Electron${RESET}          ${DIM}Desktop App (embedded server)${RESET}       ${border}\n" "$pad"
-    printf "%s${border}${sel3}[3]${RESET} 🐳  ${txt3}Docker${RESET}            ${DIM}Full Stack (live reload)${RESET}            ${border}\n" "$pad"
-    printf "%s${border}${sel4}[4]${RESET} 🔗  ${txt4}Electron & Docker${RESET} ${DIM}Desktop + Docker Server${RESET}             ${border}\n" "$pad"
-    printf "%s${border}${sel5}[5]${RESET} 💬  ${txt5}Chat Web${RESET}          ${DIM}Legacy (localhost:3009)${RESET}             ${border}\n" "$pad"
-    printf "%s${border}${sel6}[6]${RESET} 💬  ${txt6}Chat Desktop${RESET}      ${DIM}Legacy Electron App${RESET}                ${border}\n" "$pad"
+    printf "%s${border}${sel2}[2]${RESET} 🖥   ${txt2}Electron${RESET}          ${DIM}Desktop App (safe, with package build)${RESET} ${border}\n" "$pad"
+    printf "%s${border}${sel3}[3]${RESET} ⚡  ${txt3}Electron Fast${RESET}     ${DIM}Desktop App (skip package build)${RESET}    ${border}\n" "$pad"
+    printf "%s${border}${sel4}[4]${RESET} 🐳  ${txt4}Docker${RESET}            ${DIM}Full Stack (live reload)${RESET}            ${border}\n" "$pad"
+    printf "%s${border}${sel5}[5]${RESET} 🔗  ${txt5}Electron & Docker${RESET} ${DIM}Desktop + Docker Server${RESET}             ${border}\n" "$pad"
+    printf "%s${border}${sel6}[6]${RESET} 💬  ${txt6}Chat Web${RESET}          ${DIM}Legacy (localhost:3009)${RESET}             ${border}\n" "$pad"
+    printf "%s${border}${sel7}[7]${RESET} 💬  ${txt7}Chat Desktop${RESET}      ${DIM}Legacy Electron App${RESET}                ${border}\n" "$pad"
 
     printf "%s${C_GRAY}├" "$pad"
     draw_line "─" "$C_GRAY" "$MENU_INNER_WIDTH"
@@ -729,7 +740,7 @@ show_menu() {
     printf "╯${RESET}\n"
 
     echo ""
-    local footer_text="[↑↓] Navigate  [Enter] Select  [1-6] Quick Select  [Q] Exit"
+    local footer_text="[↑↓] Navigate  [Enter] Select  [1-7] Quick Select  [Q] Exit"
     local f_pad=$(( (TERM_COLS - ${#footer_text}) / 2 ))
     printf "%${f_pad}s" ""
     echo -e "${DIM}${footer_text}${RESET}"
@@ -921,6 +932,238 @@ resolve_port_conflicts() {
     stty -echo -icanon 2>/dev/null || true
 }
 
+show_fast_mode_lib_warning_if_needed() {
+    local check_output=""
+
+    if ! check_output=$(node <<'NODE'
+const fs = require('fs');
+const path = require('path');
+
+const root = process.cwd();
+const libsDir = path.join(root, 'libs');
+
+if (!fs.existsSync(libsDir)) {
+  console.log('ok|no-libs');
+  process.exit(0);
+}
+
+let newestSrc = 0;
+let newestDist = 0;
+let srcCount = 0;
+let distCount = 0;
+
+function walkFiles(dir, onFile) {
+  let entries = [];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+
+  for (const entry of entries) {
+    if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === '.cache' || entry.name === '.turbo') {
+      continue;
+    }
+
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walkFiles(fullPath, onFile);
+      continue;
+    }
+
+    if (!entry.isFile()) continue;
+
+    try {
+      const stat = fs.statSync(fullPath);
+      onFile(stat.mtimeMs);
+    } catch {
+      // Ignore unreadable files and continue scanning.
+    }
+  }
+}
+
+let packageDirs = [];
+try {
+  packageDirs = fs.readdirSync(libsDir, { withFileTypes: true }).filter((entry) => entry.isDirectory());
+} catch {
+  console.log('ok|scan-error');
+  process.exit(0);
+}
+
+for (const pkgDir of packageDirs) {
+  const pkgPath = path.join(libsDir, pkgDir.name);
+  const srcPath = path.join(pkgPath, 'src');
+  const distPath = path.join(pkgPath, 'dist');
+
+  if (fs.existsSync(srcPath)) {
+    walkFiles(srcPath, (mtimeMs) => {
+      srcCount += 1;
+      if (mtimeMs > newestSrc) newestSrc = mtimeMs;
+    });
+  }
+
+  if (fs.existsSync(distPath)) {
+    walkFiles(distPath, (mtimeMs) => {
+      distCount += 1;
+      if (mtimeMs > newestDist) newestDist = mtimeMs;
+    });
+  }
+}
+
+if (srcCount === 0) {
+  console.log('ok|no-src');
+  process.exit(0);
+}
+
+if (distCount === 0) {
+  console.log('warn|no-dist');
+  process.exit(0);
+}
+
+if (newestSrc > newestDist) {
+  console.log('warn|src-newer');
+  process.exit(0);
+}
+
+console.log('ok|fresh');
+NODE
+); then
+        return 0
+    fi
+
+    if [ "${AUTOMAKER_FORCE_FAST_MODE_WARNING:-0}" = "1" ]; then
+        check_output="warn|forced-by-env"
+    fi
+
+    local status=""
+    local reason=""
+    IFS='|' read -r status reason <<< "$check_output"
+
+    if [ "$status" != "warn" ]; then
+        return 0
+    fi
+
+    echo ""
+    center_print "⚠ Fast-Hinweis: In libs/ gibt es neuere Änderungen." "$C_YELLOW"
+
+    if [ "$reason" = "no-dist" ]; then
+        center_print "Es wurde noch kein Paket-Build gefunden." "$C_MUTE"
+    else
+        center_print "Der letzte Paket-Build ist älter als die libs/Änderungen." "$C_MUTE"
+    fi
+
+    center_print "Für sicheren Start bitte Modus 'Electron' nutzen." "$C_MUTE"
+    echo ""
+
+    evaluate_fast_mode_choice() {
+        local selected_choice="$1"
+
+        case "$selected_choice" in
+            [wW]|[wW][eE][iI][tT][eE][rR])
+                echo ""
+                center_print "Du startest jetzt trotzdem mit Fast-Modus." "$C_YELLOW"
+                echo ""
+                return 0
+                ;;
+            ""|[sS]|[sS][iI][cC][hH][eE][rR]|[eE]|[eE][lL][eE][cC][tT][rR][oO][nN])
+                echo ""
+                center_print "Du wechselst jetzt auf den sicheren Modus 'Electron'." "$C_GREEN"
+                echo ""
+                return 2
+                ;;
+            [aA]|[aA][bB][bB][rR][eE][cC][hH][eE][nN])
+                echo ""
+                center_print "Fast-Start wurde abgebrochen. Zurück ins Menü." "$C_MUTE"
+                echo ""
+                return 1
+                ;;
+            *)
+                return 3
+                ;;
+        esac
+    }
+
+    if [ -n "${AUTOMAKER_FAST_MODE_CHOICE:-}" ]; then
+        center_print "Testmodus: Auswahl über AUTOMAKER_FAST_MODE_CHOICE erkannt." "$C_MUTE"
+        evaluate_fast_mode_choice "$AUTOMAKER_FAST_MODE_CHOICE"
+        local forced_decision=$?
+        if [ "$forced_decision" -eq 3 ]; then
+            center_print "Ungültige Test-Auswahl. Wir nutzen den sicheren Modus." "$C_YELLOW"
+            echo ""
+            return 2
+        fi
+        return "$forced_decision"
+    fi
+
+    if [ ! -t 0 ]; then
+        center_print "Keine Eingabe möglich. Wir wechseln auf sicheren Modus." "$C_YELLOW"
+        center_print "Es wird jetzt mit 'Electron' gestartet." "$C_MUTE"
+        echo ""
+        return 2
+    fi
+
+    center_print "Was möchtest du tun?" "$C_WHITE"
+    center_print "[W] Weiter mit Fast-Modus" "$C_MUTE"
+    center_print "[S] Sicher mit Electron starten (Empfohlen)" "$C_GREEN"
+    center_print "[A] Abbrechen" "$C_MUTE"
+    echo ""
+
+    while true; do
+        local choice_pad=$(( (TERM_COLS - 26) / 2 ))
+        local choice=""
+        printf "%${choice_pad}s" ""
+        read -r -p "Auswahl [S]: " choice
+
+        evaluate_fast_mode_choice "$choice"
+        local choice_result=$?
+        if [ "$choice_result" -eq 3 ]; then
+            center_print "Ungültige Eingabe. Bitte W, S oder A." "$C_RED"
+            continue
+        fi
+        return "$choice_result"
+    done
+}
+
+restart_launcher_menu() {
+    local -a relaunch_args=()
+    local shell_bin="${BASH:-}"
+
+    if [ "$USE_COLORS" = false ]; then
+        relaunch_args+=("--no-colors")
+    fi
+    if [ "$CHECK_DEPS" = true ]; then
+        relaunch_args+=("--check-deps")
+    fi
+    if [ "$NO_HISTORY" = true ]; then
+        relaunch_args+=("--no-history")
+    fi
+    if [ "$PRODUCTION_MODE" = true ]; then
+        relaunch_args+=("--production")
+    fi
+
+    center_print "Zurück zum Launcher-Menü..." "$C_MUTE"
+    echo ""
+
+    show_cursor
+    stty echo icanon 2>/dev/null || true
+
+    if [ "${AUTOMAKER_TEST_SKIP_MENU_RESTART:-0}" = "1" ]; then
+        center_print "Testmodus: Menü-Rücksprung erkannt (ohne Neustart)." "$C_MUTE"
+        return 0
+    fi
+
+    if [ -z "$shell_bin" ] || [ ! -x "$shell_bin" ]; then
+        shell_bin="$(command -v bash 2>/dev/null || true)"
+    fi
+
+    if [ -z "$shell_bin" ]; then
+        center_print "Bash wurde nicht gefunden. Launcher wird beendet." "$C_RED"
+        exit 1
+    fi
+
+    exec "$shell_bin" "$SCRIPT_DIR/start-automaker.sh" "${relaunch_args[@]}"
+}
+
 launch_sequence() {
     local mode_name="$1"
 
@@ -1101,19 +1344,21 @@ if [ -z "$MODE" ]; then
                 ;;
             1) SELECTED_OPTION=1; MODE="web"; break ;;
             2) SELECTED_OPTION=2; MODE="electron"; break ;;
-            3) SELECTED_OPTION=3; MODE="docker"; break ;;
-            4) SELECTED_OPTION=4; MODE="docker-electron"; break ;;
-            5) SELECTED_OPTION=5; MODE="chat"; break ;;
-            6) SELECTED_OPTION=6; MODE="chat-electron"; break ;;
+            3) SELECTED_OPTION=3; MODE="electron-fast"; break ;;
+            4) SELECTED_OPTION=4; MODE="docker"; break ;;
+            5) SELECTED_OPTION=5; MODE="docker-electron"; break ;;
+            6) SELECTED_OPTION=6; MODE="chat"; break ;;
+            7) SELECTED_OPTION=7; MODE="chat-electron"; break ;;
             ""|$'\n'|$'\r')
                 # Enter key - select current option
                 case $SELECTED_OPTION in
                     1) MODE="web" ;;
                     2) MODE="electron" ;;
-                    3) MODE="docker" ;;
-                    4) MODE="docker-electron" ;;
-                    5) MODE="chat" ;;
-                    6) MODE="chat-electron" ;;
+                    3) MODE="electron-fast" ;;
+                    4) MODE="docker" ;;
+                    5) MODE="docker-electron" ;;
+                    6) MODE="chat" ;;
+                    7) MODE="chat-electron" ;;
                 esac
                 break
                 ;;
@@ -1134,13 +1379,14 @@ fi
 case $MODE in
     web) MODE_NAME="Web Browser" ;;
     electron) MODE_NAME="Desktop App" ;;
+    electron-fast) MODE_NAME="Desktop App (Fast)" ;;
     docker) MODE_NAME="Docker Dev" ;;
     docker-electron) MODE_NAME="Electron + Docker" ;;
     chat) MODE_NAME="Chat Web (Legacy)" ;;
     chat-electron) MODE_NAME="Chat Desktop (Legacy)" ;;
     *)
         echo "${C_RED}Error:${RESET} Invalid mode '$MODE'"
-        echo "Valid modes: web, electron, docker, docker-electron, chat, chat-electron"
+        echo "Valid modes: web, electron, electron-fast, docker, docker-electron, chat, chat-electron"
         exit 1
         ;;
 esac
@@ -1378,6 +1624,44 @@ case $MODE in
         center_print "(Electron will start its own backend server in chat mode)" "$C_MUTE"
         echo ""
         npm run dev:electron:chat
+        ;;
+    electron-fast)
+        # Set environment variables for Electron (it starts its own server)
+        export TEST_PORT="$WEB_PORT"
+        export PORT="$SERVER_PORT"
+        export VITE_SERVER_URL="http://localhost:$SERVER_PORT"
+        export CORS_ORIGIN="http://localhost:$WEB_PORT,http://127.0.0.1:$WEB_PORT"
+        export VITE_APP_MODE="2"
+
+        center_print "Launching Desktop Application (Fast Mode)..." "$C_YELLOW"
+        center_print "(Skips package build for quicker start)" "$C_MUTE"
+        center_print "(Use standard Electron mode after shared-lib changes)" "$C_MUTE"
+        echo ""
+
+        if [ "$PRODUCTION_MODE" = true ]; then
+            center_print "Fast mode is a development shortcut." "$C_YELLOW"
+            center_print "Using safe Electron mode in production selection..." "$C_MUTE"
+            echo ""
+            npm run dev:electron
+        else
+            if show_fast_mode_lib_warning_if_needed; then
+                npm run dev:electron:fast
+            else
+                fast_mode_decision=$?
+
+                if [ "$fast_mode_decision" -eq 2 ]; then
+                    center_print "Wechsel auf sicheren Modus 'Electron'..." "$C_GREEN"
+                    echo ""
+                    npm run dev:electron
+                elif [ "$fast_mode_decision" -eq 1 ]; then
+                    restart_launcher_menu
+                else
+                    center_print "Keine klare Auswahl erkannt. Zurück zum Launcher-Menü." "$C_YELLOW"
+                    echo ""
+                    restart_launcher_menu
+                fi
+            fi
+        fi
         ;;
     electron)
         # Set environment variables for Electron (it starts its own server)
