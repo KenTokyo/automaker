@@ -25,6 +25,33 @@ Pflicht-Regeln ab jetzt:
 4. In TypeScript bei Emojis im Zweifel Unicode-Escapes nutzen (z.B. `\\u{1F4A1}`), damit die Anzeige stabil bleibt.
 5. Zeilenenden nicht unnötig mischen (kein wildes CRLF/LF-Wechseln), damit keine unnötigen Diff-/Encoding-Nebeneffekte entstehen.
 
+## UTF-8 Sofort-Check + Reparatur (Pflicht vor Abschluss)
+
+So prüfen wir schnell, ob wieder etwas kaputt ist:
+
+1. Projektweite Suche nach typischen Fehlerzeichen:
+   - `rg -n --hidden -S '(Ã|Â|ðŸ|â€¦|â€“|â€”|â€ž|â€œ)' -g '!**/node_modules/**' -g '!**/.git/**'`
+2. Jede gefundene UI-Stelle sofort auf echte Zeichen korrigieren (`Ü`, `ä`, `ö`, `ß`, `…`).
+3. Datei danach explizit als UTF-8 speichern (nicht ANSI/Windows-1252).
+4. Zeilenenden nicht unnötig ändern (CRLF/LF stabil halten).
+5. Zum Schluss `npm run typecheck` ausführen.
+
+So reparieren wir einen konkreten Fehler wie `Ãœbersicht`:
+
+1. Falschen Text direkt im Quelltext ersetzen: `Ãœbersicht` -> `Übersicht`.
+2. Prüfen, ob ähnliche Wörter im selben File auch kaputt sind (`fÃ¼r`, `wird geladenâ€¦`).
+3. Datei neu speichern in UTF-8.
+4. Danach nochmal mit `rg` prüfen, ob der Fehler wirklich weg ist.
+
+## Wichtige PowerShell-Regel (Pflicht)
+
+Damit die Prüfung nicht selbst kaputte Zeichen erzeugt:
+
+1. Dateien in PowerShell immer mit UTF-8 lesen, z. B. `Get-Content -Raw -Encoding UTF8 <datei>`.
+2. Für den schnellen Projekt-Scan in PowerShell zuerst die einfache Suche nutzen:
+   - `rg -n --hidden -S "(Ã|Â|ðŸ|â)" -g "!**/node_modules/**" -g "!**/.git/**"`
+3. Treffer aus Doku-Regeln mit Beispielen (`Ãœbernehmen`, `fÃ¼r`) nicht mit echten UI-Fehlern verwechseln.
+
 # Schreibstil (Pflicht)
 
 ## Ziel

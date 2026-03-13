@@ -848,6 +848,7 @@ export interface ElectronAPI {
     archive: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     unarchive: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     delete: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
+    markClean: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
   };
   claude?: {
     getUsage: () => Promise<ClaudeUsageResponse>;

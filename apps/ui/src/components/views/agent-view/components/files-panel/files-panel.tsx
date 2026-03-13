@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
+import { RIGHT_PANEL_FONT_SIZE_DEFAULT } from '@/store/types/ui-types';
 import type { ExplorerTab, SearchFilters } from '@/store/explorer-store';
 import {
   useExplorerStore,
@@ -205,12 +206,19 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
   );
 
   const filesFontSize = useAppStore((s) => s.filesPanelFontSize);
+  const filesPanelZoom = filesFontSize / RIGHT_PANEL_FONT_SIZE_DEFAULT;
 
   const isFiltered = timeFilter > 0;
   const showPreview = selectedFilePath !== null;
 
   return (
-    <div className="flex h-full min-h-0 flex-col" style={{ fontSize: `${filesFontSize}px` }}>
+    <div
+      className="flex h-full min-h-0 flex-col"
+      style={{
+        fontSize: `${filesFontSize}px`,
+        zoom: filesPanelZoom,
+      }}
+    >
       {/* Tab bar */}
       <div className="flex items-center gap-1 border-b border-border px-2 py-1">
         <TabButton

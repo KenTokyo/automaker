@@ -10,6 +10,7 @@ import { createUpdateHandler } from './routes/update.js';
 import { createArchiveHandler } from './routes/archive.js';
 import { createUnarchiveHandler } from './routes/unarchive.js';
 import { createDeleteHandler } from './routes/delete.js';
+import { createMarkCleanHandler } from './routes/mark-clean.js';
 
 export function createSessionsRoutes(agentService: AgentService): Router {
   const router = Router();
@@ -19,6 +20,7 @@ export function createSessionsRoutes(agentService: AgentService): Router {
   router.put('/:sessionId', createUpdateHandler(agentService));
   router.post('/:sessionId/archive', createArchiveHandler(agentService));
   router.post('/:sessionId/unarchive', createUnarchiveHandler(agentService));
+  router.post('/:sessionId/mark-clean', createMarkCleanHandler(agentService));
   router.delete('/:sessionId', createDeleteHandler(agentService));
 
   return router;

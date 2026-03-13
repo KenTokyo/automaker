@@ -18,6 +18,10 @@ import {
   DashboardLoading,
   DashboardTimeTabs,
 } from '@/components/views/agent-view/components/dashboard-panel/dashboard-controls';
+import {
+  formatOverviewGeneratedAbsolute,
+  formatOverviewGeneratedRelative,
+} from '@/components/views/agent-view/components/dashboard-panel/dashboard-time-utils';
 
 export function LeftOverviewPanel() {
   const {
@@ -38,6 +42,12 @@ export function LeftOverviewPanel() {
 
   const activeLabel =
     DASHBOARD_TIME_RANGES.find((range) => range.id === activeTimeRange)?.label ?? activeTimeRange;
+  const generatedRelative = currentData
+    ? formatOverviewGeneratedRelative(currentData.generatedAt)
+    : null;
+  const generatedAbsolute = currentData
+    ? formatOverviewGeneratedAbsolute(currentData.generatedAt)
+    : null;
 
   const hasCurrentData = Boolean(currentData);
   const showInitialLoading = isLoading && !hasCurrentData;
@@ -115,10 +125,11 @@ export function LeftOverviewPanel() {
       />
 
       <div className="border-t border-muted px-3 py-1.5">
-        <p className="text-[10px] text-muted-foreground">
-          {currentData
-            ? `Generiert: ${new Date(currentData.generatedAt).toLocaleString('de-DE')}`
-            : `Zeitraum: ${activeLabel}`}
+        <p
+          className="text-[10px] text-muted-foreground"
+          title={currentData ? `Generiert am ${generatedAbsolute}` : undefined}
+        >
+          {currentData ? `Generiert: ${generatedRelative}` : `Zeitraum: ${activeLabel}`}
         </p>
       </div>
     </div>

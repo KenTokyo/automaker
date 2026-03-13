@@ -1,5 +1,17 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
-import { Send, Paperclip, Square, ListOrdered, Mic, MicOff, FileText, Plus } from 'lucide-react';
+import {
+  Send,
+  Paperclip,
+  Square,
+  ListOrdered,
+  Mic,
+  MicOff,
+  FileText,
+  Plus,
+  Loader2,
+  Cpu,
+  RotateCcw,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -8,7 +20,9 @@ import { AgentModelSelector } from '../shared/agent-model-selector';
 import { AgentPromptsSelector } from './agent-prompts-selector';
 import { TimeLimiterSettings } from './time-limiter-settings';
 import { OrchestratorSettings } from './orchestrator-settings';
+import { CompletedTasksToggle } from './completed-tasks-toggle';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
+import { useVoxtralSpeechRecognition } from '@/hooks/use-voxtral-speech-recognition';
 import { useAppStore } from '@/store/app-store';
 import type { PhaseModelEntry } from '@automaker/types';
 
@@ -214,6 +228,78 @@ export function InputControls({
     }, []),
   });
 
+  const {
+    isSupported: isVoxtralSupported,
+    isListening: isVoxtralListening,
+    isLoading: isVoxtralLoading,
+    hasLoadedModel: hasLoadedVoxtralModel,
+    status: voxtralStatus,
+    loadingMessage: voxtralLoadingMessage,
+    loadingProgress: voxtralLoadingProgress,
+    error: voxtralError,
+    toggleListening: toggleVoxtralListening,
+    resetSession: resetVoxtralSession,
+  } = useVoxtralSpeechRecognition({
+    onTranscript: useCallback(
+      (chunk: string) => {
+        setDraftInput((previous) => {
+          const normalizedChunk = previous.length === 0 ? chunk.trimStart() : chunk;
+          if (!normalizedChunk) {
+            return previous;
+          }
+          const nextValue = previous + normalizedChunk;
+          syncInputToParent(nextValue);
+          return nextValue;
+        });
+        scheduleTextareaResize(inputRef.current);
+        scrollTextareaToBottom(inputRef.current);
+      },
+      [inputRef, scheduleTextareaResize, scrollTextareaToBottom, syncInputToParent]
+    ),
+    onError: useCallback((errorMessage: string) => {
+      console.error('Voxtral speech recognition error:', errorMessage);
+    }, []),
+  });
+
+  const voxtralButtonTitle = !isVoxtralSupported
+    ? 'Voxtral braucht WebGPU und Mikrofonrechte'
+    : isVoxtralLoading
+      ? `Voxtral lädt (${Math.round(voxtralLoadingProgress)}%)`
+      : isVoxtralListening
+        ? 'Voxtral stoppen'
+        : voxtralError
+          ? `Voxtral Fehler: ${voxtralError}`
+          : 'Voxtral lokal starten';
+
+  const showVoxtralResetButton =
+    isConnected &&
+    voxtralStatus !== 'loading' &&
+    (hasLoadedVoxtralModel || isVoxtralListening || Boolean(voxtralError));
+
+  const voxtralHelpText = !isConnected
+    ? null
+    : !isVoxtralSupported
+      ? 'Voxtral braucht WebGPU. Das heißt: Dein Gerät muss KI direkt im Browser rechnen können.'
+      : isVoxtralLoading && !hasLoadedVoxtralModel
+        ? `Erster Start: ${voxtralLoadingMessage} (${Math.round(voxtralLoadingProgress)}%). Das kann kurz dauern.`
+        : isVoxtralLoading
+          ? `${voxtralLoadingMessage} (${Math.round(voxtralLoadingProgress)}%).`
+          : voxtralError
+            ? `Voxtral hat ein Problem: ${voxtralError}. Mit „Zurücksetzen“ kannst du neu starten.`
+            : isVoxtralListening
+              ? 'Voxtral hört zu. Sprich normal, der Text kommt direkt ins Feld.'
+              : hasLoadedVoxtralModel
+                ? 'Voxtral ist bereit. Klick auf den grünen Knopf zum Start.'
+                : 'Tipp: Beim ersten Start lädt Voxtral mehr Daten. Danach geht es schneller.';
+
+  const voxtralHelpToneClass = voxtralError
+    ? 'border-red-500/30 bg-red-500/5 text-red-700'
+    : isVoxtralLoading
+      ? 'border-amber-500/30 bg-amber-500/5 text-amber-700'
+      : isVoxtralListening
+        ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700'
+        : 'border-border/70 bg-muted/40 text-muted-foreground';
+
   // Listen for docs:insert-path events
   useEffect(() => {
     const handleInsertPath = (e: Event) => {
@@ -355,7 +441,7 @@ export function InputControls({
 
       {/* Controls row - compact single line (scrolls on small widths) */}
       <div className="overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex min-w-max items-center gap-1.5 whitespace-nowrap">
+        <div className="flex min-w-max items-center gap-1 whitespace-nowrap">
           {/* Model Selector */}
           <div className="shrink-0">
             <AgentModelSelector
@@ -376,14 +462,48 @@ export function InputControls({
               onClick={toggleListening}
               disabled={!isConnected}
               className={cn(
-                'h-9 w-9 rounded-lg border-border shrink-0',
+                'h-7 w-7 rounded-md border-border shrink-0',
                 isListening && 'bg-red-500/10 text-red-600 border-red-500/30 animate-pulse'
               )}
               title={isListening ? 'Stop recording' : 'Start voice input'}
             >
-              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
             </Button>
           )}
+
+          {/* Voxtral Test-Mikrofon (WebGPU) */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => {
+              void toggleVoxtralListening();
+            }}
+            disabled={!isConnected || (!isVoxtralSupported && !isVoxtralLoading)}
+            className={cn(
+              'h-7 w-7 rounded-md border-border shrink-0 transition-all',
+              isVoxtralListening &&
+                'bg-emerald-500/10 text-emerald-700 border-emerald-500/40 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.35)]',
+              isVoxtralLoading &&
+                'text-amber-600 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.35)]',
+              !isVoxtralListening &&
+                !isVoxtralLoading &&
+                isVoxtralSupported &&
+                'text-emerald-700 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.25)] hover:shadow-[0_0_14px_rgba(16,185,129,0.35)]',
+              voxtralError &&
+                !isVoxtralListening &&
+                !isVoxtralLoading &&
+                'text-red-600 border-red-500/40 shadow-none'
+            )}
+            title={voxtralButtonTitle}
+          >
+            {isVoxtralLoading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : isVoxtralListening ? (
+              <MicOff className="w-3.5 h-3.5" />
+            ) : (
+              <Cpu className="w-3.5 h-3.5" />
+            )}
+          </Button>
 
           {/* File Attachment Button */}
           <Button
@@ -392,13 +512,13 @@ export function InputControls({
             onClick={onToggleImageDropZone}
             disabled={!isConnected}
             className={cn(
-              'h-9 w-9 rounded-lg border-border shrink-0',
+              'h-7 w-7 rounded-md border-border shrink-0',
               showImageDropZone && 'bg-primary/10 text-primary border-primary/30',
               hasFiles && 'border-primary/30 text-primary'
             )}
             title="Attach files (images, .txt, .md)"
           >
-            <Paperclip className="w-4 h-4" />
+            <Paperclip className="w-3.5 h-3.5" />
           </Button>
 
           {/* Docs Quick Access */}
@@ -408,10 +528,10 @@ export function InputControls({
                 variant="outline"
                 size="icon"
                 disabled={!isConnected}
-                className="h-9 w-9 rounded-lg border-border shrink-0"
+                className="h-7 w-7 rounded-md border-border shrink-0"
                 title="Insert doc path"
               >
-                <FileText className="w-4 h-4" />
+                <FileText className="w-3.5 h-3.5" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-64 p-0" align="start">
@@ -457,19 +577,23 @@ export function InputControls({
           {/* Orchestrator Settings */}
           <OrchestratorSettings disabled={!isConnected} />
 
-          <div className="mx-1 h-5 w-px bg-border shrink-0" />
+          {/* Completed Tasks Toggle */}
+          <CompletedTasksToggle disabled={!isConnected} />
+
+          <div className="mx-0.5 h-4 w-px bg-border shrink-0" />
 
           {/* Stop Button (only when processing) */}
           {isProcessing && (
             <Button
               onClick={onStop}
               disabled={!isConnected}
-              className="h-9 px-3 rounded-lg shrink-0"
+              className="h-7 w-7 rounded-md shrink-0"
               variant="destructive"
+              size="icon"
               data-testid="stop-agent"
               title="Stop generation"
             >
-              <Square className="w-4 h-4 fill-current" />
+              <Square className="w-3.5 h-3.5 fill-current" />
             </Button>
           )}
 
@@ -477,15 +601,44 @@ export function InputControls({
           <Button
             onClick={triggerSend}
             disabled={!canSend}
-            className="h-9 px-3 rounded-lg shrink-0"
+            className="h-7 w-7 rounded-md shrink-0"
             variant={isProcessing ? 'outline' : 'default'}
+            size="icon"
             data-testid="send-message"
             title={isProcessing ? 'Add to queue' : 'Send message'}
           >
-            {isProcessing ? <ListOrdered className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+            {isProcessing ? (
+              <ListOrdered className="w-3.5 h-3.5" />
+            ) : (
+              <Send className="w-3.5 h-3.5" />
+            )}
           </Button>
         </div>
       </div>
+
+      {voxtralHelpText && (
+        <div
+          className={cn(
+            'flex flex-col gap-1 rounded-md border px-2 py-1 text-[11px] leading-tight sm:flex-row sm:items-center sm:justify-between',
+            voxtralHelpToneClass
+          )}
+        >
+          <p>{voxtralHelpText}</p>
+          {showVoxtralResetButton && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={resetVoxtralSession}
+              className="h-6 px-2 text-[11px] self-start sm:self-auto"
+              title="Voxtral neu starten"
+            >
+              <RotateCcw className="w-3 h-3 mr-1" />
+              Zurücksetzen
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

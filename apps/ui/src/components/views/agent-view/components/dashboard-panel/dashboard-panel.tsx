@@ -10,6 +10,7 @@ import { AlertCircle, Check, ClipboardCopy, Download, Loader2, RefreshCw } from 
 import { Button } from '@/components/ui/button';
 import { useDashboard } from '@/hooks/use-dashboard';
 import { useAppStore } from '@/store/app-store';
+import { RIGHT_PANEL_FONT_SIZE_DEFAULT } from '@/store/types/ui-types';
 import { saveOverviewAsFile } from '@/lib/overview-api';
 import { DASHBOARD_TIME_RANGES, type DashboardMode } from '@automaker/types';
 import { DashboardOverviewCards } from './dashboard-cards';
@@ -20,6 +21,10 @@ import {
   DashboardModelSelector,
   DashboardTimeTabs,
 } from './dashboard-controls';
+import {
+  formatOverviewGeneratedAbsolute,
+  formatOverviewGeneratedRelative,
+} from './dashboard-time-utils';
 import { overviewToMarkdown, getOverviewFileName } from './dashboard-export-utils';
 
 export function DashboardPanel() {
@@ -40,6 +45,7 @@ export function DashboardPanel() {
   } = useDashboard();
 
   const dashboardFontSize = useAppStore((s) => s.dashboardPanelFontSize);
+  const dashboardPanelZoom = dashboardFontSize / RIGHT_PANEL_FONT_SIZE_DEFAULT;
   const currentProjectPath = useAppStore((s) => s.currentProject?.path ?? null);
 
   const [copyFeedback, setCopyFeedback] = useState(false);
@@ -47,6 +53,12 @@ export function DashboardPanel() {
 
   const activeLabel =
     DASHBOARD_TIME_RANGES.find((range) => range.id === activeTimeRange)?.label ?? activeTimeRange;
+  const generatedRelative = currentData
+    ? formatOverviewGeneratedRelative(currentData.generatedAt)
+    : null;
+  const generatedAbsolute = currentData
+    ? formatOverviewGeneratedAbsolute(currentData.generatedAt)
+    : null;
 
   const hasCurrentData = Boolean(currentData);
   const showInitialLoading = isLoading && !hasCurrentData;
@@ -99,7 +111,13 @@ export function DashboardPanel() {
   }, [isGenerating, handleGenerate]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col" style={{ fontSize: `${dashboardFontSize}px` }}>
+    <div
+      className="flex h-full min-h-0 flex-col"
+      style={{
+        fontSize: `${dashboardFontSize}px`,
+        zoom: dashboardPanelZoom,
+      }}
+    >
       <div className="flex items-center justify-between border-b border-muted px-3 py-2">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold">Übersicht</h2>
@@ -211,10 +229,11 @@ export function DashboardPanel() {
       />
 
       <div className="border-t border-muted px-3 py-1.5">
-        <p className="text-[10px] text-muted-foreground">
-          {currentData
-            ? `Generiert: ${new Date(currentData.generatedAt).toLocaleString('de-DE')}`
-            : `Zeitraum: ${activeLabel}`}
+        <p
+          className="text-[10px] text-muted-foreground"
+          title={currentData ? `Generiert am ${generatedAbsolute}` : undefined}
+        >
+          {currentData ? `Generiert: ${generatedRelative}` : `Zeitraum: ${activeLabel}`}
         </p>
       </div>
     </div>

@@ -4,7 +4,8 @@ export { MessageBubble } from './message-bubble';
 export { MessageList } from './message-list';
 export { AgentHeader } from './agent-header';
 export { ChatArea } from './chat-area';
-export { BrowserPanel } from './browser-panel';
+// Legacy (disabled): BrowserPanel is intentionally not re-exported right now.
+// export { BrowserPanel } from './browser-panel';
 export { RightPanelShell } from './right-panel-shell';
 export { ToolCallGroup } from './tool-call-group';
 export { ChatSettingsPopover } from './chat-settings-popover';

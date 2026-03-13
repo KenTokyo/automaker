@@ -62,6 +62,7 @@ import { apiFetch, apiGet, apiPost, apiDeleteRaw } from '@/lib/api-fetch';
 import { getApiKey } from '@/lib/http-api-client';
 
 const logger = createLogger('Terminal');
+const TERMINAL_UI_BASE_FONT_SIZE = 14;
 
 interface TerminalStatus {
   enabled: boolean;
@@ -359,6 +360,11 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
 
   // Get active tab
   const activeTab = terminalState.tabs.find((t) => t.id === terminalState.activeTabId);
+  const terminalUiZoom = terminalState.defaultFontSize / TERMINAL_UI_BASE_FONT_SIZE;
+  const terminalUiStyle = {
+    fontSize: `${terminalState.defaultFontSize}px`,
+    zoom: terminalUiZoom,
+  };
 
   // DnD sensors with activation constraint to avoid accidental drags
   const sensors = useSensors(
@@ -1417,7 +1423,7 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
   // Loading state
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center" style={terminalUiStyle}>
         <Spinner size="xl" />
       </div>
     );
@@ -1426,7 +1432,10 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
   // Error state
   if (error) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
+      <div
+        className="flex-1 flex flex-col items-center justify-center text-center p-6"
+        style={terminalUiStyle}
+      >
         <div className="p-4 rounded-full bg-destructive/10 mb-4">
           <AlertCircle className="h-12 w-12 text-destructive" />
         </div>
@@ -1443,7 +1452,10 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
   // Disabled state
   if (!status?.enabled) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
+      <div
+        className="flex-1 flex flex-col items-center justify-center text-center p-6"
+        style={terminalUiStyle}
+      >
         <div className="p-4 rounded-full bg-muted/50 mb-4">
           <TerminalIcon className="h-12 w-12 text-muted-foreground" />
         </div>
@@ -1460,7 +1472,10 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
   // Password gate
   if (status.passwordRequired && !terminalState.isUnlocked) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
+      <div
+        className="flex-1 flex flex-col items-center justify-center text-center p-6"
+        style={terminalUiStyle}
+      >
         <div className="p-4 rounded-full bg-muted/50 mb-4">
           <Lock className="h-12 w-12 text-muted-foreground" />
         </div>
@@ -1503,7 +1518,10 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
   // No terminals yet - show welcome screen
   if (terminalState.tabs.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
+      <div
+        className="flex-1 flex flex-col items-center justify-center text-center p-6"
+        style={terminalUiStyle}
+      >
         <div className="p-4 rounded-full bg-brand-500/10 mb-4">
           <TerminalIcon className="h-12 w-12 text-brand-500" />
         </div>
@@ -1796,7 +1814,10 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
           ) : activeTab?.layout ? (
             renderPanelContent(activeTab.layout)
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
+            <div
+              className="flex-1 flex flex-col items-center justify-center text-center p-6"
+              style={terminalUiStyle}
+            >
               <p className="text-muted-foreground mb-4">This tab is empty</p>
               <Button variant="outline" size="sm" onClick={() => createTerminal()}>
                 <Plus className="h-4 w-4 mr-2" />

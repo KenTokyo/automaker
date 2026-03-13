@@ -1464,6 +1464,10 @@ export interface ProjectSettings {
     welcomeMessage?: string;
   };
 
+  // Completed Tasks Auto-Capture
+  /** When true, the AI agent automatically documents completed tasks via the API */
+  completedTasksAutoCapture?: boolean;
+
   // Deprecated Claude API Profile Override
   /**
    * @deprecated Use phaseModelOverrides instead.

@@ -66,6 +66,7 @@
     "@fontsource/source-code-pro": "^5.2.7",
     "@fontsource/source-sans-3": "^5.2.9",
     "@fontsource/work-sans": "^5.2.8",
+    "@huggingface/transformers": "^4.0.0-next.7",
     "@lezer/highlight": "1.2.3",
     "@radix-ui/react-checkbox": "1.3.3",
     "@radix-ui/react-collapsible": "1.1.12",

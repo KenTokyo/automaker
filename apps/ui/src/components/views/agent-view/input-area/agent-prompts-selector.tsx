@@ -280,13 +280,13 @@ export const AgentPromptsSelector = memo(function AgentPromptsSelector({
             size="sm"
             disabled={disabled}
             className={cn(
-              'h-9 px-2.5 rounded-lg border-border gap-1.5',
+              'h-7 px-1.5 rounded-md border-border gap-1 text-[11px]',
               selectedCount > 0 && 'border-primary/30 text-primary bg-primary/5'
             )}
           >
-            <Bot className="w-4 h-4" />
+            <Bot className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">{getButtonLabel()}</span>
-            <ChevronDown className="w-3 h-3 opacity-50" />
+            <ChevronDown className="w-2.5 h-2.5 opacity-50" />
           </Button>
         </DropdownMenuTrigger>
 

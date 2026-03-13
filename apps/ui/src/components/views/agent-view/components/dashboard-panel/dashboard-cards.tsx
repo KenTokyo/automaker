@@ -24,8 +24,13 @@ import {
   type DashboardOverviewData,
   type DashboardSection,
   type DashboardStats,
+  type DashboardTimeRange,
 } from '@automaker/types';
 import { DashboardDetails } from './dashboard-details';
+import {
+  formatOverviewGeneratedAbsolute,
+  formatOverviewGeneratedRelative,
+} from './dashboard-time-utils';
 
 // ---------------------------------------------------------------------------
 // OverviewCards (main content)
@@ -68,6 +73,7 @@ export function DashboardOverviewCards({ data, projectPath }: DashboardOverviewC
       <SummaryCard
         summary={data.summary}
         timeRangeLabel={timeRangeLabel}
+        timeRange={data.timeRange}
         generatedAt={data.generatedAt}
       />
 
@@ -99,25 +105,28 @@ export function DashboardOverviewCards({ data, projectPath }: DashboardOverviewC
 function SummaryCard({
   summary,
   timeRangeLabel,
+  timeRange,
   generatedAt,
 }: {
   summary: string;
   timeRangeLabel: string;
+  timeRange: DashboardTimeRange;
   generatedAt: string;
 }) {
-  const formattedDate = new Date(generatedAt).toLocaleString('de-DE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const generatedRelative = formatOverviewGeneratedRelative(generatedAt);
+  const generatedAbsolute = formatOverviewGeneratedAbsolute(generatedAt);
+  const rangeLabel = DASHBOARD_TIME_RANGES.find((r) => r.id === timeRange)?.label ?? timeRange;
 
   return (
     <div className="rounded-lg border border-muted bg-gradient-to-r from-sky-500/10 to-emerald-500/10 p-4">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-medium text-muted-foreground">Letzte {timeRangeLabel}</span>
-        <span className="text-[10px] text-muted-foreground">{formattedDate}</span>
+        <span
+          className="text-[10px] text-muted-foreground"
+          title={`Generiert am ${generatedAbsolute} (${rangeLabel})`}
+        >
+          {generatedRelative} generiert
+        </span>
       </div>
       <p className="text-sm leading-relaxed text-foreground">{summary}</p>
     </div>

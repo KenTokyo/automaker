@@ -82,6 +82,7 @@ export const DEFAULT_KEYBOARD_SHORTCUTS: KeyboardShortcuts = {
   board: 'K',
   graph: 'H',
   agent: 'A',
+  projectOverview: 'U',
   spec: 'D',
   context: 'C',
   memory: 'Y',

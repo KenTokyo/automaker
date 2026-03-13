@@ -1,3 +1,10 @@
+/**
+ * @deprecated Legacy code (currently disabled).
+ *
+ * Browser tab rendering in the right panel is intentionally hidden for now
+ * to reduce UI overhead. Keep this file only as a fallback while the legacy
+ * browser path is not active.
+ */
 import { memo, useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import {
   ArrowLeft,

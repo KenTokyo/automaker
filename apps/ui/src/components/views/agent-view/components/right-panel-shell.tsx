@@ -1,7 +1,11 @@
 /**
  * RightPanelShell - Container for the right panel with mode tabs and optional split.
  *
- * Wraps BrowserPanel, FilesPanel, TerminalView and DashboardPanel
+ * Wraps FilesPanel, TerminalView and DashboardPanel.
+ *
+ * Legacy note:
+ * BrowserPanel is intentionally disabled for now to reduce UI overhead.
+ * The old Browser code is kept in browser-panel.tsx as deprecated legacy code.
  * with a top-level mode switcher.
  * The active mode is stored in app-store (rightPanelMode).
  *
@@ -17,7 +21,8 @@
  */
 
 import { lazy, memo, Suspense, useCallback, useRef, useState, useEffect } from 'react';
-import { BarChart3, Columns2, Globe, FolderOpen, Terminal, X } from 'lucide-react';
+import { BarChart3, Columns2, FolderOpen, Terminal, X } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/store/app-store';
 import { cn } from '@/lib/utils';
@@ -26,7 +31,6 @@ import { FontSizeStepper } from '@/components/ui/font-size-stepper';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import type { RightPanelMode } from '@/store/types/ui-types';
 import { RIGHT_PANEL_FONT_SIZE_MIN, RIGHT_PANEL_FONT_SIZE_MAX } from '@/store/types/ui-types';
-import { BrowserPanel } from './browser-panel';
 import { DashboardPanel } from './dashboard-panel';
 import { FilesPanel } from './files-panel';
 
@@ -41,8 +45,8 @@ interface RightPanelShellProps {
 
 const ICON_ONLY_BREAKPOINT = 360;
 
-const MODE_TABS: { mode: RightPanelMode; label: string; icon: typeof Globe }[] = [
-  { mode: 'browser', label: 'Browser', icon: Globe },
+const MODE_TABS: { mode: RightPanelMode; label: string; icon: LucideIcon }[] = [
+  // Legacy (disabled): { mode: 'browser', label: 'Browser', icon: Globe },
   { mode: 'files', label: 'Dateien', icon: FolderOpen },
   { mode: 'terminal', label: 'Terminal', icon: Terminal },
   { mode: 'dashboard', label: 'Übersicht', icon: BarChart3 },
@@ -54,8 +58,6 @@ const MODE_TABS: { mode: RightPanelMode; label: string; icon: typeof Globe }[] =
 
 function PanelContent({ mode, projectPath }: { mode: RightPanelMode; projectPath: string }) {
   switch (mode) {
-    case 'browser':
-      return <BrowserPanel projectPath={projectPath} />;
     case 'files':
       return <FilesPanel projectPath={projectPath} />;
     case 'terminal':

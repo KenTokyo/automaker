@@ -55,6 +55,8 @@ export type EventType =
   | 'notification:created'
   | 'overview:progress'
   | 'overview:data'
-  | 'overview:error';
+  | 'overview:error'
+  | 'completed-task:created'
+  | 'completed-task:deleted';
 
 export type EventCallback = (type: EventType, payload: unknown) => void;

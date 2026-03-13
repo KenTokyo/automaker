@@ -35,7 +35,7 @@ export const QueueDisplay = memo(function QueueDisplay({
           Clear all
         </button>
       </div>
-      <div className="space-y-1.5">
+      <div className="max-h-28 space-y-1.5 overflow-y-auto pr-1 scrollbar-styled">
         {serverQueue.map((item, index) => (
           <div
             key={item.id}

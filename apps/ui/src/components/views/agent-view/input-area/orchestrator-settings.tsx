@@ -88,8 +88,8 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
           size="icon"
           disabled={disabled}
           className={cn(
-            'h-9 rounded-lg border-border shrink-0',
-            isEnabled ? 'border-purple-500/50 text-purple-600 w-auto min-w-9 px-2 gap-1.5' : 'w-9',
+            'h-7 rounded-md border-border shrink-0',
+            isEnabled ? 'border-purple-500/50 text-purple-600 w-auto min-w-7 px-1.5 gap-1' : 'w-7',
             autoSendStatus !== 'idle' && 'animate-pulse'
           )}
           title={
@@ -103,12 +103,12 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
           }
         >
           {autoSendStatus !== 'idle' ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : (
-            <Repeat className="w-4 h-4" />
+            <Repeat className="w-3.5 h-3.5" />
           )}
           {isEnabled && (
-            <span className="text-xs font-medium tabular-nums">
+            <span className="text-[11px] font-medium tabular-nums">
               {currentIteration}/{maxIterations}
             </span>
           )}

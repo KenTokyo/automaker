@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
-import { MessageSquare, FileText, BarChart3 } from 'lucide-react';
+import { MessageSquare, FileText, BarChart3, CheckCircle } from 'lucide-react';
 import { createLogger } from '@automaker/utils/logger';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,6 +13,7 @@ import { DeleteSessionDialog } from '@/components/dialogs/delete-session-dialog'
 import { DeleteAllArchivedSessionsDialog } from '@/components/dialogs/delete-all-archived-sessions-dialog';
 import { DocsPanel } from '@/components/views/agent-view/components/docs-panel';
 import { LeftOverviewPanel } from '@/components/session-manager/left-overview-panel';
+import { CompletedTasksPanel } from '@/components/session-manager/completed-tasks-panel';
 import { useProjectLookup } from '@/hooks/use-project-lookup';
 import { useSessionSearch } from '@/hooks/use-session-search';
 import { useSessionFilter } from '@/hooks/use-session-filter';
@@ -422,6 +423,21 @@ export function SessionManager({
     toggleOrchestratorRunExpanded(runId);
   };
 
+  const handleSelectSession = useCallback(
+    (sessionId: string, sessionProjectPath?: string) => {
+      // Mark session as clean (read) when user clicks on it
+      const session = sessions.find((s) => s.id === sessionId);
+      if (session?.isDirty) {
+        const api = getElectronAPI();
+        if (api?.sessions?.markClean) {
+          void api.sessions.markClean(sessionId).then(() => void invalidateSessions());
+        }
+      }
+      onSelectSession(sessionId, sessionProjectPath);
+    },
+    [sessions, onSelectSession, invalidateSessions]
+  );
+
   const handleQuickCreateFromHeader = () => {
     if (activeTab === 'archived') {
       setActiveTab('active');
@@ -450,6 +466,10 @@ export function SessionManager({
               <BarChart3 className="mr-0.5 h-3.5 w-3.5" />
               Übersicht
             </TabsTrigger>
+            <TabsTrigger value="completed" className="h-6 flex-1 gap-1 px-2 text-xs font-semibold">
+              <CheckCircle className="mr-0.5 h-3.5 w-3.5" />
+              Fertig
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -461,6 +481,10 @@ export function SessionManager({
       ) : leftPanelTab === 'overview' ? (
         <div className="flex-1 overflow-hidden">
           <LeftOverviewPanel />
+        </div>
+      ) : leftPanelTab === 'completed' ? (
+        <div className="flex-1 overflow-hidden">
+          <CompletedTasksPanel projectPath={projectPath} />
         </div>
       ) : (
         <>
@@ -546,7 +570,7 @@ export function SessionManager({
                     onArchiveSession={(sessionId) => void handleArchiveSession(sessionId)}
                     onUnarchiveSession={(sessionId) => void handleUnarchiveSession(sessionId)}
                     onDeleteSession={handleDeleteSession}
-                    onSelectSession={onSelectSession}
+                    onSelectSession={handleSelectSession}
                     onToggleSelection={toggleSessionSelection}
                     getProjectName={getProjectName}
                     getBadgeColor={getBadgeColor}
@@ -618,7 +642,7 @@ export function SessionManager({
                               void handleUnarchiveSession(sessionId)
                             }
                             onDeleteSession={handleDeleteSession}
-                            onSelectSession={onSelectSession}
+                            onSelectSession={handleSelectSession}
                             onToggleSelection={toggleSessionSelection}
                             getProjectName={getProjectName}
                             getBadgeColor={getBadgeColor}

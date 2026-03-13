@@ -57,7 +57,7 @@ export const SelectedPromptsDisplay = memo(function SelectedPromptsDisplay() {
 
   return (
     <TooltipProvider>
-      <div className="flex flex-wrap items-center gap-2 mb-3 p-2 bg-muted/30 rounded-lg border border-border/50">
+      <div className="mb-3 flex max-h-28 flex-wrap items-center gap-2 overflow-y-auto rounded-lg border border-border/50 bg-muted/30 p-2 pr-1 scrollbar-styled">
         <span className="text-xs text-muted-foreground font-medium">Agent Prompts:</span>
         {selectedPrompts.map((prompt) => {
           const key = getPromptKey(prompt.scope, prompt.id);

@@ -21,6 +21,11 @@ import {
   type DashboardOverviewData,
   type DashboardTimeRange,
 } from '@automaker/types';
+import {
+  formatOverviewGeneratedAbsolute,
+  formatOverviewGeneratedRelative,
+  isOverviewExpired,
+} from './dashboard-time-utils';
 
 // ---------------------------------------------------------------------------
 // TimeTabs
@@ -95,7 +100,12 @@ function getModeLabel(mode: DashboardMode): string {
 
 export function DashboardActionBar({ data, isGenerating, onAction }: DashboardActionBarProps) {
   const activeMode: DashboardMode = data?.mode ?? 'standard';
-  const generatedAt = data ? new Date(data.generatedAt).toLocaleString('de-DE') : null;
+  const generatedAt = data ? formatOverviewGeneratedAbsolute(data.generatedAt) : null;
+  const generatedRelative = data ? formatOverviewGeneratedRelative(data.generatedAt) : null;
+  const isExpired = data ? isOverviewExpired(data.generatedAt, data.timeRange) : false;
+  const expireAfterLabel = data
+    ? (DASHBOARD_TIME_RANGES.find((range) => range.id === data.timeRange)?.label ?? data.timeRange)
+    : null;
 
   if (!data) {
     return (
@@ -125,8 +135,16 @@ export function DashboardActionBar({ data, isGenerating, onAction }: DashboardAc
           disabled={isGenerating}
           aria-label="Übersicht neu generieren"
           aria-pressed={activeMode === 'standard'}
-          title="Erstellt eine neue Standard-Übersicht"
-          className="gap-1.5 text-xs"
+          title={
+            isExpired
+              ? 'Die Übersicht ist abgelaufen. Bitte neu generieren.'
+              : 'Erstellt eine neue Standard-Übersicht'
+          }
+          className={cn(
+            'gap-1.5 text-xs',
+            isExpired &&
+              'border-amber-400/80 bg-amber-400/20 text-amber-900 hover:bg-amber-400/30 dark:text-amber-300 dark:hover:bg-amber-400/25'
+          )}
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Neu generieren
@@ -169,8 +187,20 @@ export function DashboardActionBar({ data, isGenerating, onAction }: DashboardAc
         <p>
           Generiert mit{' '}
           <span className="font-medium text-foreground">{toModelShortLabel(data.model)}</span>
-          {generatedAt ? ` am ${generatedAt}` : ''}
+          {generatedRelative ? (
+            <>
+              {' '}
+              <span className="font-medium text-foreground" title={`Generiert am ${generatedAt}`}>
+                {generatedRelative}
+              </span>
+            </>
+          ) : null}
         </p>
+        {isExpired && expireAfterLabel ? (
+          <p className="text-amber-700 dark:text-amber-300">
+            Diese Übersicht ist älter als {expireAfterLabel}. Bitte neu generieren.
+          </p>
+        ) : null}
       </div>
     </div>
   );

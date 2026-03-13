@@ -39,7 +39,7 @@ export const FilePreview = memo(function FilePreview({
           Clear all
         </button>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex max-h-28 flex-wrap gap-2 overflow-y-auto pr-1 scrollbar-styled">
         {/* Image attachments */}
         {selectedImages.map((image) => (
           <div

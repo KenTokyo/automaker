@@ -3,6 +3,7 @@ import {
   Archive,
   ArchiveRestore,
   Check,
+  CheckCircle2,
   Edit2,
   Info,
   MessageSquare,
@@ -78,6 +79,7 @@ export function SessionListItemRow({
     runningSessions.has(session.id);
   const hasFailed = session.status === 'failed' && !isRunning;
   const wasStopped = session.status === 'stopped' && !isRunning;
+  const isDirty = session.isDirty && !isRunning && !hasFailed && !wasStopped;
 
   const project = getProject(session.projectPath);
   const sessionBadgeColor = getBadgeColor(session.projectPath);
@@ -103,8 +105,15 @@ export function SessionListItemRow({
         wasStopped &&
           isCurrentSession &&
           'border-red-500 bg-red-500/10 shadow-[0_8px_20px_-16px_theme(colors.red.500)]',
+        isDirty &&
+          !isCurrentSession &&
+          'border-emerald-500/70 bg-emerald-500/5 shadow-[0_8px_20px_-16px_theme(colors.emerald.500)]',
+        isDirty &&
+          isCurrentSession &&
+          'border-emerald-500 bg-emerald-500/10 shadow-[0_8px_20px_-16px_theme(colors.emerald.500)]',
         !isRunning &&
           !wasStopped &&
+          !isDirty &&
           isCurrentSession &&
           'border-primary bg-primary/10 shadow-[0_8px_20px_-16px_hsl(var(--primary))]',
         session.isArchived && 'opacity-60',
@@ -197,6 +206,14 @@ export function SessionListItemRow({
                     }}
                     className="shrink-0 text-destructive"
                   />
+                ) : isDirty ? (
+                  <CheckCircle2
+                    style={{
+                      width: `${sessionFontSize}px`,
+                      height: `${sessionFontSize}px`,
+                    }}
+                    className="shrink-0 text-emerald-500"
+                  />
                 ) : (
                   <MessageSquare
                     style={{
@@ -232,6 +249,15 @@ export function SessionListItemRow({
                     style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
                   >
                     Gestoppt
+                  </span>
+                )}
+
+                {isDirty && (
+                  <span
+                    className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-emerald-500"
+                    style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
+                  >
+                    Fertig
                   </span>
                 )}
 

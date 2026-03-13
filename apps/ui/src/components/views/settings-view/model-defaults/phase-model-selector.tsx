@@ -2154,16 +2154,16 @@ export function PhaseModelSelector({
       aria-expanded={open}
       disabled={disabled}
       className={cn(
-        'h-9 gap-1 text-xs font-medium rounded-xl border-border px-2',
+        'h-7 gap-1 text-[11px] font-medium rounded-md border-border px-1.5',
         triggerClassName
       )}
       data-testid="model-selector"
     >
-      {currentModel?.icon && <currentModel.icon className="h-3.5 w-3.5 text-muted-foreground/70" />}
-      <span className="truncate text-xs">
+      {currentModel?.icon && <currentModel.icon className="h-3 w-3 text-muted-foreground/70" />}
+      <span className="truncate text-[11px]">
         {currentModel?.label?.replace('Claude ', '') || 'Select model...'}
       </span>
-      <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+      <ChevronsUpDown className="ml-0.5 h-2.5 w-2.5 shrink-0 opacity-50" />
     </Button>
   );
 

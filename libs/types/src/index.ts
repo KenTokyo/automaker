@@ -406,6 +406,24 @@ export type {
 } from './dashboard.js';
 export { DASHBOARD_TIME_RANGES, getTimeRangeHours } from './dashboard.js';
 
+// Completed task types (Done tab)
+export type {
+  CompletedTaskCategory,
+  CompletedTaskBadge,
+  CompletedTask,
+  CompletedTasksFile,
+  CreateCompletedTaskInput,
+  CompletedTaskFilter,
+  CompletedTaskSortField,
+  CompletedTaskSortOrder,
+} from './completed-task.js';
+export {
+  COMPLETED_TASKS_VERSION,
+  DEFAULT_COMPLETED_TASKS_FILE,
+  COMPLETED_TASK_CATEGORIES,
+  COMPLETED_TASK_BADGE_OPTIONS,
+} from './completed-task.js';
+
 // Markdown Explorer types (project file browser)
 export type {
   ExplorerSearchResult,

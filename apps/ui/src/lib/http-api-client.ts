@@ -588,7 +588,9 @@ type EventType =
   | 'test-runner:started'
   | 'test-runner:output'
   | 'test-runner:completed'
-  | 'notification:created';
+  | 'notification:created'
+  | 'completed-task:created'
+  | 'completed-task:deleted';
 
 /**
  * Dev server log event payloads for WebSocket streaming
@@ -926,6 +928,14 @@ export class HttpApiClient implements ElectronAPI {
 
   onOverviewError(callback: (payload: { message?: string }) => void): () => void {
     return this.subscribeToEvent('overview:error', callback as EventCallback);
+  }
+
+  onCompletedTaskCreated(callback: (payload: unknown) => void): () => void {
+    return this.subscribeToEvent('completed-task:created', callback as EventCallback);
+  }
+
+  onCompletedTaskDeleted(callback: (payload: unknown) => void): () => void {
+    return this.subscribeToEvent('completed-task:deleted', callback as EventCallback);
   }
 
   private getHeaders(): Record<string, string> {
@@ -2710,6 +2720,9 @@ export class HttpApiClient implements ElectronAPI {
 
     delete: (sessionId: string): Promise<{ success: boolean; error?: string }> =>
       this.httpDelete(`/api/sessions/${sessionId}`),
+
+    markClean: (sessionId: string): Promise<{ success: boolean; error?: string }> =>
+      this.post(`/api/sessions/${sessionId}/mark-clean`, {}),
   };
 
   // Claude API

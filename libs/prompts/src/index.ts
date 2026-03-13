@@ -80,6 +80,9 @@ export {
   DEFAULT_PROMPTS,
 } from './defaults.js';
 
+// Completed task capture prompt
+export { getCompletedTaskCapturePrompt } from './completed-task-prompt.js';
+
 // Prompt merging utilities
 export {
   mergeAutoModePrompts,

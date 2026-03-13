@@ -92,7 +92,7 @@ export const TimeLimiterSettings = memo(function TimeLimiterSettings({
           size="icon"
           disabled={disabled}
           className={cn(
-            'h-9 w-9 rounded-lg border-border shrink-0',
+            'h-7 w-7 rounded-md border-border shrink-0',
             isEnabled && 'border-primary/30',
             isWarning && 'border-yellow-500/50 text-yellow-600',
             isExpired && 'border-red-500/50 text-red-600 animate-pulse'
@@ -103,7 +103,7 @@ export const TimeLimiterSettings = memo(function TimeLimiterSettings({
               : 'Time Limiter (disabled)'
           }
         >
-          <Timer className="w-4 h-4" />
+          <Timer className="w-3.5 h-3.5" />
         </Button>
       </DropdownMenuTrigger>
 

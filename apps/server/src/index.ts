@@ -94,6 +94,7 @@ import { getEventHistoryService } from './services/event-history-service.js';
 import { getTestRunnerService } from './services/test-runner-service.js';
 import { createProjectsRoutes } from './routes/projects/index.js';
 import { createOverviewRoutes } from './routes/overview/index.js';
+import { createCompletedTasksRoutes } from './routes/completed-tasks/index.js';
 
 // Load environment variables
 dotenv.config();
@@ -404,6 +405,7 @@ app.use('/api/docs', createDocsRoutes(settingsService));
 app.use('/api/markdown-explorer', createMarkdownExplorerRoutes());
 app.use('/api/mcp', createMCPRoutes(mcpTestService));
 app.use('/api/overview', createOverviewRoutes(events, DATA_DIR));
+app.use('/api/completed-tasks', createCompletedTasksRoutes(events));
 app.use(
   '/api/projects',
   createProjectsRoutes(featureLoader, autoModeService, settingsService, notificationService)

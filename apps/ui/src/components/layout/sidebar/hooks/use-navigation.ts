@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import type { NavigateOptions } from '@tanstack/react-router';
 import {
+  BarChart3,
   FileText,
   LayoutGrid,
   Bot,
@@ -33,6 +34,7 @@ interface UseNavigationProps {
     board: string;
     graph: string;
     agent: string;
+    projectOverview: string;
     terminal: string;
     settings: string;
     projectSettings: string;
@@ -144,6 +146,12 @@ export function useNavigation({
 
     // Build project items - Terminal is conditionally included
     const projectItems: NavItem[] = [
+      {
+        id: 'project-overview',
+        label: 'Übersicht',
+        icon: BarChart3,
+        shortcut: shortcuts.projectOverview,
+      },
       {
         id: 'board',
         label: 'Kanban Board',

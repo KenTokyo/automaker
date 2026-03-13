@@ -26,6 +26,10 @@ import type {
   EditorThemeSettings,
   HeadingStyle,
   TableThemeStyles,
+  CompletedTask,
+  CompletedTaskFilter,
+  CompletedTaskSortField,
+  CompletedTaskSortOrder,
 } from '@automaker/types';
 
 import type {
@@ -379,7 +383,7 @@ export interface AppState {
   sessionFontSize: number;
 
   // Right Panel State
-  rightPanelMode: RightPanelMode; // Which content the right panel shows ('browser' | 'files' | 'terminal' | 'dashboard')
+  rightPanelMode: RightPanelMode; // Which content the right panel shows ('files' | 'terminal' | 'dashboard')
   rightPanelSecondaryMode: RightPanelMode | null; // Secondary panel in split mode (null = no split)
   rightPanelSplitSize: number; // Primary (top) panel percentage when split is active (default 50)
 
@@ -392,6 +396,15 @@ export interface AppState {
   browserTabsByProject: Record<string, BrowserTab[]>;
   activeBrowserTabByProject: Record<string, string>;
   browserPanelSize: number;
+
+  // Completed Tasks State (Done Tab)
+  completedTasks: CompletedTask[];
+  completedTasksLoading: boolean;
+  completedTasksError: string | null;
+  completedTasksFilter: CompletedTaskFilter;
+  completedTasksSortField: CompletedTaskSortField;
+  completedTasksSortOrder: CompletedTaskSortOrder;
+  completedTasksAutoCapture: boolean; // Per-project toggle for automatic task capture by AI agent
 }
 
 export interface AppActions {
@@ -895,6 +908,17 @@ export interface AppActions {
   getBrowserTabs: (projectPath: string) => BrowserTab[];
   getActiveBrowserTab: (projectPath: string) => BrowserTab | null;
   setBrowserPanelSize: (size: number) => void;
+
+  // Completed Tasks actions (Done Tab)
+  setCompletedTasks: (tasks: CompletedTask[]) => void;
+  addCompletedTask: (task: CompletedTask) => void;
+  removeCompletedTask: (taskId: string) => void;
+  setCompletedTasksLoading: (loading: boolean) => void;
+  setCompletedTasksError: (error: string | null) => void;
+  setCompletedTasksFilter: (filter: CompletedTaskFilter) => void;
+  setCompletedTasksSortField: (field: CompletedTaskSortField) => void;
+  setCompletedTasksSortOrder: (order: CompletedTaskSortOrder) => void;
+  setCompletedTasksAutoCapture: (enabled: boolean) => void;
 
   // Reset
   reset: () => void;

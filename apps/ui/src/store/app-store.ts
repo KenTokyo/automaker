@@ -399,6 +399,25 @@ function persistBrowserPanelState(
 // - defaultTerminalState (./defaults/terminal-defaults.ts)
 
 const storedBrowserPanelState = getStoredBrowserPanelState();
+const RIGHT_PANEL_MODES: readonly RightPanelMode[] = ['files', 'terminal', 'dashboard'];
+
+function isRightPanelMode(value: string): value is RightPanelMode {
+  return RIGHT_PANEL_MODES.includes(value as RightPanelMode);
+}
+
+function getStoredRightPanelSecondaryMode(): RightPanelMode | null {
+  const stored = getItem('automaker:rightPanelSecondaryMode');
+  if (!stored) return null;
+
+  if (isRightPanelMode(stored)) {
+    return stored;
+  }
+
+  // Legacy migration: old persisted "browser" mode is disabled now.
+  const fallbackMode: RightPanelMode = 'terminal';
+  setItem('automaker:rightPanelSecondaryMode', fallbackMode);
+  return fallbackMode;
+}
 
 const initialState: AppState = {
   projects: [],
@@ -538,9 +557,8 @@ const initialState: AppState = {
   docsAutoSave: getItem('automaker:docsAutoSave') !== 'false', // default true
   docsAutoSaveDelay: parseInt(getItem('automaker:docsAutoSaveDelay') || '3000', 10),
   // Right Panel State
-  rightPanelMode: 'browser' as const,
-  rightPanelSecondaryMode: (getItem('automaker:rightPanelSecondaryMode') ||
-    null) as RightPanelMode | null,
+  rightPanelMode: 'files' as const,
+  rightPanelSecondaryMode: getStoredRightPanelSecondaryMode(),
   rightPanelSplitSize: parseInt(getItem('automaker:rightPanelSplitSize') || '50', 10),
   // Right Panel Font Sizes
   filesPanelFontSize: parseInt(getItem('automaker:filesPanelFontSize') || '13', 10),
@@ -550,6 +568,15 @@ const initialState: AppState = {
   browserTabsByProject: storedBrowserPanelState.tabsByProject,
   activeBrowserTabByProject: storedBrowserPanelState.activeByProject,
   browserPanelSize: 35,
+
+  // Completed Tasks (Done Tab)
+  completedTasks: [],
+  completedTasksLoading: false,
+  completedTasksError: null,
+  completedTasksFilter: {},
+  completedTasksSortField: 'completedAt',
+  completedTasksSortOrder: 'desc',
+  completedTasksAutoCapture: false,
 };
 
 export const useAppStore = create<AppState & AppActions>()((set, get) => ({
@@ -3172,6 +3199,20 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     return tabs.find((t) => t.id === activeId) || null;
   },
   setBrowserPanelSize: (size) => set({ browserPanelSize: size }),
+
+  // Completed Tasks actions (Done Tab)
+  setCompletedTasks: (tasks) => set({ completedTasks: tasks }),
+  addCompletedTask: (task) => set((state) => ({ completedTasks: [task, ...state.completedTasks] })),
+  removeCompletedTask: (taskId) =>
+    set((state) => ({
+      completedTasks: state.completedTasks.filter((t) => t.id !== taskId),
+    })),
+  setCompletedTasksLoading: (loading) => set({ completedTasksLoading: loading }),
+  setCompletedTasksError: (error) => set({ completedTasksError: error }),
+  setCompletedTasksFilter: (filter) => set({ completedTasksFilter: filter }),
+  setCompletedTasksSortField: (field) => set({ completedTasksSortField: field }),
+  setCompletedTasksSortOrder: (order) => set({ completedTasksSortOrder: order }),
+  setCompletedTasksAutoCapture: (enabled) => set({ completedTasksAutoCapture: enabled }),
 
   // Reset
   reset: () => set(initialState),

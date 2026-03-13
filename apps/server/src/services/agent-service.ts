@@ -21,6 +21,7 @@ import { isFirstMessage, prependTitleInstruction, parseSessionInfo } from '../li
 import { ProviderFactory } from '../providers/provider-factory.js';
 import { createChatOptions, validateWorkingDirectory } from '../lib/sdk-options.js';
 import { PathNotAllowedError } from '@automaker/platform';
+import { getCompletedTaskCapturePrompt } from '@automaker/prompts';
 import type { SettingsService } from './settings-service.js';
 import {
   getAutoLoadClaudeMdSetting,
@@ -79,6 +80,7 @@ interface SessionMetadata {
   createdAt: string;
   updatedAt: string;
   archived?: boolean;
+  isDirty?: boolean; // Session completed work that hasn't been reviewed yet
   tags?: string[];
   model?: string;
   orchestratorRunId?: string;
@@ -328,9 +330,25 @@ export class AgentService {
 
       // Build combined system prompt with base prompt and context files
       const baseSystemPrompt = await this.getSystemPrompt();
-      const combinedSystemPrompt = contextFilesPrompt
+      let combinedSystemPrompt = contextFilesPrompt
         ? `${contextFilesPrompt}\n\n${baseSystemPrompt}`
         : baseSystemPrompt;
+
+      // Append completed task capture prompt if enabled in project settings
+      if (this.settingsService) {
+        try {
+          const projectSettings = await this.settingsService.getProjectSettings(effectiveWorkDir);
+          if (projectSettings.completedTasksAutoCapture) {
+            const port = process.env.PORT || '3008';
+            const hostname = process.env.HOSTNAME || 'localhost';
+            const apiBaseUrl = `http://${hostname}:${port}`;
+            combinedSystemPrompt +=
+              '\n\n' + getCompletedTaskCapturePrompt(apiBaseUrl, effectiveWorkDir);
+          }
+        } catch (error) {
+          this.logger.debug('Could not check completedTasksAutoCapture setting:', error);
+        }
+      }
 
       // Build SDK options using centralized configuration
       // Use thinking level and reasoning effort from request, or fall back to session's stored values
@@ -667,6 +685,9 @@ export class AgentService {
         toolUses,
       });
 
+      // Mark session as dirty (needs review) after successful completion
+      await this.markSessionDirty(sessionId);
+
       // Process next item in queue after completion
       setImmediate(() => this.processNextInQueue(sessionId));
 
@@ -816,6 +837,28 @@ export class AgentService {
       metadata[sessionId].updatedAt = new Date().toISOString();
       await this.saveMetadata(metadata);
     }
+  }
+
+  /**
+   * Mark session as dirty (has completed work that needs review)
+   */
+  async markSessionDirty(sessionId: string): Promise<boolean> {
+    const metadata = await this.loadMetadata();
+    if (!metadata[sessionId]) return false;
+    metadata[sessionId].isDirty = true;
+    await this.saveMetadata(metadata);
+    return true;
+  }
+
+  /**
+   * Mark session as clean (user has reviewed the completed work)
+   */
+  async markSessionClean(sessionId: string): Promise<boolean> {
+    const metadata = await this.loadMetadata();
+    if (!metadata[sessionId]) return false;
+    metadata[sessionId].isDirty = false;
+    await this.saveMetadata(metadata);
+    return true;
   }
 
   async listSessions(includeArchived = false): Promise<SessionMetadata[]> {
