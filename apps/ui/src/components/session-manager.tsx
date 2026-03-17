@@ -25,8 +25,12 @@ import type { StreamEvent } from '@/types/electron';
 import { SessionManagerHeader } from '@/components/session-manager/session-manager-header';
 import { SessionListControls } from '@/components/session-manager/session-list-controls';
 import { SessionListItemRow } from '@/components/session-manager/session-list-item';
+import { SessionItemErrorBoundary } from '@/components/session-manager/session-item-error-boundary';
 import { OrchestratorRunHeader } from '@/components/session-manager/orchestrator-run-header';
 import { generateRandomSessionName } from '@/components/session-manager/session-name-generator';
+import { validateSessionData } from '@/lib/session-utils';
+import { SessionListSkeleton } from '@/components/session-manager/session-list-skeleton';
+import { SessionListError } from '@/components/session-manager/session-list-error';
 
 const logger = createLogger('SessionManager');
 
@@ -60,7 +64,16 @@ export function SessionManager({
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   const [timeFilterHours, setTimeFilterHours] = useState<number | null>(null);
 
-  const { data: sessions = [], refetch: refetchSessions } = useSessions(true);
+  const {
+    data: rawSessions = [],
+    refetch: refetchSessions,
+    isLoading: isSessionsLoading,
+    isError: isSessionsError,
+    error: sessionsError,
+  } = useSessions(true);
+
+  // Validiere Session-Daten zur Laufzeit – repariert fehlende Felder, filtert kaputte Einträge
+  const sessions = useMemo(() => validateSessionData(rawSessions), [rawSessions]);
   const { searchTerm, debouncedSearchTerm, setSearchTerm, clearSearch } = useSessionSearch();
 
   const {
@@ -542,40 +555,52 @@ export function SessionManager({
               onDeleteAllArchived={() => setIsDeleteAllArchivedDialogOpen(true)}
             />
 
+            {isSessionsLoading && rawSessions.length === 0 && <SessionListSkeleton count={5} />}
+
+            {isSessionsError && rawSessions.length === 0 && (
+              <SessionListError error={sessionsError} onRetry={() => void refetchSessions()} />
+            )}
+
             {displayEntries.map((displayEntry) => {
               if (displayEntry.type === 'single') {
                 const session = displayEntry.session;
                 return (
-                  <SessionListItemRow
-                    key={session.id}
-                    session={session}
-                    currentSessionId={currentSessionId}
-                    isCurrentSessionThinking={isCurrentSessionThinking}
-                    runningSessions={runningSessions}
-                    sessionFontSize={sessionFontSize}
-                    isMultiselectMode={isMultiselectMode}
-                    isSelected={selectedSessionIds.has(session.id)}
-                    editingSessionId={editingSessionId}
-                    editingName={editingName}
-                    onEditingNameChange={setEditingName}
-                    onStartEditing={(sessionId, currentName) => {
-                      setEditingSessionId(sessionId);
-                      setEditingName(currentName);
-                    }}
-                    onStopEditing={() => {
-                      setEditingSessionId(null);
-                      setEditingName('');
-                    }}
-                    onRenameSession={(sessionId) => void handleRenameSession(sessionId)}
-                    onArchiveSession={(sessionId) => void handleArchiveSession(sessionId)}
-                    onUnarchiveSession={(sessionId) => void handleUnarchiveSession(sessionId)}
-                    onDeleteSession={handleDeleteSession}
-                    onSelectSession={handleSelectSession}
-                    onToggleSelection={toggleSessionSelection}
-                    getProjectName={getProjectName}
-                    getBadgeColor={getBadgeColor}
-                    getProject={getProject}
-                  />
+                  <SessionItemErrorBoundary
+                    key={`boundary-${session.id}`}
+                    sessionId={session.id}
+                    sessionName={session.name}
+                  >
+                    <SessionListItemRow
+                      key={session.id}
+                      session={session}
+                      currentSessionId={currentSessionId}
+                      isCurrentSessionThinking={isCurrentSessionThinking}
+                      runningSessions={runningSessions}
+                      sessionFontSize={sessionFontSize}
+                      isMultiselectMode={isMultiselectMode}
+                      isSelected={selectedSessionIds.has(session.id)}
+                      editingSessionId={editingSessionId}
+                      editingName={editingName}
+                      onEditingNameChange={setEditingName}
+                      onStartEditing={(sessionId, currentName) => {
+                        setEditingSessionId(sessionId);
+                        setEditingName(currentName);
+                      }}
+                      onStopEditing={() => {
+                        setEditingSessionId(null);
+                        setEditingName('');
+                      }}
+                      onRenameSession={(sessionId) => void handleRenameSession(sessionId)}
+                      onArchiveSession={(sessionId) => void handleArchiveSession(sessionId)}
+                      onUnarchiveSession={(sessionId) => void handleUnarchiveSession(sessionId)}
+                      onDeleteSession={handleDeleteSession}
+                      onSelectSession={handleSelectSession}
+                      onToggleSelection={toggleSessionSelection}
+                      getProjectName={getProjectName}
+                      getBadgeColor={getBadgeColor}
+                      getProject={getProject}
+                    />
+                  </SessionItemErrorBoundary>
                 );
               }
 
@@ -616,39 +641,44 @@ export function SessionManager({
                     <div className="min-h-0 overflow-hidden">
                       <div className="space-y-1.5 border-l border-dashed border-muted-foreground/30 pl-2">
                         {displayEntry.group.sessions.map((session, index) => (
-                          <SessionListItemRow
-                            key={session.id}
-                            session={session}
-                            currentSessionId={currentSessionId}
-                            isCurrentSessionThinking={isCurrentSessionThinking}
-                            runningSessions={runningSessions}
-                            sessionFontSize={Math.max(10, sessionFontSize - 1)}
-                            isMultiselectMode={isMultiselectMode}
-                            isSelected={selectedSessionIds.has(session.id)}
-                            editingSessionId={editingSessionId}
-                            editingName={editingName}
-                            onEditingNameChange={setEditingName}
-                            onStartEditing={(sessionId, currentName) => {
-                              setEditingSessionId(sessionId);
-                              setEditingName(currentName);
-                            }}
-                            onStopEditing={() => {
-                              setEditingSessionId(null);
-                              setEditingName('');
-                            }}
-                            onRenameSession={(sessionId) => void handleRenameSession(sessionId)}
-                            onArchiveSession={(sessionId) => void handleArchiveSession(sessionId)}
-                            onUnarchiveSession={(sessionId) =>
-                              void handleUnarchiveSession(sessionId)
-                            }
-                            onDeleteSession={handleDeleteSession}
-                            onSelectSession={handleSelectSession}
-                            onToggleSelection={toggleSessionSelection}
-                            getProjectName={getProjectName}
-                            getBadgeColor={getBadgeColor}
-                            getProject={getProject}
-                            phaseIndex={index + 1}
-                          />
+                          <SessionItemErrorBoundary
+                            key={`boundary-${session.id}`}
+                            sessionId={session.id}
+                            sessionName={session.name}
+                          >
+                            <SessionListItemRow
+                              session={session}
+                              currentSessionId={currentSessionId}
+                              isCurrentSessionThinking={isCurrentSessionThinking}
+                              runningSessions={runningSessions}
+                              sessionFontSize={Math.max(10, sessionFontSize - 1)}
+                              isMultiselectMode={isMultiselectMode}
+                              isSelected={selectedSessionIds.has(session.id)}
+                              editingSessionId={editingSessionId}
+                              editingName={editingName}
+                              onEditingNameChange={setEditingName}
+                              onStartEditing={(sessionId, currentName) => {
+                                setEditingSessionId(sessionId);
+                                setEditingName(currentName);
+                              }}
+                              onStopEditing={() => {
+                                setEditingSessionId(null);
+                                setEditingName('');
+                              }}
+                              onRenameSession={(sessionId) => void handleRenameSession(sessionId)}
+                              onArchiveSession={(sessionId) => void handleArchiveSession(sessionId)}
+                              onUnarchiveSession={(sessionId) =>
+                                void handleUnarchiveSession(sessionId)
+                              }
+                              onDeleteSession={handleDeleteSession}
+                              onSelectSession={handleSelectSession}
+                              onToggleSelection={toggleSessionSelection}
+                              getProjectName={getProjectName}
+                              getBadgeColor={getBadgeColor}
+                              getProject={getProject}
+                              phaseIndex={index + 1}
+                            />
+                          </SessionItemErrorBoundary>
                         ))}
                       </div>
                     </div>

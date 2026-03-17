@@ -248,7 +248,7 @@ function resolveFallbackScript(parsedArgs) {
 
   switch (mode) {
     case 'web':
-      return { scriptName: 'dev:web', notes };
+      return { scriptName: 'dev:stable', notes };
     case 'electron':
       return { scriptName: 'dev:electron', notes };
     case 'docker':
@@ -294,7 +294,7 @@ function printWindowsNoBashHelp() {
   console.log('Usage: node start-automaker.mjs [mode] [options]');
   console.log('');
   console.log('Modes (direct fallback):');
-  console.log('  web              -> npm run dev:web');
+  console.log('  web              -> npm run dev:stable');
   console.log('  electron         -> npm run dev:electron');
   console.log('  electron-fast    -> fallback to safe "electron"');
   console.log('  docker           -> npm run dev:docker');

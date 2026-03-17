@@ -57,6 +57,9 @@ export type EventType =
   | 'overview:data'
   | 'overview:error'
   | 'completed-task:created'
-  | 'completed-task:deleted';
+  | 'completed-task:deleted'
+  | 'agent:subagent_started'
+  | 'agent:subagent_progress'
+  | 'agent:subagent_stopped';
 
 export type EventCallback = (type: EventType, payload: unknown) => void;

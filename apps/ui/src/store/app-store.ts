@@ -574,7 +574,7 @@ const initialState: AppState = {
   completedTasksLoading: false,
   completedTasksError: null,
   completedTasksFilter: {},
-  completedTasksSortField: 'completedAt',
+  completedTasksSortField: 'date',
   completedTasksSortOrder: 'desc',
   completedTasksAutoCapture: false,
 };
@@ -3203,9 +3203,9 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   // Completed Tasks actions (Done Tab)
   setCompletedTasks: (tasks) => set({ completedTasks: tasks }),
   addCompletedTask: (task) => set((state) => ({ completedTasks: [task, ...state.completedTasks] })),
-  removeCompletedTask: (taskId) =>
+  removeCompletedTask: (filename) =>
     set((state) => ({
-      completedTasks: state.completedTasks.filter((t) => t.id !== taskId),
+      completedTasks: state.completedTasks.filter((t) => t.filename !== filename),
     })),
   setCompletedTasksLoading: (loading) => set({ completedTasksLoading: loading }),
   setCompletedTasksError: (error) => set({ completedTasksError: error }),

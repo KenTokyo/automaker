@@ -1,0 +1,42 @@
+- generic [active] [ref=e1]:
+    - generic [ref=e2]:
+        - main [ref=e3]:
+            - generic [ref=e257]:
+                - generic [ref=e258]:
+                    - img [ref=e260]
+                    - heading "Authentication Required" [level=1] [ref=e263]
+                    - paragraph [ref=e264]: Enter the API key shown in the server console to continue.
+                - generic [ref=e265]:
+                    - generic [ref=e266]:
+                        - text: API Key
+                        - textbox "API Key" [ref=e267]:
+                            - /placeholder: Enter API key...
+                            - text: 37ec6602-8a78-4ac9-9d85-f84fd071a690
+                    - generic [ref=e275]:
+                        - img [ref=e276]
+                        - generic [ref=e278]: Invalid API key.
+                    - button "Login" [ref=e274] [cursor=pointer]
+                - generic [ref=e268]:
+                    - paragraph [ref=e269]: 'Where to find the API key:'
+                    - list [ref=e270]:
+                        - listitem [ref=e271]: Look at the server terminal/console output
+                        - listitem [ref=e272]: Find the box labeled "API Key for Web Mode Authentication"
+                        - listitem [ref=e273]: Copy the UUID displayed there
+        - generic [ref=e8]:
+            - img [ref=e10]
+            - button "Open Tanstack query devtools" [ref=e58] [cursor=pointer]:
+                - img [ref=e59]
+    - generic [ref=e222]:
+        - generic [ref=e224]:
+            - generic [ref=e225]:
+                - button [ref=e228] [cursor=pointer]:
+                    - img [ref=e229]
+                - button [ref=e234] [cursor=pointer]:
+                    - img [ref=e235]
+                - generic:
+                    - generic:
+                        - button:
+                            - img
+            - button [ref=e239] [cursor=pointer]
+        - button [ref=e242] [cursor=pointer]:
+            - img [ref=e243]

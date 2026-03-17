@@ -2,43 +2,55 @@
  * Completed Task Capture Prompt
  *
  * When enabled, this prompt is appended to the agent's system prompt
- * so the AI automatically documents completed tasks via the API.
+ * so the AI automatically documents completed tasks as `.completed/*.md` files.
  */
 
 export function getCompletedTaskCapturePrompt(apiBaseUrl: string, projectPath: string): string {
   return `
 ## Automatische Aufgaben-Erfassung
 
-Wenn du eine Aufgabe abgeschlossen hast, erstelle einen Eintrag über die API.
-Erstelle den Eintrag NACHDEM die Arbeit erledigt ist, nicht vorher.
+[Completed-Task Regel aktiv] Nach Abschluss dieser Aufgabe erstelle eine .completed/<YYYY-MM-DD>_<slug>.md Datei im Projektverzeichnis (${projectPath}).
 
-Nutze dazu das Bash-Tool mit curl:
+Dateiformat:
+\`\`\`markdown
+---
+title: <Titel>
+description: <Einzeiler>
+date: <YYYY-MM-DD>
+status: success|partial|failed
+effort: S|M|L|XL
+files:
+  - <bearbeitete Datei 1>
+  - <bearbeitete Datei 2>
+tags: [feature, bugfix, refactor, docs, ui, performance, security, test, config, cleanup]
+---
+<Markdown: Was wurde gemacht, warum, und wichtige Hinweise>
+Bei mehreren Versuchen: Dokumentiere Attempts mit Problem + Learning.
+\`\`\`
+
+Alternativ kannst du auch die API nutzen:
 
 curl -s -X POST "${apiBaseUrl}/api/completed-tasks" \\
   -H "Content-Type: application/json" \\
   -d '{
     "projectPath": "${projectPath}",
     "title": "<kurze Beschreibung, max 100 Zeichen>",
-    "description": "<was genau gemacht wurde, 1-3 Sätze>",
-    "category": "<feature|bugfix|improvement|refactor|config|docs>",
-    "badges": ["<relevante Badges>"],
-    "relatedFiles": ["<geänderte Dateien>"],
-    "summary": "<einzeilige Zusammenfassung>"
+    "description": "<was genau gemacht wurde, 1-3 Saetze>",
+    "date": "<YYYY-MM-DD>",
+    "status": "<success|partial|failed>",
+    "effort": "<S|M|L|XL>",
+    "files": ["<geaenderte Dateien>"],
+    "tags": ["<relevante Tags>"],
+    "summary": "<Markdown Body>"
   }'
 
-Kategorien:
-- feature: Komplett neues Feature
-- bugfix: Fehler behoben
-- improvement: Bestehendes verbessert
-- refactor: Code umstrukturiert
-- config: Konfiguration geändert
-- docs: Dokumentation erstellt/aktualisiert
-
-Mögliche Badges: frontend, backend, database, api, ui, testing, security, performance, urgent, breaking-change
+Tags: feature, bugfix, refactor, docs, ui, performance, security, test, config, cleanup
+Status: success (alles erledigt), partial (teilweise), failed (fehlgeschlagen)
+Effort: S (< 30min), M (30min-2h), L (2-8h), XL (> 8h)
 
 Regeln:
 - Erstelle pro abgeschlossener Aufgabe EINEN Eintrag
-- Fasse mehrere kleine Änderungen NICHT in einen Eintrag zusammen, außer sie gehören logisch zusammen
-- Wenn der curl-Befehl fehlschlägt, mach einfach weiter – die Erfassung ist optional
+- Fasse mehrere kleine Aenderungen NICHT in einen Eintrag zusammen, ausser sie gehoeren logisch zusammen
+- Wenn der Befehl fehlschlaegt, mach einfach weiter - die Erfassung ist optional
 `.trim();
 }

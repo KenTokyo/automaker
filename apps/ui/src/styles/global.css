@@ -970,23 +970,22 @@
   animation: pulse-subtle 2s ease-in-out infinite;
 }
 
-/* Progress bar indeterminate animation */
+/* Progress bar indeterminate animation (GPU-accelerated, no layout thrashing) */
 @keyframes progress-indeterminate {
   0% {
-    transform: translateX(-100%);
-    width: 50%;
+    transform: translateX(-100%) scaleX(1);
   }
   50% {
-    transform: translateX(50%);
-    width: 30%;
+    transform: translateX(50%) scaleX(0.6);
   }
   100% {
-    transform: translateX(200%);
-    width: 50%;
+    transform: translateX(200%) scaleX(1);
   }
 }
 
 .animate-progress-indeterminate {
+  width: 50%;
+  transform-origin: left;
   animation: progress-indeterminate 1.5s ease-in-out infinite;
 }
 

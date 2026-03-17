@@ -571,6 +571,21 @@ export class AgentService {
                   type: 'tool_use',
                   tool: toolUse,
                 });
+
+                // Detect Task tool invocations for sub-agent tracking
+                if (block.name === 'Task') {
+                  const taskInput = block.input as Record<string, unknown>;
+                  // SDK tool_use blocks include an 'id' field not in our ContentBlock type
+                  const blockWithId = block as typeof block & { id?: string };
+                  this.emitAgentEvent(sessionId, {
+                    type: 'subagent_started',
+                    agentId: blockWithId.id,
+                    agentType: (taskInput.subagent_type as string) || 'unknown',
+                    description: (taskInput.description as string) || '',
+                    model: taskInput.model as string | undefined,
+                    runInBackground: taskInput.run_in_background as boolean | undefined,
+                  });
+                }
               }
             }
           }
@@ -668,6 +683,28 @@ export class AgentService {
           return {
             success: false,
           };
+        } else if ((msg as { type: string }).type === 'tool_progress') {
+          // Track sub-agent progress - the SDK emits these for long-running tools
+          // The SDK's tool_progress messages have fields not in our ProviderMessage type
+          const progressMsg = msg as {
+            tool_use_id?: string;
+            tool_name?: string;
+            elapsed_time_seconds?: number;
+            parent_tool_use_id?: string;
+          };
+          this.emitAgentEvent(sessionId, {
+            type: 'subagent_progress',
+            agentId: progressMsg.tool_use_id,
+            toolName: progressMsg.tool_name,
+            elapsedSeconds: progressMsg.elapsed_time_seconds,
+            parentToolUseId: progressMsg.parent_tool_use_id,
+          });
+        } else if (msg.type === 'user' && msg.parent_tool_use_id) {
+          // Sub-agent returned its result
+          this.emitAgentEvent(sessionId, {
+            type: 'subagent_stopped',
+            agentId: msg.parent_tool_use_id,
+          });
         }
       }
 

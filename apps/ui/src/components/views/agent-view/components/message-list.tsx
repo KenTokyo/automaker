@@ -39,13 +39,16 @@ export const MessageList = memo(function MessageList({
   return (
     <div
       ref={messagesContainerRef}
-      className="flex-1 overflow-y-auto px-6 py-6 space-y-6 scroll-smooth"
+      className="flex-1 overflow-y-auto px-6 py-6 space-y-6"
       data-testid="message-list"
       onScroll={onScroll}
       style={{ backgroundColor: mutedChatBackground }}
     >
       {messages.map((message) => (
-        <div key={message.id}>
+        <div
+          key={message.id}
+          style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 100px' }}
+        >
           {/* Tool Call Group - shown above assistant messages that used tools */}
           {message.role === 'assistant' && message.toolCalls && message.toolCalls.length > 0 && (
             <div className="mb-3">

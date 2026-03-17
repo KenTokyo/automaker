@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getCopyableMessageContent } from '@/lib/message-copy';
 import { splitOrchestratorMessage } from '@/lib/orchestrator-message';
+import { stripEmbeddedSystemPrompts } from '@/lib/system-prompt-payload';
 import { Markdown } from '@/components/ui/markdown';
 import type { ImageAttachment } from '@/store/app-store';
 import { useAppStore } from '@/store/app-store';
@@ -51,11 +52,15 @@ export const MessageBubble = memo(function MessageBubble({
   const isError = message.isError && message.role === 'assistant';
   const normalizedMessageContent =
     message.role === 'assistant' ? message.content.replace(/\\n/g, '\n') : message.content;
-  const { preMessage, mainMessage, postMessage } = useMemo(
-    () => splitOrchestratorMessage(normalizedMessageContent),
+  const visibleMessageContent = useMemo(
+    () => stripEmbeddedSystemPrompts(normalizedMessageContent),
     [normalizedMessageContent]
   );
-  const hasContent = normalizedMessageContent.trim().length > 0;
+  const { preMessage, mainMessage, postMessage } = useMemo(
+    () => splitOrchestratorMessage(visibleMessageContent),
+    [visibleMessageContent]
+  );
+  const hasContent = visibleMessageContent.trim().length > 0;
   const showCopyButton = hasContent;
   const showInsertDocs = message.role === 'assistant' && !isError && mainMessage.length > 0;
   const markdownClassName = cn(

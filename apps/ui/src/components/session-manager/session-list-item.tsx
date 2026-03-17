@@ -69,8 +69,16 @@ export function SessionListItemRow({
   getProject,
   phaseIndex,
 }: SessionListItemRowProps) {
-  const formatTime = (timestamp: string) =>
-    new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const formatTime = (timestamp: string | null | undefined): string => {
+    if (!timestamp) return '--:--';
+    try {
+      const date = new Date(timestamp);
+      if (Number.isNaN(date.getTime())) return '--:--';
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '--:--';
+    }
+  };
 
   const isCurrentSession = currentSessionId === session.id;
   const isRunning =
@@ -231,7 +239,7 @@ export function SessionListItemRow({
                 )}
 
                 <h3 className="truncate font-medium" style={{ fontSize: 'inherit' }}>
-                  {session.name}
+                  {session.name || 'Unbenannte Session'}
                 </h3>
 
                 {isRunning && (
@@ -293,10 +301,10 @@ export function SessionListItemRow({
                     <p
                       className={cn(
                         'overflow-hidden whitespace-pre-line italic text-foreground/85',
-                        'transition-[max-height,color] duration-300 ease-out',
+                        'transition-colors duration-300 ease-out',
                         isCurrentSession
-                          ? 'line-clamp-none max-h-44 text-foreground'
-                          : 'line-clamp-2 max-h-14 group-hover:line-clamp-4 group-hover:max-h-28 group-hover:text-foreground/95'
+                          ? 'line-clamp-none text-foreground'
+                          : 'line-clamp-2 group-hover:line-clamp-4 group-hover:text-foreground/95'
                       )}
                       style={{ fontSize: `${Math.max(10, sessionFontSize - 2)}px` }}
                     >
@@ -317,7 +325,7 @@ export function SessionListItemRow({
 
               {session.lastError && (
                 <p
-                  className="mt-1 overflow-hidden text-destructive/90 transition-[max-height] duration-200 line-clamp-2 group-hover:line-clamp-4"
+                  className="mt-1 overflow-hidden text-destructive/90 line-clamp-2 group-hover:line-clamp-4"
                   style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
                 >
                   Fehler: {session.lastError}
@@ -328,7 +336,7 @@ export function SessionListItemRow({
                 className="mt-1 flex flex-wrap items-center gap-2"
                 style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
               >
-                <span className="text-muted-foreground">{session.messageCount} messages</span>
+                <span className="text-muted-foreground">{session.messageCount ?? 0} messages</span>
                 <span className="text-muted-foreground">|</span>
                 <span className="text-muted-foreground">
                   Created {formatTime(session.createdAt)}
@@ -366,7 +374,7 @@ export function SessionListItemRow({
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => onStartEditing(session.id, session.name)}
+              onClick={() => onStartEditing(session.id, session.name || '')}
               className="p-0 transition-transform duration-200 hover:scale-105"
               style={{
                 width: `${sessionFontSize + 6}px`,

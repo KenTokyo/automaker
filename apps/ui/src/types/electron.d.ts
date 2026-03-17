@@ -91,6 +91,28 @@ export type StreamEvent =
   | {
       type: 'stopped';
       sessionId: string;
+    }
+  | {
+      type: 'subagent_started';
+      sessionId: string;
+      agentId: string;
+      agentType: string;
+      description: string;
+      model?: string;
+      runInBackground?: boolean;
+    }
+  | {
+      type: 'subagent_progress';
+      sessionId: string;
+      agentId: string;
+      toolName: string;
+      elapsedSeconds: number;
+      parentToolUseId?: string | null;
+    }
+  | {
+      type: 'subagent_stopped';
+      sessionId: string;
+      agentId: string;
     };
 
 export interface SessionListItem {

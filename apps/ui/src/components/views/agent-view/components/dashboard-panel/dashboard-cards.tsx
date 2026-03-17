@@ -244,22 +244,24 @@ function SectionCard({
 
       <div
         className={cn(
-          'overflow-hidden transition-all duration-200',
-          open ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
+          'grid transition-[grid-template-rows,opacity] duration-200',
+          open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
         )}
       >
-        <div className="space-y-1 px-3 pb-2">
-          {section.items.map((item, i) => (
-            <div key={i} className="flex items-start gap-2 py-0.5">
-              {guessIcon(item.text)}
-              <div className="min-w-0 flex-1">
-                <p className="text-xs leading-relaxed text-foreground/90">{item.text}</p>
-                {item.file && (
-                  <p className="truncate text-[10px] text-muted-foreground">{item.file}</p>
-                )}
+        <div className="overflow-hidden">
+          <div className="space-y-1 px-3 pb-2">
+            {section.items.map((item, i) => (
+              <div key={i} className="flex items-start gap-2 py-0.5">
+                {guessIcon(item.text)}
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs leading-relaxed text-foreground/90">{item.text}</p>
+                  {item.file && (
+                    <p className="truncate text-[10px] text-muted-foreground">{item.file}</p>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </div>

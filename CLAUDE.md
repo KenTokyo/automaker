@@ -185,3 +185,5 @@ Use `resolveModelString()` from `@automaker/model-resolver` to convert model ali
 - `VITE_HOSTNAME` - Hostname for frontend API URLs (default: localhost)
 
 bitte kein build durchlaufen lassen, sondern nur nach typescript fehlern suchen, statt kompletten build oder dev server zu starten!
+
+**Completed-Task Dokumentation**: Nach erfolgreichem Abschluss einer Aufgabe MUSS eine Datei in `.completed/<YYYY-MM-DD>_<slug>.md` erstellt werden. Format: YAML Frontmatter mit title, description, date, status, effort + Markdown Body. Siehe: `shared-docs/agents/completed-task-rule.md`

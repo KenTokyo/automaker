@@ -6,6 +6,7 @@
  */
 
 import type { Message } from '@/types/electron';
+import { getCopyableMessageContent } from '@/lib/message-copy';
 
 /**
  * Extracted file operation from chat messages
@@ -111,7 +112,7 @@ function formatMessage(message: Message): string {
   const timePrefix = timestamp ? `[${timestamp}] ` : '';
 
   // Truncate very long messages for summary
-  let content = message.content;
+  let content = getCopyableMessageContent(message.content);
   if (content.length > 5000) {
     content = content.substring(0, 5000) + '\n... (truncated)';
   }
@@ -262,7 +263,7 @@ export function generateContextSummary(messages: Message[]): string {
     for (const msg of relevantMessages) {
       const role = msg.role === 'user' ? 'User' : 'KI';
       // Truncate long messages
-      let content = msg.content;
+      let content = getCopyableMessageContent(msg.content);
       if (content.length > 1000) {
         content = content.substring(0, 1000) + '... (truncated)';
       }

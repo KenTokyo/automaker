@@ -36,12 +36,14 @@ function getBadgeIcon(
   // Lucide icon by name
   if (icon && icon in LucideIcons) {
     const IconComponent = (LucideIcons as unknown as Record<string, LucideIcon>)[icon];
-    return (
-      <IconComponent
-        className="w-3 h-3 shrink-0"
-        style={iconColor ? { color: iconColor } : undefined}
-      />
-    );
+    if (typeof IconComponent === 'function') {
+      return (
+        <IconComponent
+          className="w-3 h-3 shrink-0"
+          style={iconColor ? { color: iconColor } : undefined}
+        />
+      );
+    }
   }
 
   // Default: Folder icon

@@ -18,8 +18,9 @@ function buildFilterQuery(filter?: CompletedTaskFilter): string {
   if (!filter) return '';
   const params = new URLSearchParams();
   if (filter.search) params.set('search', filter.search);
-  if (filter.categories?.length) params.set('categories', filter.categories.join(','));
-  if (filter.badges?.length) params.set('badges', filter.badges.join(','));
+  if (filter.tags?.length) params.set('tags', filter.tags.join(','));
+  if (filter.status?.length) params.set('status', filter.status.join(','));
+  if (filter.effort?.length) params.set('effort', filter.effort.join(','));
   if (filter.since) params.set('since', filter.since);
   if (filter.until) params.set('until', filter.until);
   if (filter.limit) params.set('limit', String(filter.limit));
@@ -97,13 +98,16 @@ export function useCompletedTasks(projectPath: string | null, filter?: Completed
     const client = getHttpApiClient();
     const unsubCreated = client.onCompletedTaskCreated((payload) => {
       const task = payload as CompletedTask;
-      if (task && task.projectPath === projectPath) {
+      // The new model no longer has projectPath on the task itself,
+      // so we accept all WS events when they arrive (server already scopes by project)
+      if (task) {
         addCompletedTask(task);
       }
     });
     const unsubDeleted = client.onCompletedTaskDeleted((payload) => {
       const data = payload as { taskId: string; projectPath: string };
       if (data && data.projectPath === projectPath) {
+        // taskId is now the filename
         removeCompletedTask(data.taskId);
       }
     });
@@ -121,7 +125,7 @@ export function useCompletedTasks(projectPath: string | null, filter?: Completed
  * Create a new completed task via POST
  */
 export async function createCompletedTask(
-  input: Omit<CompletedTask, 'id' | 'completedAt'>
+  input: Omit<CompletedTask, 'filename'> & { projectPath: string }
 ): Promise<CompletedTask | null> {
   try {
     const response = await apiFetch('/api/completed-tasks', 'POST', {
@@ -136,12 +140,12 @@ export async function createCompletedTask(
 }
 
 /**
- * Delete a completed task via DELETE
+ * Delete a completed task via DELETE (by filename)
  */
-export async function deleteCompletedTask(taskId: string, projectPath: string): Promise<boolean> {
+export async function deleteCompletedTask(filename: string, projectPath: string): Promise<boolean> {
   try {
     const response = await apiFetch(
-      `/api/completed-tasks/${encodeURIComponent(taskId)}?projectPath=${encodeURIComponent(projectPath)}`,
+      `/api/completed-tasks/${encodeURIComponent(filename)}?projectPath=${encodeURIComponent(projectPath)}`,
       'DELETE'
     );
     return response.ok;

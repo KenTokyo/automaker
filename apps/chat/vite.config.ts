@@ -68,6 +68,7 @@ export default defineConfig(({ command }) => {
     server: {
       host: process.env.HOST || '0.0.0.0',
       port: parseInt(process.env.CHAT_PORT || '3009', 10),
+      hmr: false,
       allowedHosts: true,
       proxy: {
         '/api': {

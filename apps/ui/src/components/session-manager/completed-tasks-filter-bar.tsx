@@ -1,24 +1,33 @@
 /**
  * CompletedTasksFilterBar - Filter and sort controls for the Done tab.
  *
- * Contains a category filter popover, a badge filter popover,
- * and a sort dropdown. Follows the project-filter-dropdown pattern.
+ * Contains a tag filter popover, a status filter popover,
+ * an effort filter popover, and a sort dropdown.
  */
 
 import { useMemo } from 'react';
-import { Check, ChevronDown, ArrowUpDown, Filter, Tag } from 'lucide-react';
+import { Check, ChevronDown, ArrowUpDown, Tag, CircleDot, Gauge } from 'lucide-react';
 import type {
-  CompletedTaskCategory,
-  CompletedTaskBadge,
   CompletedTaskSortField,
   CompletedTaskSortOrder,
   CompletedTaskFilter,
+  CompletedTaskStatus,
+  CompletedTaskEffort,
 } from '@automaker/types';
-import { COMPLETED_TASK_CATEGORIES, COMPLETED_TASK_BADGE_OPTIONS } from '@automaker/types';
+import {
+  COMPLETED_TASK_TAGS,
+  COMPLETED_TASK_STATUSES,
+  COMPLETED_TASK_EFFORTS,
+} from '@automaker/types';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { getCategoryIcon, getCategoryIconColor } from './completed-task-utils';
+import {
+  getStatusLabel,
+  getStatusDotColor,
+  getEffortLabel,
+  getEffortColor,
+} from './completed-task-utils';
 
 // ---------------------------------------------------------------------------
 // Sort options
@@ -31,11 +40,11 @@ interface SortOption {
 }
 
 const SORT_OPTIONS: SortOption[] = [
-  { field: 'completedAt', order: 'desc', label: 'Neueste zuerst' },
-  { field: 'completedAt', order: 'asc', label: 'Älteste zuerst' },
-  { field: 'title', order: 'asc', label: 'A–Z' },
-  { field: 'title', order: 'desc', label: 'Z–A' },
-  { field: 'category', order: 'asc', label: 'Nach Kategorie' },
+  { field: 'date', order: 'desc', label: 'Neueste zuerst' },
+  { field: 'date', order: 'asc', label: 'Aelteste zuerst' },
+  { field: 'title', order: 'asc', label: 'A-Z' },
+  { field: 'title', order: 'desc', label: 'Z-A' },
+  { field: 'effort', order: 'desc', label: 'Nach Effort' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -48,7 +57,6 @@ interface CompletedTasksFilterBarProps {
   sortField: CompletedTaskSortField;
   sortOrder: CompletedTaskSortOrder;
   onSortChange: (field: CompletedTaskSortField, order: CompletedTaskSortOrder) => void;
-  availableBadges: CompletedTaskBadge[];
 }
 
 // ---------------------------------------------------------------------------
@@ -61,48 +69,55 @@ export function CompletedTasksFilterBar({
   sortField,
   sortOrder,
   onSortChange,
-  availableBadges,
 }: CompletedTasksFilterBarProps) {
-  const activeCategories = filter.categories ?? [];
-  const activeBadges = filter.badges ?? [];
+  const activeTags = filter.tags ?? [];
+  const activeStatuses = filter.status ?? [];
+  const activeEfforts = filter.effort ?? [];
 
   const currentSortLabel = useMemo(() => {
     const opt = SORT_OPTIONS.find((o) => o.field === sortField && o.order === sortOrder);
     return opt?.label ?? 'Neueste zuerst';
   }, [sortField, sortOrder]);
 
-  // Category filter handlers
-  const toggleCategory = (cat: CompletedTaskCategory) => {
-    const next = activeCategories.includes(cat)
-      ? activeCategories.filter((c) => c !== cat)
-      : [...activeCategories, cat];
-    onFilterChange({ ...filter, categories: next.length ? next : undefined });
+  // Tag filter handlers
+  const toggleTag = (tag: string) => {
+    const next = activeTags.includes(tag)
+      ? activeTags.filter((t) => t !== tag)
+      : [...activeTags, tag];
+    onFilterChange({ ...filter, tags: next.length ? next : undefined });
   };
 
-  const clearCategories = () => {
-    onFilterChange({ ...filter, categories: undefined });
+  const clearTags = () => {
+    onFilterChange({ ...filter, tags: undefined });
   };
 
-  // Badge filter handlers
-  const toggleBadge = (badge: CompletedTaskBadge) => {
-    const next = activeBadges.includes(badge)
-      ? activeBadges.filter((b) => b !== badge)
-      : [...activeBadges, badge];
-    onFilterChange({ ...filter, badges: next.length ? next : undefined });
+  // Status filter handlers
+  const toggleStatus = (status: CompletedTaskStatus) => {
+    const next = activeStatuses.includes(status)
+      ? activeStatuses.filter((s) => s !== status)
+      : [...activeStatuses, status];
+    onFilterChange({ ...filter, status: next.length ? next : undefined });
   };
 
-  const clearBadges = () => {
-    onFilterChange({ ...filter, badges: undefined });
+  const clearStatuses = () => {
+    onFilterChange({ ...filter, status: undefined });
   };
 
-  const categoryEntries = Object.entries(COMPLETED_TASK_CATEGORIES) as [
-    CompletedTaskCategory,
-    string,
-  ][];
+  // Effort filter handlers
+  const toggleEffort = (effort: CompletedTaskEffort) => {
+    const next = activeEfforts.includes(effort)
+      ? activeEfforts.filter((e) => e !== effort)
+      : [...activeEfforts, effort];
+    onFilterChange({ ...filter, effort: next.length ? next : undefined });
+  };
+
+  const clearEfforts = () => {
+    onFilterChange({ ...filter, effort: undefined });
+  };
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {/* Category Filter */}
+      {/* Tag Filter */}
       <Popover>
         <PopoverTrigger asChild>
           <Button
@@ -110,36 +125,34 @@ export function CompletedTasksFilterBar({
             size="sm"
             className={cn(
               'h-7 gap-1 text-xs',
-              activeCategories.length > 0 && 'border-sky-500/50 text-sky-600'
+              activeTags.length > 0 && 'border-sky-500/50 text-sky-600'
             )}
           >
-            <Filter className="h-3 w-3" />
-            {activeCategories.length > 0 ? `${activeCategories.length} gewählt` : 'Kategorie'}
+            <Tag className="h-3 w-3" />
+            {activeTags.length > 0 ? `${activeTags.length} Tags` : 'Tags'}
             <ChevronDown className="h-3 w-3" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-48 p-1" align="start">
-          {activeCategories.length > 0 && (
+          {activeTags.length > 0 && (
             <button
               type="button"
               className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent"
-              onClick={clearCategories}
+              onClick={clearTags}
             >
               Alle anzeigen
             </button>
           )}
-          {categoryEntries.map(([key, label]) => {
-            const CatIcon = getCategoryIcon(key);
-            const active = activeCategories.includes(key);
+          {COMPLETED_TASK_TAGS.map((tag) => {
+            const active = activeTags.includes(tag);
             return (
               <button
-                key={key}
+                key={tag}
                 type="button"
                 className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent"
-                onClick={() => toggleCategory(key)}
+                onClick={() => toggleTag(tag)}
               >
-                <CatIcon className={cn('h-3.5 w-3.5', getCategoryIconColor(key))} />
-                <span className="flex-1 text-left">{label}</span>
+                <span className="flex-1 text-left">{tag}</span>
                 {active && <Check className="h-3.5 w-3.5 text-sky-500" />}
               </button>
             );
@@ -147,52 +160,100 @@ export function CompletedTasksFilterBar({
         </PopoverContent>
       </Popover>
 
-      {/* Badge Filter */}
-      {availableBadges.length > 0 && (
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className={cn(
-                'h-7 gap-1 text-xs',
-                activeBadges.length > 0 && 'border-sky-500/50 text-sky-600'
-              )}
-            >
-              <Tag className="h-3 w-3" />
-              {activeBadges.length > 0 ? `${activeBadges.length} gewählt` : 'Badges'}
-              <ChevronDown className="h-3 w-3" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-48 p-1" align="start">
-            {activeBadges.length > 0 && (
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent"
-                onClick={clearBadges}
-              >
-                Alle anzeigen
-              </button>
+      {/* Status Filter */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              'h-7 gap-1 text-xs',
+              activeStatuses.length > 0 && 'border-sky-500/50 text-sky-600'
             )}
-            {availableBadges.map((badge) => {
-              const active = activeBadges.includes(badge);
-              return (
-                <button
-                  key={badge}
-                  type="button"
-                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent"
-                  onClick={() => toggleBadge(badge)}
+          >
+            <CircleDot className="h-3 w-3" />
+            {activeStatuses.length > 0 ? `${activeStatuses.length} Status` : 'Status'}
+            <ChevronDown className="h-3 w-3" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-44 p-1" align="start">
+          {activeStatuses.length > 0 && (
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+              onClick={clearStatuses}
+            >
+              Alle anzeigen
+            </button>
+          )}
+          {COMPLETED_TASK_STATUSES.map((status) => {
+            const active = activeStatuses.includes(status);
+            return (
+              <button
+                key={status}
+                type="button"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent"
+                onClick={() => toggleStatus(status)}
+              >
+                <span className={cn('h-2 w-2 rounded-full', getStatusDotColor(status))} />
+                <span className="flex-1 text-left">{getStatusLabel(status)}</span>
+                {active && <Check className="h-3.5 w-3.5 text-sky-500" />}
+              </button>
+            );
+          })}
+        </PopoverContent>
+      </Popover>
+
+      {/* Effort Filter */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              'h-7 gap-1 text-xs',
+              activeEfforts.length > 0 && 'border-sky-500/50 text-sky-600'
+            )}
+          >
+            <Gauge className="h-3 w-3" />
+            {activeEfforts.length > 0 ? `${activeEfforts.length} Effort` : 'Effort'}
+            <ChevronDown className="h-3 w-3" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-40 p-1" align="start">
+          {activeEfforts.length > 0 && (
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+              onClick={clearEfforts}
+            >
+              Alle anzeigen
+            </button>
+          )}
+          {COMPLETED_TASK_EFFORTS.map((effort) => {
+            const active = activeEfforts.includes(effort);
+            return (
+              <button
+                key={effort}
+                type="button"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent"
+                onClick={() => toggleEffort(effort)}
+              >
+                <span
+                  className={cn(
+                    'rounded px-1 text-[10px] font-medium border',
+                    getEffortColor(effort)
+                  )}
                 >
-                  <span className="flex-1 text-left">
-                    {COMPLETED_TASK_BADGE_OPTIONS[badge] ?? badge}
-                  </span>
-                  {active && <Check className="h-3.5 w-3.5 text-sky-500" />}
-                </button>
-              );
-            })}
-          </PopoverContent>
-        </Popover>
-      )}
+                  {getEffortLabel(effort)}
+                </span>
+                <span className="flex-1 text-left" />
+                {active && <Check className="h-3.5 w-3.5 text-sky-500" />}
+              </button>
+            );
+          })}
+        </PopoverContent>
+      </Popover>
 
       {/* Sort Dropdown */}
       <Popover>

@@ -1477,9 +1477,9 @@ case $MODE in
             center_print "✓ Packages built" "$C_GREEN"
             echo ""
 
-            # Start backend server in dev mode (background)
+            # Start backend server in stable dev mode (without watch auto-restart)
             center_print "Starting backend server on port $SERVER_PORT..." "$C_YELLOW"
-            npm run _dev:server &
+            npm run dev:test --workspace=apps/server &
             SERVER_PID=$!
 
             # Wait for server to be healthy
@@ -1507,7 +1507,7 @@ case $MODE in
             center_print "The application will be available at: http://${APP_HOST}:$WEB_PORT" "$C_GREEN"
             echo ""
 
-            # Start web app with Vite dev server (HMR enabled)
+            # Start web app with Vite dev server (HMR is disabled in Vite config)
             export VITE_APP_MODE="1"
             npm run _dev:web
         fi
@@ -1571,9 +1571,9 @@ case $MODE in
             center_print "✓ Packages built" "$C_GREEN"
             echo ""
 
-            # Start backend server in chat mode (background)
+            # Start backend server in stable chat mode (without watch auto-restart)
             center_print "Starting backend server (chat mode) on port $SERVER_PORT..." "$C_YELLOW"
-            npm run _dev:server:chat &
+            npm run dev:test --workspace=apps/server &
             SERVER_PID=$!
 
             # Wait for server to be healthy

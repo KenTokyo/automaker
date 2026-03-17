@@ -9,6 +9,17 @@ import type { ReasoningEffort } from '@automaker/types';
 
 const logger = createLogger('ElectronAgent');
 
+export interface ActiveSubAgent {
+  agentId: string;
+  agentType: string;
+  description: string;
+  model?: string;
+  startedAt: Date;
+  elapsedSeconds: number;
+  runInBackground?: boolean;
+  lastToolName?: string;
+}
+
 interface UseElectronAgentOptions {
   sessionId: string;
   workingDirectory?: string;
@@ -60,6 +71,8 @@ interface UseElectronAgentResult {
   ) => Promise<void>;
   removeFromServerQueue: (promptId: string) => Promise<void>;
   clearServerQueue: () => Promise<void>;
+  // Active sub-agents
+  activeSubAgents: ActiveSubAgent[];
 }
 
 /**
@@ -81,6 +94,7 @@ export function useElectronAgent({
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [serverQueue, setServerQueue] = useState<QueuedPrompt[]>([]);
+  const [activeSubAgents, setActiveSubAgents] = useState<ActiveSubAgent[]>([]);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const currentMessageRef = useRef<Message | null>(null);
   const onToolUseRef = useRef(onToolUse);
@@ -420,6 +434,7 @@ export function useElectronAgent({
           // Agent finished processing for THIS session
           logger.info('Processing complete for session:', sessionId);
           setIsProcessing(false);
+          setActiveSubAgents([]); // Clear all sub-agents on completion
           const completedToolCalls =
             pendingToolCallsRef.current.length > 0 ? [...pendingToolCallsRef.current] : undefined;
           pendingToolCallsRef.current = [];
@@ -481,12 +496,47 @@ export function useElectronAgent({
           // Session was manually stopped by the user
           logger.info('Session stopped for:', sessionId);
           setIsProcessing(false);
+          setActiveSubAgents([]); // Clear all sub-agents on stop
           break;
 
         case 'session_metadata_updated':
           // Session title/description updated from first Claude response
           // Query invalidation hook handles the sessions list refresh
           logger.info('Session metadata updated:', event.name);
+          break;
+
+        case 'subagent_started':
+          // Sub-agent started processing
+          logger.info('Sub-agent started:', event.agentId, event.agentType);
+          setActiveSubAgents((prev) => [
+            ...prev.filter((a) => a.agentId !== event.agentId),
+            {
+              agentId: event.agentId,
+              agentType: event.agentType,
+              description: event.description,
+              model: event.model,
+              startedAt: new Date(),
+              elapsedSeconds: 0,
+              runInBackground: event.runInBackground,
+            },
+          ]);
+          break;
+
+        case 'subagent_progress':
+          // Sub-agent progress update
+          setActiveSubAgents((prev) =>
+            prev.map((a) =>
+              a.agentId === event.agentId
+                ? { ...a, elapsedSeconds: event.elapsedSeconds, lastToolName: event.toolName }
+                : a
+            )
+          );
+          break;
+
+        case 'subagent_stopped':
+          // Sub-agent stopped
+          logger.info('Sub-agent stopped:', event.agentId);
+          setActiveSubAgents((prev) => prev.filter((a) => a.agentId !== event.agentId));
           break;
       }
     };
@@ -732,5 +782,7 @@ export function useElectronAgent({
     addToServerQueue,
     removeFromServerQueue,
     clearServerQueue,
+    // Active sub-agents
+    activeSubAgents,
   };
 }

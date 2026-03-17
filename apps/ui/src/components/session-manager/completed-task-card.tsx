@@ -1,43 +1,38 @@
 /**
  * CompletedTaskCard - A single card for a completed task in the Done tab.
  *
- * Displays category icon, title, badges, description, relative time,
- * and a hover-visible delete button.
+ * Displays status dot, title, tags as chips, effort badge,
+ * attempt badge (if > 1), provider badge, and relative time.
  */
 
 import { useCallback, useState } from 'react';
-import { Loader2, Trash2, Clock, FileText, ChevronRight } from 'lucide-react';
+import { Loader2, Trash2, Clock } from 'lucide-react';
 import type { CompletedTask } from '@automaker/types';
-import { COMPLETED_TASK_BADGE_OPTIONS } from '@automaker/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
-  getCategoryIcon,
-  getCategoryColor,
-  getCategoryIconColor,
-  getCategoryLabel,
+  getStatusColor,
+  getStatusDotColor,
+  getStatusLabel,
+  getEffortLabel,
+  getEffortColor,
   formatRelativeTime,
 } from './completed-task-utils';
 
 interface CompletedTaskCardProps {
   task: CompletedTask;
-  onDelete?: (taskId: string) => void;
-  onHistoryClick?: (historyFile: string) => void;
+  onDelete?: (filename: string) => void;
 }
 
-export function CompletedTaskCard({ task, onDelete, onHistoryClick }: CompletedTaskCardProps) {
+export function CompletedTaskCard({ task, onDelete }: CompletedTaskCardProps) {
   const [deleting, setDeleting] = useState(false);
-
-  const Icon = getCategoryIcon(task.category);
-  const categoryColor = getCategoryColor(task.category);
-  const iconColor = getCategoryIconColor(task.category);
 
   const handleDelete = useCallback(() => {
     if (!onDelete || deleting) return;
     setDeleting(true);
-    onDelete(task.id);
-  }, [task.id, onDelete, deleting]);
+    onDelete(task.filename);
+  }, [task.filename, onDelete, deleting]);
 
   return (
     <div
@@ -47,10 +42,13 @@ export function CompletedTaskCard({ task, onDelete, onHistoryClick }: CompletedT
         'cursor-default'
       )}
     >
-      {/* Header: Icon + Title + Delete */}
+      {/* Header: Status dot + Title + Delete */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <Icon className={cn('h-3.5 w-3.5 shrink-0', iconColor)} />
+          <span
+            className={cn('h-2 w-2 shrink-0 rounded-full', getStatusDotColor(task.status))}
+            title={getStatusLabel(task.status)}
+          />
           <span className="min-w-0 truncate text-sm font-medium">{task.title}</span>
         </div>
         {onDelete && (
@@ -71,14 +69,38 @@ export function CompletedTaskCard({ task, onDelete, onHistoryClick }: CompletedT
         )}
       </div>
 
-      {/* Badges row */}
+      {/* Badges row: Status, Effort, Attempt, Provider, Tags */}
       <div className="mt-1.5 flex flex-wrap gap-1">
-        <Badge size="sm" className={cn('gap-1 border', categoryColor)}>
-          {getCategoryLabel(task.category)}
+        {/* Status badge */}
+        <Badge size="sm" className={cn('gap-1 border', getStatusColor(task.status))}>
+          {getStatusLabel(task.status)}
         </Badge>
-        {task.badges.map((badge) => (
-          <Badge key={badge} variant="outline" size="sm">
-            {COMPLETED_TASK_BADGE_OPTIONS[badge] ?? badge}
+
+        {/* Effort badge */}
+        {task.effort && (
+          <Badge size="sm" className={cn('gap-1 border', getEffortColor(task.effort))}>
+            {getEffortLabel(task.effort)}
+          </Badge>
+        )}
+
+        {/* Attempt badge (only if > 1) */}
+        {task.attempt > 1 && (
+          <Badge variant="outline" size="sm" title={`Versuch ${task.attempt}`}>
+            #{task.attempt}
+          </Badge>
+        )}
+
+        {/* Provider badge */}
+        {task.provider && (
+          <Badge variant="outline" size="sm">
+            {task.provider}
+          </Badge>
+        )}
+
+        {/* Tag chips */}
+        {task.tags.map((tag) => (
+          <Badge key={tag} variant="outline" size="sm">
+            {tag}
           </Badge>
         ))}
       </div>
@@ -88,25 +110,12 @@ export function CompletedTaskCard({ task, onDelete, onHistoryClick }: CompletedT
         <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">{task.description}</p>
       )}
 
-      {/* Footer: relative time */}
+      {/* Footer: relative time + date */}
       <div className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
         <Clock className="h-3 w-3" />
-        <span>{formatRelativeTime(task.completedAt)}</span>
+        <span>{formatRelativeTime(task.date)}</span>
+        {task.date && <span className="ml-1 opacity-60">({task.date})</span>}
       </div>
-
-      {/* History file link */}
-      {task.historyFile && (
-        <button
-          type="button"
-          className="mt-2 flex w-full items-center gap-1.5 border-t border-muted pt-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
-          onClick={() => onHistoryClick?.(task.historyFile!)}
-          title={task.historyFile}
-        >
-          <FileText className="h-3 w-3 shrink-0" />
-          <span className="min-w-0 truncate">{task.historyFile.split('/').pop()}</span>
-          <ChevronRight className="ml-auto h-3 w-3 shrink-0" />
-        </button>
-      )}
     </div>
   );
 }

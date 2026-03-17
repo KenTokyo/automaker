@@ -59,6 +59,12 @@ interface InputControlsProps {
   onInputHeightChange?: () => void;
 }
 
+/**
+ * Voxtral local speech recognition is disabled for now – the WebGPU model
+ * requires too many resources.  Set to `true` to re-enable.
+ */
+const VOXTRAL_ENABLED = false;
+
 const TEXTAREA_MIN_HEIGHT = 44;
 const TEXTAREA_MAX_HEIGHT = 320;
 const INPUT_SYNC_DEBOUNCE_MS = 180;
@@ -228,6 +234,28 @@ export function InputControls({
     }, []),
   });
 
+  // Voxtral local speech recognition (disabled – see VOXTRAL_ENABLED)
+  const voxtralHook = useVoxtralSpeechRecognition(
+    VOXTRAL_ENABLED
+      ? {
+          onTranscript: (chunk: string) => {
+            setDraftInput((previous) => {
+              const normalizedChunk = previous.length === 0 ? chunk.trimStart() : chunk;
+              if (!normalizedChunk) return previous;
+              const nextValue = previous + normalizedChunk;
+              syncInputToParent(nextValue);
+              return nextValue;
+            });
+            scheduleTextareaResize(inputRef.current);
+            scrollTextareaToBottom(inputRef.current);
+          },
+          onError: (errorMessage: string) => {
+            console.error('Voxtral speech recognition error:', errorMessage);
+          },
+        }
+      : {}
+  );
+
   const {
     isSupported: isVoxtralSupported,
     isListening: isVoxtralListening,
@@ -239,27 +267,7 @@ export function InputControls({
     error: voxtralError,
     toggleListening: toggleVoxtralListening,
     resetSession: resetVoxtralSession,
-  } = useVoxtralSpeechRecognition({
-    onTranscript: useCallback(
-      (chunk: string) => {
-        setDraftInput((previous) => {
-          const normalizedChunk = previous.length === 0 ? chunk.trimStart() : chunk;
-          if (!normalizedChunk) {
-            return previous;
-          }
-          const nextValue = previous + normalizedChunk;
-          syncInputToParent(nextValue);
-          return nextValue;
-        });
-        scheduleTextareaResize(inputRef.current);
-        scrollTextareaToBottom(inputRef.current);
-      },
-      [inputRef, scheduleTextareaResize, scrollTextareaToBottom, syncInputToParent]
-    ),
-    onError: useCallback((errorMessage: string) => {
-      console.error('Voxtral speech recognition error:', errorMessage);
-    }, []),
-  });
+  } = voxtralHook;
 
   const voxtralButtonTitle = !isVoxtralSupported
     ? 'Voxtral braucht WebGPU und Mikrofonrechte'
@@ -285,7 +293,7 @@ export function InputControls({
         : isVoxtralLoading
           ? `${voxtralLoadingMessage} (${Math.round(voxtralLoadingProgress)}%).`
           : voxtralError
-            ? `Voxtral hat ein Problem: ${voxtralError}. Mit „Zurücksetzen“ kannst du neu starten.`
+            ? `Voxtral hat ein Problem: ${voxtralError}. Mit „Zurücksetzen” kannst du neu starten.`
             : isVoxtralListening
               ? 'Voxtral hört zu. Sprich normal, der Text kommt direkt ins Feld.'
               : hasLoadedVoxtralModel
@@ -368,7 +376,7 @@ export function InputControls({
   return (
     <div
       className={cn(
-        'flex flex-col gap-1.5 transition-all duration-200 rounded-lg p-1',
+        'flex flex-col gap-1.5 transition-[background-color,box-shadow] duration-200 rounded-lg p-1',
         isDragOver && 'bg-primary/5 ring-2 ring-primary/30'
       )}
       onDragEnter={onDragEnter}
@@ -471,39 +479,41 @@ export function InputControls({
             </Button>
           )}
 
-          {/* Voxtral Test-Mikrofon (WebGPU) */}
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => {
-              void toggleVoxtralListening();
-            }}
-            disabled={!isConnected || (!isVoxtralSupported && !isVoxtralLoading)}
-            className={cn(
-              'h-7 w-7 rounded-md border-border shrink-0 transition-all',
-              isVoxtralListening &&
-                'bg-emerald-500/10 text-emerald-700 border-emerald-500/40 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.35)]',
-              isVoxtralLoading &&
-                'text-amber-600 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.35)]',
-              !isVoxtralListening &&
-                !isVoxtralLoading &&
-                isVoxtralSupported &&
-                'text-emerald-700 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.25)] hover:shadow-[0_0_14px_rgba(16,185,129,0.35)]',
-              voxtralError &&
+          {/* Voxtral Test-Mikrofon (WebGPU) – disabled via VOXTRAL_ENABLED */}
+          {VOXTRAL_ENABLED && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                void toggleVoxtralListening();
+              }}
+              disabled={!isConnected || (!isVoxtralSupported && !isVoxtralLoading)}
+              className={cn(
+                'h-7 w-7 rounded-md border-border shrink-0 transition-[background-color,color,border-color,box-shadow]',
+                isVoxtralListening &&
+                  'bg-emerald-500/10 text-emerald-700 border-emerald-500/40 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.35)]',
+                isVoxtralLoading &&
+                  'text-amber-600 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.35)]',
                 !isVoxtralListening &&
-                !isVoxtralLoading &&
-                'text-red-600 border-red-500/40 shadow-none'
-            )}
-            title={voxtralButtonTitle}
-          >
-            {isVoxtralLoading ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : isVoxtralListening ? (
-              <MicOff className="w-3.5 h-3.5" />
-            ) : (
-              <Cpu className="w-3.5 h-3.5" />
-            )}
-          </Button>
+                  !isVoxtralLoading &&
+                  isVoxtralSupported &&
+                  'text-emerald-700 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.25)] hover:shadow-[0_0_14px_rgba(16,185,129,0.35)]',
+                voxtralError &&
+                  !isVoxtralListening &&
+                  !isVoxtralLoading &&
+                  'text-red-600 border-red-500/40 shadow-none'
+              )}
+              title={voxtralButtonTitle}
+            >
+              {isVoxtralLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : isVoxtralListening ? (
+                <MicOff className="w-3.5 h-3.5" />
+              ) : (
+                <Cpu className="w-3.5 h-3.5" />
+              )}
+            </Button>
+          )}
 
           {/* File Attachment Button */}
           <Button
@@ -616,7 +626,7 @@ export function InputControls({
         </div>
       </div>
 
-      {voxtralHelpText && (
+      {VOXTRAL_ENABLED && voxtralHelpText && (
         <div
           className={cn(
             'flex flex-col gap-1 rounded-md border px-2 py-1 text-[11px] leading-tight sm:flex-row sm:items-center sm:justify-between',

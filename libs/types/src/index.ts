@@ -408,20 +408,18 @@ export { DASHBOARD_TIME_RANGES, getTimeRangeHours } from './dashboard.js';
 
 // Completed task types (Done tab)
 export type {
-  CompletedTaskCategory,
-  CompletedTaskBadge,
   CompletedTask,
-  CompletedTasksFile,
-  CreateCompletedTaskInput,
+  CompletedTaskTag,
+  CompletedTaskEffort,
+  CompletedTaskStatus,
   CompletedTaskFilter,
   CompletedTaskSortField,
   CompletedTaskSortOrder,
 } from './completed-task.js';
 export {
-  COMPLETED_TASKS_VERSION,
-  DEFAULT_COMPLETED_TASKS_FILE,
-  COMPLETED_TASK_CATEGORIES,
-  COMPLETED_TASK_BADGE_OPTIONS,
+  COMPLETED_TASK_TAGS,
+  COMPLETED_TASK_EFFORTS,
+  COMPLETED_TASK_STATUSES,
 } from './completed-task.js';
 
 // Markdown Explorer types (project file browser)

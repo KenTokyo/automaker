@@ -18,10 +18,43 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { useOrchestratorStore } from '@/store/orchestrator-store';
+import {
+  useOrchestratorStore,
+  type OrchestratorAutoSendStatus,
+  type OrchestratorTriggerReason,
+} from '@/store/orchestrator-store';
 
 interface OrchestratorSettingsProps {
   disabled?: boolean;
+}
+
+function getTriggerReasonText(reason: OrchestratorTriggerReason): string {
+  switch (reason) {
+    case 'no-new-assistant-output':
+      return 'Keine neue Assistent-Antwort. Deshalb wurde kein neuer Schritt gestartet.';
+    case 'keyword-empty':
+      return 'Es ist kein Stichwort gesetzt.';
+    case 'last-line-empty':
+      return 'Die letzte Zeile war leer.';
+    case 'exact-match':
+      return 'Die letzte Zeile ist genau das Stichwort.';
+    case 'keyword-match':
+      return 'Das Stichwort wurde in der letzten Zeile gefunden.';
+    case 'disabled':
+      return 'Der Orchestrator ist aus.';
+    default:
+      return 'Die letzte Zeile passt nicht zum Stichwort.';
+  }
+}
+
+function getAutoSendStatusText(status: OrchestratorAutoSendStatus): string {
+  if (status === 'waiting') {
+    return 'Warte auf neuen Chat...';
+  }
+  if (status === 'sending') {
+    return 'Sende automatisch...';
+  }
+  return 'Bereit';
 }
 
 export const OrchestratorSettings = memo(function OrchestratorSettings({
@@ -35,6 +68,7 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
     autoSendEnabled,
     orchestratorRunId,
     autoSendStatus,
+    lastTriggerCheck,
     setEnabled,
     setTriggerKeyword,
     setMaxIterations,
@@ -89,17 +123,17 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
           disabled={disabled}
           className={cn(
             'h-7 rounded-md border-border shrink-0',
-            isEnabled ? 'border-purple-500/50 text-purple-600 w-auto min-w-7 px-1.5 gap-1' : 'w-7',
+            isEnabled ? 'w-auto min-w-7 px-1.5 gap-1 bg-muted/50 text-foreground' : 'w-7',
             autoSendStatus !== 'idle' && 'animate-pulse'
           )}
           title={
             isEnabled
               ? autoSendStatus === 'waiting'
-                ? 'Orchestrator: Waiting for session...'
+                ? 'Orchestrator: Warte auf neuen Chat...'
                 : autoSendStatus === 'sending'
-                  ? 'Orchestrator: Auto-sending...'
-                  : `Orchestrator: ${currentIteration}/${maxIterations}`
-              : 'Orchestrator (disabled)'
+                  ? 'Orchestrator: Sende automatisch...'
+                  : `Orchestrator: ${currentIteration}/${maxIterations} Schritte`
+              : 'Orchestrator (aus)'
           }
         >
           {autoSendStatus !== 'idle' ? (
@@ -124,10 +158,10 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
         <div className="p-3 border-b border-border">
           <div className="flex items-center gap-2 mb-1">
             <Settings className="w-4 h-4" />
-            <h4 className="font-medium text-sm">Orchestrator Settings</h4>
+            <h4 className="font-medium text-sm">Orchestrator</h4>
           </div>
           <p className="text-xs text-muted-foreground">
-            Automatically chain AI conversations when a trigger keyword is detected.
+            Startet den nächsten Chat automatisch, wenn das Stichwort passt.
           </p>
         </div>
 
@@ -137,9 +171,9 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="orchestrator-enabled" className="text-sm font-medium">
-                Enable Orchestrator
+                Orchestrator aktiv
               </Label>
-              <p className="text-xs text-muted-foreground">Auto-chain on keyword detection</p>
+              <p className="text-xs text-muted-foreground">Neue Phasen automatisch starten</p>
             </div>
             <Switch id="orchestrator-enabled" checked={isEnabled} onCheckedChange={setEnabled} />
           </div>
@@ -147,7 +181,7 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
           {/* Trigger Keyword Input */}
           <div className="space-y-2">
             <Label htmlFor="orchestrator-keyword" className="text-sm font-medium">
-              Trigger Keyword
+              Stichwort
             </Label>
             <Input
               id="orchestrator-keyword"
@@ -161,14 +195,14 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
               placeholder="NEXT_PHASE_READY"
             />
             <p className="text-xs text-muted-foreground">
-              Keyword to detect in the last AI message
+              Nur die letzte sinnvolle Zeile wird geprüft
             </p>
           </div>
 
           {/* Max Iterations Input */}
           <div className="space-y-2">
             <Label htmlFor="orchestrator-max" className="text-sm font-medium">
-              Max Iterations
+              Max Schritte
             </Label>
             <Input
               id="orchestrator-max"
@@ -183,7 +217,7 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
               className="h-9"
             />
             <p className="text-xs text-muted-foreground">
-              Auto-disables after reaching this limit (1-999)
+              Nach diesem Limit stoppt die Automatik (1-999).
             </p>
           </div>
 
@@ -191,9 +225,9 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="orchestrator-auto-send" className="text-sm font-medium">
-                Auto-Send
+                Direkt senden
               </Label>
-              <p className="text-xs text-muted-foreground">Automatically send in new chat</p>
+              <p className="text-xs text-muted-foreground">Neue Phase sofort absenden</p>
             </div>
             <Switch
               id="orchestrator-auto-send"
@@ -209,28 +243,79 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
               <div className="pt-2 border-t border-border space-y-1.5">
                 {currentIteration > 0 && (
                   <div className="flex items-center gap-2 text-sm">
-                    <Repeat className="w-4 h-4 text-purple-600" />
+                    <Repeat className="w-4 h-4 text-muted-foreground" />
                     <span>
-                      Iteration: <strong>{currentIteration}</strong> / {maxIterations}
+                      Schritt: <strong>{currentIteration}</strong> / {maxIterations}
                     </span>
                   </div>
                 )}
-                {autoSendStatus !== 'idle' && (
-                  <div className="flex items-center gap-2 text-sm text-purple-600">
+                <div
+                  className={cn(
+                    'flex items-center gap-2 text-sm',
+                    autoSendStatus !== 'idle' && 'text-foreground'
+                  )}
+                >
+                  {autoSendStatus !== 'idle' ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span className="text-xs">
-                      {autoSendStatus === 'waiting' ? 'Waiting for session...' : 'Auto-sending...'}
-                    </span>
-                  </div>
-                )}
+                  ) : (
+                    <Repeat className="w-3.5 h-3.5 text-muted-foreground" />
+                  )}
+                  <span className="text-xs">{getAutoSendStatusText(autoSendStatus)}</span>
+                </div>
                 {orchestratorRunId && (
                   <p
                     className="text-[10px] text-muted-foreground font-mono truncate"
                     title={orchestratorRunId}
                   >
-                    Run: {orchestratorRunId}
+                    Lauf-ID: {orchestratorRunId}
                   </p>
                 )}
+
+                {lastTriggerCheck && (
+                  <div className="mt-2 rounded-md border border-border bg-muted/30 p-2 space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium">Letzte Prüfung</p>
+                      <span
+                        className={cn(
+                          'text-[10px] px-1.5 py-0.5 rounded border',
+                          lastTriggerCheck.matched
+                            ? 'border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
+                            : 'border-border text-muted-foreground'
+                        )}
+                      >
+                        {lastTriggerCheck.matched ? 'Treffer' : 'Kein Treffer'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      {new Date(lastTriggerCheck.checkedAt).toLocaleTimeString('de-DE')}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {getTriggerReasonText(lastTriggerCheck.reason)}
+                    </p>
+                    <p className="text-[11px] font-mono text-muted-foreground break-all">
+                      Stichwort: {lastTriggerCheck.keyword || '(leer)'}
+                    </p>
+                    <p className="text-[11px] font-mono text-muted-foreground break-all">
+                      Letzte Zeile: {lastTriggerCheck.lastLine || '(leer)'}
+                    </p>
+                  </div>
+                )}
+
+                <div className="mt-2 rounded-md border border-border bg-muted/20 p-2 space-y-1">
+                  <p className="text-xs font-medium">Schnelltest</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Nutze diese letzte Zeile für einen kurzen Live-Test:
+                  </p>
+                  <p className="text-[11px] font-mono text-muted-foreground break-all">
+                    1) NEXT_PHASE_READY -&gt; Treffer
+                  </p>
+                  <p className="text-[11px] font-mono text-muted-foreground break-all">
+                    2) - NEXT_PHASE_READY. -&gt; Treffer (toleriert)
+                  </p>
+                  <p className="text-[11px] font-mono text-muted-foreground break-all">
+                    3) PHASE_READY -&gt; Kein Treffer
+                  </p>
+                </div>
               </div>
             )}
         </div>

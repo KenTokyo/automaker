@@ -912,7 +912,7 @@ export interface AppActions {
   // Completed Tasks actions (Done Tab)
   setCompletedTasks: (tasks: CompletedTask[]) => void;
   addCompletedTask: (task: CompletedTask) => void;
-  removeCompletedTask: (taskId: string) => void;
+  removeCompletedTask: (filename: string) => void;
   setCompletedTasksLoading: (loading: boolean) => void;
   setCompletedTasksError: (error: string | null) => void;
   setCompletedTasksFilter: (filter: CompletedTaskFilter) => void;

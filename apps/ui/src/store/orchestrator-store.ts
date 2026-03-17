@@ -26,6 +26,22 @@ interface OrchestratorMessageWrapper {
 
 /** Whether the auto-send mechanism is currently waiting for session readiness */
 export type OrchestratorAutoSendStatus = 'idle' | 'waiting' | 'sending';
+export type OrchestratorTriggerReason =
+  | 'disabled'
+  | 'keyword-empty'
+  | 'last-line-empty'
+  | 'no-new-assistant-output'
+  | 'exact-match'
+  | 'keyword-match'
+  | 'no-match';
+
+export interface OrchestratorTriggerCheck {
+  checkedAt: number;
+  matched: boolean;
+  reason: OrchestratorTriggerReason;
+  lastLine: string;
+  keyword: string;
+}
 
 interface OrchestratorState {
   // Whether orchestrator mode is enabled
@@ -44,6 +60,8 @@ interface OrchestratorState {
   orchestratorRunId: string | null;
   // Auto-send status for UI display
   autoSendStatus: OrchestratorAutoSendStatus;
+  // Last trigger evaluation details for live status display
+  lastTriggerCheck: OrchestratorTriggerCheck | null;
 
   // Actions
   setEnabled: (enabled: boolean) => void;
@@ -55,6 +73,7 @@ interface OrchestratorState {
   clearPendingContent: () => void;
   setAutoSendEnabled: (enabled: boolean) => void;
   setAutoSendStatus: (status: OrchestratorAutoSendStatus) => void;
+  setLastTriggerCheck: (check: OrchestratorTriggerCheck | null) => void;
   startNewRun: () => string | null;
   shouldTrigger: (lastMessage: string) => boolean;
   /** Returns pre/post messages to wrap user content, or null if orchestrator is disabled */
@@ -135,6 +154,29 @@ function saveRunId(runId: string | null): void {
   removeItem(ORCHESTRATOR_RUN_ID_KEY);
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeLastLineForTrigger(content: string): string {
+  const normalized = content.replace(/\r\n/g, '\n');
+  const lines = normalized
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  if (lines.length === 0) {
+    return '';
+  }
+
+  return lines[lines.length - 1]
+    .replace(/^[-*]\s+/, '')
+    .replace(/^`+|`+$/g, '')
+    .replace(/^[*_~]+|[*_~]+$/g, '')
+    .replace(/[.,;:!?]+$/g, '')
+    .trim();
+}
+
 const initialEnabled = loadEnabled();
 const initialRunId = initialEnabled ? (loadRunId() ?? generateRunId()) : null;
 if (initialRunId) {
@@ -150,6 +192,7 @@ export const useOrchestratorStore = create<OrchestratorState>((set, get) => ({
   autoSendEnabled: loadAutoSend(),
   orchestratorRunId: initialRunId,
   autoSendStatus: 'idle' as OrchestratorAutoSendStatus,
+  lastTriggerCheck: null,
 
   setEnabled: (enabled) => {
     const runId = enabled ? generateRunId() : null;
@@ -158,6 +201,7 @@ export const useOrchestratorStore = create<OrchestratorState>((set, get) => ({
       currentIteration: 0, // Reset iteration on toggle
       orchestratorRunId: runId,
       autoSendStatus: 'idle',
+      lastTriggerCheck: null,
     });
     saveEnabled(enabled);
     saveRunId(runId);
@@ -216,6 +260,10 @@ export const useOrchestratorStore = create<OrchestratorState>((set, get) => ({
     set({ autoSendStatus: status });
   },
 
+  setLastTriggerCheck: (check) => {
+    set({ lastTriggerCheck: check });
+  },
+
   startNewRun: () => {
     if (!get().isEnabled) {
       return null;
@@ -227,6 +275,7 @@ export const useOrchestratorStore = create<OrchestratorState>((set, get) => ({
       currentIteration: 0,
       pendingOrchestratorContent: null,
       autoSendStatus: 'idle',
+      lastTriggerCheck: null,
     });
     saveRunId(runId);
     return runId;
@@ -234,8 +283,74 @@ export const useOrchestratorStore = create<OrchestratorState>((set, get) => ({
 
   shouldTrigger: (lastMessage) => {
     const { isEnabled, triggerKeyword } = get();
-    if (!isEnabled) return false;
-    return lastMessage.includes(triggerKeyword);
+    const normalizedKeyword = triggerKeyword.trim();
+    const normalizedLastLine = normalizeLastLineForTrigger(lastMessage);
+    const checkedAt = Date.now();
+
+    if (!isEnabled) {
+      set({
+        lastTriggerCheck: {
+          checkedAt,
+          matched: false,
+          reason: 'disabled',
+          lastLine: normalizedLastLine,
+          keyword: normalizedKeyword,
+        },
+      });
+      return false;
+    }
+
+    if (normalizedKeyword.length === 0) {
+      set({
+        lastTriggerCheck: {
+          checkedAt,
+          matched: false,
+          reason: 'keyword-empty',
+          lastLine: normalizedLastLine,
+          keyword: normalizedKeyword,
+        },
+      });
+      return false;
+    }
+
+    if (normalizedLastLine.length === 0) {
+      set({
+        lastTriggerCheck: {
+          checkedAt,
+          matched: false,
+          reason: 'last-line-empty',
+          lastLine: normalizedLastLine,
+          keyword: normalizedKeyword,
+        },
+      });
+      return false;
+    }
+
+    if (normalizedLastLine.toLowerCase() === normalizedKeyword.toLowerCase()) {
+      set({
+        lastTriggerCheck: {
+          checkedAt,
+          matched: true,
+          reason: 'exact-match',
+          lastLine: normalizedLastLine,
+          keyword: normalizedKeyword,
+        },
+      });
+      return true;
+    }
+
+    const relaxedPattern = new RegExp(`\\b${escapeRegExp(normalizedKeyword)}\\b`, 'i');
+    const matched = relaxedPattern.test(normalizedLastLine);
+    set({
+      lastTriggerCheck: {
+        checkedAt,
+        matched,
+        reason: matched ? 'keyword-match' : 'no-match',
+        lastLine: normalizedLastLine,
+        keyword: normalizedKeyword,
+      },
+    });
+    return matched;
   },
 
   getMessageWrapper: () => {

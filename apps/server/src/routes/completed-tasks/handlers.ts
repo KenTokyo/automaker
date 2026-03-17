@@ -2,38 +2,41 @@
  * Request handlers for completed tasks CRUD operations.
  *
  * GET    /                — List tasks (with filtering, sorting, pagination)
- * POST   /                — Create a new completed task
- * DELETE /:taskId         — Delete a task by ID
+ * POST   /                — Create a new completed task (.completed/*.md)
+ * DELETE /:taskId         — Delete a task by filename
  * GET    /stats           — Aggregate statistics
  */
 
 import type { Request, Response } from 'express';
-import { randomUUID } from 'crypto';
 import { createLogger } from '@automaker/utils';
 import { getErrorMessage, createLogError } from '../common.js';
-import { readCompletedTasks, writeCompletedTasks } from './storage.js';
+import { readCompletedTasks, writeCompletedTask, deleteCompletedTask } from './storage.js';
 import type { EventEmitter } from '../../lib/events.js';
 import type {
   CompletedTask,
-  CompletedTaskCategory,
-  CompletedTaskBadge,
   CompletedTaskSortField,
   CompletedTaskSortOrder,
+  CompletedTaskStatus,
+  CompletedTaskEffort,
 } from '@automaker/types';
-import { COMPLETED_TASKS_VERSION } from '@automaker/types';
+import { COMPLETED_TASK_STATUSES, COMPLETED_TASK_EFFORTS } from '@automaker/types';
 
 const logger = createLogger('CompletedTasks');
 const logError = createLogError(logger);
 
-const VALID_CATEGORIES: CompletedTaskCategory[] = [
-  'feature',
-  'bugfix',
-  'improvement',
-  'config',
-  'refactor',
-  'docs',
-];
 const MAX_TITLE_LENGTH = 200;
+
+/**
+ * Create a URL-safe slug from a title string.
+ */
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[äöü]/g, (c) => ({ ä: 'ae', ö: 'oe', ü: 'ue' })[c] || c)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .substring(0, 50);
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // LIST
@@ -48,8 +51,7 @@ export function createListHandler() {
         return;
       }
 
-      const file = await readCompletedTasks(projectPath);
-      let tasks = file.tasks;
+      let tasks = await readCompletedTasks(projectPath);
 
       // --- Filters ---
       const search = req.query.search as string | undefined;
@@ -63,36 +65,53 @@ export function createListHandler() {
         );
       }
 
-      const categoriesParam = req.query.categories as string | undefined;
-      if (categoriesParam) {
-        const cats = categoriesParam.split(',') as CompletedTaskCategory[];
-        tasks = tasks.filter((t) => cats.includes(t.category));
+      const tagsParam = req.query.tags as string | undefined;
+      if (tagsParam) {
+        const tags = tagsParam.split(',');
+        tasks = tasks.filter((t) => t.tags.some((tag) => tags.includes(tag)));
       }
 
-      const badgesParam = req.query.badges as string | undefined;
-      if (badgesParam) {
-        const badges = badgesParam.split(',') as CompletedTaskBadge[];
-        tasks = tasks.filter((t) => t.badges.some((b) => badges.includes(b)));
+      const statusParam = req.query.status as string | undefined;
+      if (statusParam) {
+        const statuses = statusParam.split(',') as CompletedTaskStatus[];
+        tasks = tasks.filter((t) => statuses.includes(t.status));
+      }
+
+      const effortParam = req.query.effort as string | undefined;
+      if (effortParam) {
+        const efforts = effortParam.split(',') as CompletedTaskEffort[];
+        tasks = tasks.filter((t) => t.effort && efforts.includes(t.effort as CompletedTaskEffort));
       }
 
       const since = req.query.since as string | undefined;
       if (since) {
-        tasks = tasks.filter((t) => t.completedAt >= since);
+        tasks = tasks.filter((t) => t.date >= since);
       }
 
       const until = req.query.until as string | undefined;
       if (until) {
-        tasks = tasks.filter((t) => t.completedAt <= until);
+        tasks = tasks.filter((t) => t.date <= until);
       }
 
       // --- Sort ---
-      const sortBy = (req.query.sortBy as CompletedTaskSortField) || 'completedAt';
+      const sortBy = (req.query.sortBy as CompletedTaskSortField) || 'date';
       const sortOrder = (req.query.sortOrder as CompletedTaskSortOrder) || 'desc';
       const direction = sortOrder === 'asc' ? 1 : -1;
 
+      const effortOrder: Record<string, number> = { S: 1, M: 2, L: 3, XL: 4 };
+
       tasks.sort((a, b) => {
-        const aVal = a[sortBy] ?? '';
-        const bVal = b[sortBy] ?? '';
+        let aVal: string | number;
+        let bVal: string | number;
+
+        if (sortBy === 'effort') {
+          aVal = effortOrder[a.effort] || 0;
+          bVal = effortOrder[b.effort] || 0;
+        } else {
+          aVal = a[sortBy] ?? '';
+          bVal = b[sortBy] ?? '';
+        }
+
         if (aVal < bVal) return -1 * direction;
         if (aVal > bVal) return 1 * direction;
         return 0;
@@ -129,14 +148,14 @@ export function createCreateHandler(events: EventEmitter) {
         projectPath,
         title,
         description,
-        category,
-        badges,
-        historyFile,
-        relatedFiles,
-        chatSessionId,
-        featureId,
+        date,
+        status,
+        effort,
+        attempt,
+        provider,
+        files,
+        tags,
         summary,
-        commitHash,
       } = req.body;
 
       if (!projectPath || typeof projectPath !== 'string') {
@@ -147,39 +166,35 @@ export function createCreateHandler(events: EventEmitter) {
         res.status(400).json({ success: false, error: 'title is required' });
         return;
       }
-      if (!category || !VALID_CATEGORIES.includes(category)) {
-        res
-          .status(400)
-          .json({
-            success: false,
-            error: `category must be one of: ${VALID_CATEGORIES.join(', ')}`,
-          });
-        return;
-      }
+
+      const taskDate =
+        date && typeof date === 'string' ? date : new Date().toISOString().slice(0, 10);
+      const taskStatus: CompletedTaskStatus =
+        status && COMPLETED_TASK_STATUSES.includes(status) ? status : 'success';
+      const taskEffort: CompletedTask['effort'] =
+        effort && COMPLETED_TASK_EFFORTS.includes(effort) ? effort : '';
+
+      const slug = slugify(title);
+      const filename = `${taskDate}_${slug}.md`;
 
       const task: CompletedTask = {
-        id: randomUUID(),
+        filename,
         title: title.length > MAX_TITLE_LENGTH ? title.slice(0, MAX_TITLE_LENGTH) : title,
         description: description || '',
-        category,
-        badges: Array.isArray(badges) ? badges : [],
-        completedAt: new Date().toISOString(),
-        projectPath,
-        historyFile: historyFile || undefined,
-        relatedFiles: Array.isArray(relatedFiles) ? relatedFiles : undefined,
-        chatSessionId: chatSessionId || undefined,
-        featureId: featureId || undefined,
-        summary: summary || undefined,
-        commitHash: commitHash || undefined,
+        date: taskDate,
+        status: taskStatus,
+        effort: taskEffort,
+        attempt: typeof attempt === 'number' && attempt > 0 ? attempt : 1,
+        provider: provider || '',
+        files: Array.isArray(files) ? files : [],
+        tags: Array.isArray(tags) ? tags : [],
+        summary: summary || '',
       };
 
-      const file = await readCompletedTasks(projectPath);
-      file.tasks.push(task);
-      file.version = COMPLETED_TASKS_VERSION;
-      await writeCompletedTasks(projectPath, file);
+      await writeCompletedTask(projectPath, task);
 
       events.emit('completed-task:created', { task });
-      logger.info(`Created completed task "${task.title}" (${task.id})`);
+      logger.info(`Created completed task "${task.title}" (${task.filename})`);
 
       res.status(201).json({ success: true, task });
     } catch (error) {
@@ -208,19 +223,16 @@ export function createDeleteHandler(events: EventEmitter) {
         return;
       }
 
-      const file = await readCompletedTasks(projectPath);
-      const index = file.tasks.findIndex((t) => t.id === taskId);
+      // taskId is now the filename (e.g. "2026-03-17_session-tabs.md")
+      const deleted = await deleteCompletedTask(projectPath, taskId);
 
-      if (index === -1) {
+      if (!deleted) {
         res.status(404).json({ success: false, error: 'Task not found' });
         return;
       }
 
-      const [deleted] = file.tasks.splice(index, 1);
-      await writeCompletedTasks(projectPath, file);
-
       events.emit('completed-task:deleted', { taskId, projectPath });
-      logger.info(`Deleted completed task "${deleted.title}" (${taskId})`);
+      logger.info(`Deleted completed task "${taskId}"`);
 
       res.json({ success: true });
     } catch (error) {
@@ -243,40 +255,45 @@ export function createStatsHandler() {
         return;
       }
 
-      const file = await readCompletedTasks(projectPath);
-      const tasks = file.tasks;
+      const tasks = await readCompletedTasks(projectPath);
 
-      // Count per category
-      const byCategory: Record<string, number> = {};
-      for (const cat of VALID_CATEGORIES) {
-        byCategory[cat] = 0;
-      }
+      // Count per tag
+      const byTag: Record<string, number> = {};
       for (const t of tasks) {
-        byCategory[t.category] = (byCategory[t.category] || 0) + 1;
-      }
-
-      // Count per badge
-      const byBadge: Record<string, number> = {};
-      for (const t of tasks) {
-        for (const b of t.badges) {
-          byBadge[b] = (byBadge[b] || 0) + 1;
+        for (const tag of t.tags) {
+          byTag[tag] = (byTag[tag] || 0) + 1;
         }
       }
 
-      // Time range
+      // Count per status
+      const byStatus: Record<string, number> = {};
+      for (const t of tasks) {
+        byStatus[t.status] = (byStatus[t.status] || 0) + 1;
+      }
+
+      // Count per effort
+      const byEffort: Record<string, number> = {};
+      for (const t of tasks) {
+        if (t.effort) {
+          byEffort[t.effort] = (byEffort[t.effort] || 0) + 1;
+        }
+      }
+
+      // Date range
       let oldest: string | null = null;
       let newest: string | null = null;
       for (const t of tasks) {
-        if (!oldest || t.completedAt < oldest) oldest = t.completedAt;
-        if (!newest || t.completedAt > newest) newest = t.completedAt;
+        if (!oldest || t.date < oldest) oldest = t.date;
+        if (!newest || t.date > newest) newest = t.date;
       }
 
       res.json({
         success: true,
         stats: {
           total: tasks.length,
-          byCategory,
-          byBadge,
+          byTag,
+          byStatus,
+          byEffort,
           oldest,
           newest,
         },

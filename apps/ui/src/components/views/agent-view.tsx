@@ -3,10 +3,12 @@ import { useAppStore } from '@/store/app-store';
 import { useAgentPromptsStore } from '@/store/agent-prompts-store';
 import { useTimeLimiterStore } from '@/store/time-limiter-store';
 import { useOrchestratorStore } from '@/store/orchestrator-store';
+import { useShallow } from 'zustand/react/shallow';
 import { useElectronAgent } from '@/hooks/use-electron-agent';
 import { SessionManager } from '@/components/session-manager';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { copyToClipboard, generateChatSummary, generateContextSummary } from '@/lib/copy-all-chat';
+import { embedSystemPrompts } from '@/lib/system-prompt-payload';
 import type { ChatDisplaySettings } from '@/store/types/ui-types';
 import { DEFAULT_CHAT_DISPLAY_SETTINGS } from '@/store/types/ui-types';
 import { getHttpApiClient } from '@/lib/http-api-client';
@@ -60,7 +62,20 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     currentDocPath,
     setCurrentDocPath,
     setDocsOpen,
-  } = useAppStore();
+  } = useAppStore(
+    useShallow((s) => ({
+      currentProject: s.currentProject,
+      projects: s.projects,
+      setCurrentProject: s.setCurrentProject,
+      selectedAgentModel: s.selectedAgentModel,
+      setSelectedAgentModel: s.setSelectedAgentModel,
+      browserPanelOpen: s.browserPanelOpen,
+      setBrowserPanelOpen: s.setBrowserPanelOpen,
+      currentDocPath: s.currentDocPath,
+      setCurrentDocPath: s.setCurrentDocPath,
+      setDocsOpen: s.setDocsOpen,
+    }))
+  );
   const [input, setInput] = useState('');
   const [currentTool, setCurrentTool] = useState<string | null>(null);
   const [isDesktop, setIsDesktop] = useState(true);
@@ -345,6 +360,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
   // Orchestrator store
   const {
     isEnabled: orchestratorEnabled,
+    triggerKeyword: orchestratorTriggerKeyword,
     shouldTrigger: orchestratorShouldTrigger,
     incrementIteration: orchestratorIncrementIteration,
     setPendingContent: setOrchestratorPendingContent,
@@ -353,20 +369,45 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     autoSendEnabled: orchestratorAutoSend,
     getMessageWrapper: getOrchestratorMessageWrapper,
     setAutoSendStatus: orchestratorSetAutoSendStatus,
-  } = useOrchestratorStore();
+    setLastTriggerCheck: orchestratorSetLastTriggerCheck,
+  } = useOrchestratorStore(
+    useShallow((s) => ({
+      isEnabled: s.isEnabled,
+      triggerKeyword: s.triggerKeyword,
+      shouldTrigger: s.shouldTrigger,
+      incrementIteration: s.incrementIteration,
+      setPendingContent: s.setPendingContent,
+      pendingOrchestratorContent: s.pendingOrchestratorContent,
+      clearPendingContent: s.clearPendingContent,
+      autoSendEnabled: s.autoSendEnabled,
+      getMessageWrapper: s.getMessageWrapper,
+      setAutoSendStatus: s.setAutoSendStatus,
+      setLastTriggerCheck: s.setLastTriggerCheck,
+    }))
+  );
 
   // Track previous isProcessing to detect complete events (true → false)
   const wasProcessingRef = useRef(false);
-  const assistantCountAtProcessingStartRef = useRef(0);
+  const assistantSnapshotAtProcessingStartRef = useRef<{ id: string; content: string } | null>(
+    null
+  );
   const orchestratorSourceSessionIdRef = useRef<string | null>(null);
+  const sessionsWithInjectedSystemPromptsRef = useRef(new Set<string>());
 
   // Detect when processing finishes and check for orchestrator trigger
   useEffect(() => {
     const wasProcessing = wasProcessingRef.current;
     const assistantMessages = messages.filter((message) => message.role === 'assistant');
+    const lastAssistantMessage =
+      assistantMessages.length > 0 ? assistantMessages[assistantMessages.length - 1] : null;
 
     if (!wasProcessing && isProcessing) {
-      assistantCountAtProcessingStartRef.current = assistantMessages.length;
+      assistantSnapshotAtProcessingStartRef.current = lastAssistantMessage
+        ? {
+            id: lastAssistantMessage.id,
+            content: lastAssistantMessage.content,
+          }
+        : null;
     }
 
     wasProcessingRef.current = isProcessing;
@@ -376,14 +417,29 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     if (!orchestratorEnabled || !currentSessionId || !isConnected) return;
 
     // Ignore stale completion events that did not produce a new assistant message.
-    if (assistantMessages.length <= assistantCountAtProcessingStartRef.current) {
-      logger.info(
-        '[Orchestrator] Ignoring completion event because no new assistant message was produced'
-      );
+    if (!lastAssistantMessage) {
       return;
     }
 
-    const lastAssistantMessage = assistantMessages[assistantMessages.length - 1];
+    const assistantSnapshot = assistantSnapshotAtProcessingStartRef.current;
+    const hasNewAssistantOutput =
+      !assistantSnapshot ||
+      lastAssistantMessage.id !== assistantSnapshot.id ||
+      lastAssistantMessage.content !== assistantSnapshot.content;
+
+    if (!hasNewAssistantOutput) {
+      logger.info(
+        '[Orchestrator] Ignoring completion event because assistant output did not change'
+      );
+      orchestratorSetLastTriggerCheck({
+        checkedAt: Date.now(),
+        matched: false,
+        reason: 'no-new-assistant-output',
+        lastLine: '',
+        keyword: orchestratorTriggerKeyword.trim(),
+      });
+      return;
+    }
 
     // Check if the trigger keyword is present
     if (!orchestratorShouldTrigger(lastAssistantMessage.content)) return;
@@ -416,6 +472,8 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     setOrchestratorPendingContent,
     orchestratorAutoSend,
     orchestratorSetAutoSendStatus,
+    orchestratorSetLastTriggerCheck,
+    orchestratorTriggerKeyword,
   ]);
 
   // Guard ref to prevent double auto-sends
@@ -478,6 +536,18 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     orchestratorSetAutoSendStatus,
   ]);
 
+  useEffect(() => {
+    if (!currentSessionId) return;
+
+    const hasUserMessages = messages.some((message) => message.role === 'user');
+    if (hasUserMessages) {
+      sessionsWithInjectedSystemPromptsRef.current.add(currentSessionId);
+      return;
+    }
+
+    sessionsWithInjectedSystemPromptsRef.current.delete(currentSessionId);
+  }, [currentSessionId, messages]);
+
   // Handle send message
   const handleSend = useCallback(
     async (messageOverride?: string) => {
@@ -494,22 +564,21 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
         return;
       }
 
-      // Get selected agent prompts and prepend to message
-      const agentPromptsText = getSelectedPromptsText();
       let messageContent = messageInput;
-      if (agentPromptsText) {
-        messageContent = agentPromptsText + '\n\n---\n\n' + messageInput;
-      }
+      const shouldInjectSystemPrompts =
+        !!currentSessionId && !sessionsWithInjectedSystemPromptsRef.current.has(currentSessionId);
 
-      // Wrap with orchestrator pre/post messages if enabled
-      const orchestratorWrapper = getOrchestratorMessageWrapper();
-      if (orchestratorWrapper) {
-        messageContent =
-          orchestratorWrapper.preMessage +
-          '\n\n' +
-          messageContent +
-          '\n\n' +
-          orchestratorWrapper.postMessage;
+      if (shouldInjectSystemPrompts) {
+        const agentPromptsText = getSelectedPromptsText();
+        const orchestratorWrapper = getOrchestratorMessageWrapper();
+
+        messageContent = embedSystemPrompts(messageInput, {
+          agentPromptsText,
+          orchestratorPreMessage: orchestratorWrapper?.preMessage,
+          orchestratorPostMessage: orchestratorWrapper?.postMessage,
+        });
+
+        sessionsWithInjectedSystemPromptsRef.current.add(currentSessionId);
       }
 
       const messageImages = selectedImages;
@@ -541,6 +610,9 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
   const handleClearChat = async () => {
     if (!confirm('Are you sure you want to clear this conversation?')) return;
     await clearHistory();
+    if (currentSessionId) {
+      sessionsWithInjectedSystemPromptsRef.current.delete(currentSessionId);
+    }
   };
 
   const handleCopyAll = useCallback(async () => {

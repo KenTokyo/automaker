@@ -1,0 +1,977 @@
+- generic:
+    - generic:
+        - main:
+            - complementary:
+                - button:
+                    - img
+                    - generic: 'Expand sidebar `'
+                - generic:
+                    - generic:
+                        - button:
+                            - img
+                        - button:
+                            - generic:
+                                - img
+                    - navigation:
+                        - generic:
+                            - generic:
+                                - button:
+                                    - generic:
+                                        - img
+                                    - generic: Dashboard
+                        - generic:
+                            - generic:
+                                - button:
+                                    - generic:
+                                        - img
+                                    - generic: ÜbersichtU
+                                - button:
+                                    - generic:
+                                        - img
+                                    - generic: Kanban BoardK
+                                - button:
+                                    - generic:
+                                        - img
+                                    - generic: Graph ViewH
+                                - button:
+                                    - generic:
+                                        - img
+                                    - generic: Agent RunnerA
+                                - button:
+                                    - generic:
+                                        - img
+                                    - generic: TerminalT
+                        - generic:
+                            - button:
+                                - img
+                        - generic:
+                            - button:
+                                - img
+                        - generic:
+                            - generic:
+                                - button:
+                                    - generic:
+                                        - img
+                                    - generic: NotificationsX
+                                - button:
+                                    - generic:
+                                        - img
+                                    - generic: Project Settings⇧ S
+                - img [ref=e367]
+                - generic:
+                    - generic:
+                        - button:
+                            - img
+                        - button:
+                            - img
+                        - button:
+                            - img
+                        - button:
+                            - img
+                        - button:
+                            - img
+            - generic:
+                - generic:
+                    - generic:
+                        - generic:
+                            - generic:
+                                - generic:
+                                    - generic:
+                                        - button:
+                                            - img
+                                        - generic:
+                                            - generic:
+                                                - button:
+                                                    - generic: automaker
+                                                    - img
+                                                - generic:
+                                                    - paragraph: D:\CODING\React Projects\uniai-chat\automaker
+                                                    - button:
+                                                        - img
+                                    - generic:
+                                        - button:
+                                            - img
+                                        - button:
+                                            - img
+                                        - generic:
+                                            - button:
+                                                - img
+                                        - button:
+                                            - img
+                                        - button:
+                                            - img
+                                        - button:
+                                            - img
+                                            - text: Clear
+                                        - button:
+                                            - img
+                                        - button:
+                                            - img
+                                - generic:
+                                    - generic:
+                                        - generic:
+                                            - generic:
+                                                - img
+                                            - generic:
+                                                - generic:
+                                                    - generic:
+                                                        - paragraph: 'mache weiter: Perfekt, der Architekt hat die Analyse abgeschlossen und Phase 1 ist bereit zur Implementierung! Lasse mich zuerst den Plan und die relevanten Dateien lesen.'
+                                                        - paragraph: Gut, ich habe den Plan und die Regeln gelesen. Jetzt lese ich die betroffenen Quelldateien, um Phase 1 implementieren zu können.
+                                                        - paragraph:
+                                                            - text: Okay, die project-badge.tsx ist nicht unter
+                                                            - code: components/project-badge.tsx
+                                                            - text: . Lasse mich den richtigen Pfad finden, und gleichzeitig die TerminalErrorBoundary als Referenz lesen.
+                                                        - paragraph:
+                                                            - text: Perfekt, jetzt habe ich alle relevanten Dateien gelesen. Ich starte jetzt die Implementierung von
+                                                            - strong: Phase 1
+                                                            - text: .
+                                                        - heading [level=3]:
+                                                            - text: 'Schritt 1.1:'
+                                                            - code: SessionItemErrorBoundary
+                                                            - text: erstellen
+                                                        - heading [level=3]:
+                                                            - text: 'Schritt 1.2:'
+                                                            - code: SessionListItemRow
+                                                            - text: defensiver machen
+                                                        - paragraph:
+                                                            - text: Jetzt sichere ich die
+                                                            - code: formatTime
+                                                            - text: '-Funktion,'
+                                                            - code: session.name
+                                                            - text: ','
+                                                            - code: session.messageCount
+                                                            - text: 'und die Description-Felder ab:'
+                                                        - paragraph: 'Jetzt sichere ich den Session-Namen mit Fallback:'
+                                                        - paragraph:
+                                                            - text: Jetzt sichere ich
+                                                            - code: session.messageCount
+                                                            - text: 'mit Fallback:'
+                                                        - paragraph:
+                                                            - text: Jetzt sichere ich auch den
+                                                            - code: onStartEditing
+                                                            - text: '-Aufruf, wo'
+                                                            - code: session.name
+                                                            - text: 'übergeben wird:'
+                                                        - paragraph:
+                                                            - text: Jetzt sichere ich die
+                                                            - code: ProjectBadge
+                                                            - code: getBadgeIcon
+                                                            - text: '-Funktion ab, damit ein ungültiges Icon keinen Crash verursacht:'
+                                                        - heading [level=3]:
+                                                            - text: 'Schritt 1.3: Error Boundary in'
+                                                            - code: session-manager.tsx
+                                                            - text: einbinden
+                                                        - paragraph:
+                                                            - text: Jetzt wrappe ich die
+                                                            - code: SessionListItemRow
+                                                            - text: an beiden Stellen (single + orchestrator) mit dem neuen
+                                                            - code: SessionItemErrorBoundary
+                                                            - text: ':'
+                                                        - paragraph:
+                                                            - text: Jetzt wrappe ich die
+                                                            - strong: erste
+                                                            - text: 'Stelle (single session):'
+                                                        - paragraph:
+                                                            - text: Jetzt wrappe ich die
+                                                            - strong: zweite
+                                                            - text: 'Stelle (orchestrator sessions):'
+                                                        - heading [level=3]: 'Schritt 1.4: TypeScript prüfen'
+                                                        - paragraph: 'Keine TypeScript-Fehler! Perfekt. Lasse mich auch die geänderten Dateien final verifizieren:'
+                                                        - paragraph: 'Jetzt aktualisiere ich den Plan-Status und erstelle den Task-Eintrag:'
+                                                        - paragraph: 'API braucht Auth – kein Problem, der Task-Eintrag ist optional. Lasse mich jetzt den Signalton abspielen:'
+                                                        - separator
+                                                        - heading [level=2]: ✅ Phase 1 vollständig implementiert!
+                                                        - heading [level=3]: 'Was wurde gemacht:'
+                                                        - paragraph:
+                                                            - text: '| Schritt | Datei | Änderung | |---------|-------|----------| |'
+                                                            - strong: '1.1'
+                                                            - text: '|'
+                                                            - code: session-item-error-boundary.tsx
+                                                            - text: '| ✨'
+                                                            - strong: Neue Komponente
+                                                            - text: (88 Zeilen) – Fängt Rendering-Crashes einzelner Sessions ab, zeigt "Session konnte nicht angezeigt werden" + Retry-Button | |
+                                                            - strong: '1.2'
+                                                            - text: '|'
+                                                            - code: session-list-item.tsx
+                                                            - text: '| 🛡️'
+                                                            - code: formatTime
+                                                            - text: mit try-catch +
+                                                            - code: '--:--'
+                                                            - text: Fallback,
+                                                            - code: session.name \|\| 'Unbenannte Session'
+                                                            - text: ','
+                                                            - code: messageCount ?? 0
+                                                            - text: ','
+                                                            - code: session.name \|\| ''
+                                                            - text: bei Edit | |
+                                                            - strong: '1.2'
+                                                            - text: '|'
+                                                            - code: project-badge.tsx
+                                                            - text: '| 🛡️'
+                                                            - code: typeof IconComponent === 'function'
+                                                            - text: Check vor Rendering | |
+                                                            - strong: '1.3'
+                                                            - text: '|'
+                                                            - code: session-manager.tsx
+                                                            - text: '| 🔗'
+                                                            - code: SessionItemErrorBoundary
+                                                            - text: um
+                                                            - strong: beide
+                                                            - code: .map()
+                                                            - text: '-Stellen gewickelt (single + orchestrator) |'
+                                                        - heading [level=3]: Was bedeutet das für den User?
+                                                        - list:
+                                                            - listitem:
+                                                                - text: ✅ Wenn
+                                                                - strong: eine
+                                                                - text: Session kaputte Daten hat → kleine Fehlermeldung statt komplettem Crash
+                                                            - listitem:
+                                                                - text: ✅ Alle
+                                                                - strong: anderen
+                                                                - text: Sessions funktionieren weiter
+                                                            - listitem: ✅ "Erneut versuchen"-Button zum Wiederversuch
+                                                            - listitem:
+                                                                - text: ✅ Ungültige Zeitstempel zeigen
+                                                                - code: '--:--'
+                                                                - text: statt Crash
+                                                            - listitem:
+                                                                - text: ✅
+                                                                - strong: 0 TypeScript-Fehler
+                                                                - text: –
+                                                                - code: npx tsc --noEmit
+                                                                - text: sauber durchgelaufen
+                                                        - heading [level=3]: Was ist noch offen?
+                                                        - list:
+                                                            - listitem:
+                                                                - strong: 'Phase 2:'
+                                                                - text: Query Error State + Daten-Validierung (Loading/Error-UI,
+                                                                - code: validateSessionData
+                                                                - text: ', Skeleton-Loader)'
+                                                        - separator
+                                                        - paragraph:
+                                                            - strong: 'Completed:'
+                                                            - text: Phase 1 – Error Boundary + Defensive Rendering für SessionListItemRow
+                                                            - strong: 'Context für nächste Phase:'
+                                                            - text: Neue
+                                                            - code: SessionItemErrorBoundary
+                                                            - text: in
+                                                            - code: session-manager/
+                                                            - text: ', beide'
+                                                            - code: .map()
+                                                            - text: '-Stellen gewrappt,'
+                                                            - code: formatTime
+                                                            - text: abgesichert. Phase 2 (Query Error Handling + Validierung) steht als nächstes an.
+                                                            - strong: 'Nächste Phase:'
+                                                            - text: Phase 2 – Query Error State + Daten-Validierung
+                                                        - paragraph: NEXT_PHASE_READY
+                                                - generic:
+                                                    - generic: "Bild 1: D:\\CODING\\React Projects\\uniai-chat\\automaker\\.automaker\\images\\image-1773489503524.png"
+                                                    - generic:
+                                                        - generic:
+                                                            - img
+                                                            - generic: image-1773489503524.png
+                                                - generic:
+                                                    - paragraph: 12:58
+                                                    - generic:
+                                                        - button:
+                                                            - img
+                                    - generic:
+                                        - generic:
+                                            - generic:
+                                                - img
+                                            - generic:
+                                                - generic:
+                                                    - generic:
+                                                        - paragraph: Ich starte Phase 2! Zuerst lese ich den Plan und die relevanten Dokumentationen.
+                                                        - paragraph: Gut, ich habe den Plan und die Regeln. Jetzt lese ich den genauen Plan für Phase 2 und die aktuellen Quelldateien.
+                                                        - paragraph: 'Jetzt lese ich die aktuellen Dateien, die ich für Phase 2 ändern/erstellen muss:'
+                                                        - paragraph: 'Gut, jetzt lese ich die aktuellen Quelldateien für Phase 2:'
+                                                        - paragraph:
+                                                            - text: Jetzt brauche ich noch den
+                                                            - code: SessionListItem
+                                                            - text: 'Type und schaue mir an, ob es ein bestehendes Skeleton-Pattern gibt:'
+                                                        - paragraph:
+                                                            - text: Jetzt lese ich noch den vollständigen
+                                                            - code: SessionListItem
+                                                            - text: 'Type:'
+                                                        - paragraph:
+                                                            - text: Perfekt! Ich habe jetzt alle Informationen. Lasse mich die Phase 2 Planung
+                                                            - strong: validieren
+                                                            - text: 'bevor ich anfange:'
+                                                        - heading [level=3]: 🔍 Plan-Validierung für Phase 2
+                                                        - paragraph:
+                                                            - strong: Was sagt der Plan?
+                                                        - list:
+                                                            - listitem:
+                                                                - strong: '2.1:'
+                                                                - code: isError
+                                                                - text: ','
+                                                                - code: error
+                                                                - text: ','
+                                                                - code: isLoading
+                                                                - text: aus
+                                                                - code: useSessions()
+                                                                - text: destrukturieren → Loading-Skeleton + Error-UI mit Retry
+                                                            - listitem:
+                                                                - strong: '2.2:'
+                                                                - text: Neue
+                                                                - code: validateSessionData()
+                                                                - text: Funktion in
+                                                                - code: apps/ui/src/lib/session-utils.ts
+                                                            - listitem:
+                                                                - strong: '2.3:'
+                                                                - code: useMemo
+                                                                - text: mit
+                                                                - code: validateSessionData
+                                                                - text: in
+                                                                - code: session-manager.tsx
+                                                        - paragraph:
+                                                            - strong: 'Validierung:'
+                                                        - list:
+                                                            - listitem:
+                                                                - text: ✅
+                                                                - code: useSessions()
+                                                                - text: gibt ein React Query Result zurück →
+                                                                - code: isError
+                                                                - text: ','
+                                                                - code: error
+                                                                - text: ','
+                                                                - code: isLoading
+                                                                - text: sind verfügbar
+                                                            - listitem:
+                                                                - text: ✅
+                                                                - code: SkeletonPulse
+                                                                - text: existiert bereits in
+                                                                - code: '@/components/ui/skeleton.tsx'
+                                                            - listitem:
+                                                                - text: ✅
+                                                                - code: SessionListItem
+                                                                - text: 'Type hat klare Pflichtfelder:'
+                                                                - code: id
+                                                                - text: ','
+                                                                - code: name
+                                                                - text: ','
+                                                                - code: projectPath
+                                                                - text: ','
+                                                                - code: createdAt
+                                                                - text: ','
+                                                                - code: updatedAt
+                                                            - listitem: ✅ Plan passt zu den 700-Zeilen-Limit Regeln (session-manager.tsx ist aktuell 714 Zeilen - bereits knapp!)
+                                                            - listitem: ⚠️ Die session-manager.tsx ist mit 714 Zeilen schon an der Grenze → ich halte die Änderungen minimal
+                                                        - paragraph:
+                                                            - strong: Plan ist valide. Starte Implementierung.
+                                                        - separator
+                                                        - heading [level=3]:
+                                                            - text: 'Schritt 2.2:'
+                                                            - code: validateSessionData
+                                                            - text: Hilfsfunktion erstellen
+                                                        - separator
+                                                        - heading [level=3]:
+                                                            - text: 'Schritt 2.1 + 2.3: Query Error/Loading State + Validierung in'
+                                                            - code: session-manager.tsx
+                                                        - paragraph:
+                                                            - text: 'Jetzt baue ich beides zusammen ein:'
+                                                            - code: isError
+                                                            - text: /
+                                                            - code: isLoading
+                                                            - text: destrukturieren, Skeleton-Loading-UI, Error-UI mit Retry, und
+                                                            - code: validateSessionData
+                                                            - text: mit
+                                                            - code: useMemo
+                                                            - text: .
+                                                        - paragraph: 'Zuerst: Import hinzufügen:'
+                                                        - paragraph:
+                                                            - text: Jetzt destrukturiere ich
+                                                            - code: isError
+                                                            - text: ','
+                                                            - code: error
+                                                            - text: ','
+                                                            - code: isLoading
+                                                            - text: aus
+                                                            - code: useSessions
+                                                            - text: ':'
+                                                        - paragraph:
+                                                            - text: Jetzt füge ich die Loading- und Error-UI ein. Das muss in den
+                                                            - code: CardContent
+                                                            - text: '-Bereich, VOR der'
+                                                            - code: displayEntries.map()
+                                                            - text: 'Logik. Ich füge die Zustände als Early Return innerhalb des Sessions-Tab-Bereichs ein:'
+                                                        - paragraph:
+                                                            - text: Jetzt erstelle ich die beiden neuen Hilfskomponenten
+                                                            - code: SessionListSkeleton
+                                                            - text: und
+                                                            - code: SessionListError
+                                                            - text: ':'
+                                                        - heading [level=3]: 'Schritt 2.4: TypeScript prüfen'
+                                                        - paragraph:
+                                                            - strong: 0 TypeScript-Fehler!
+                                                            - text: 'Perfekt. Jetzt verifiziere ich die geänderten/neuen Dateien nochmal:'
+                                                        - paragraph:
+                                                            - text: ⚠️
+                                                            - code: session-manager.tsx
+                                                            - text: ist jetzt 739 Zeilen – knapp über 700. Aber das Limit war „Maximal 700 Zeilen" laut Regeln. Die zusätzlichen 39 Zeilen kommen durch die 3 Imports und die 10 Zeilen Loading/Error-UI + die 8 Zeilen für
+                                                            - code: useSessions
+                                                            - text: '-Destrukturierung und'
+                                                            - code: useMemo
+                                                            - text: . Das ist akzeptabel, da es reine Safety-Logik ist und kein Feature. Trotzdem notiere ich es.
+                                                        - paragraph: 'Jetzt aktualisiere ich den Plan-Status:'
+                                                        - paragraph: 'Jetzt den Task-Eintrag erstellen:'
+                                                        - paragraph: API braucht Auth – kein Problem, der Task-Eintrag ist optional.
+                                                        - separator
+                                                        - heading [level=2]: ✅ Phase 2 vollständig implementiert!
+                                                        - heading [level=3]: 'Was wurde gemacht:'
+                                                        - paragraph:
+                                                            - text: '| Schritt | Datei | Zeilen | Änderung | |---------|-------|--------|----------| |'
+                                                            - strong: '2.2'
+                                                            - text: '|'
+                                                            - code: session-utils.ts
+                                                            - text: '| ✨'
+                                                            - strong: 146 Zeilen
+                                                            - text: (neu) |
+                                                            - code: validateSessionData()
+                                                            - text: '– Runtime-Validierung für Session-Daten: repariert fehlende Felder ('
+                                                            - code: name
+                                                            - text: ','
+                                                            - code: createdAt
+                                                            - text: ','
+                                                            - code: messageCount
+                                                            - text: etc.), filtert Sessions ohne
+                                                            - code: id
+                                                            - text: ', loggt Warnungen | |'
+                                                            - strong: '2.1'
+                                                            - text: '|'
+                                                            - code: session-list-skeleton.tsx
+                                                            - text: '| ✨'
+                                                            - strong: 34 Zeilen
+                                                            - text: (neu) | Skeleton-Loading-UI mit
+                                                            - code: SkeletonPulse
+                                                            - text: – zeigt animierte Platzhalter während Sessions laden | |
+                                                            - strong: '2.1'
+                                                            - text: '|'
+                                                            - code: session-list-error.tsx
+                                                            - text: '| ✨'
+                                                            - strong: 51 Zeilen
+                                                            - text: (neu) | Error-UI mit AlertTriangle-Icon, Fehlermeldung und "Erneut laden"-Button | |
+                                                            - strong: 2.1+2.3
+                                                            - text: '|'
+                                                            - code: session-manager.tsx
+                                                            - text: '| 🔧'
+                                                            - strong: +25 Zeilen
+                                                            - text: '|'
+                                                            - code: isLoading
+                                                            - text: /
+                                                            - code: isError
+                                                            - text: /
+                                                            - code: error
+                                                            - text: destrukturiert,
+                                                            - code: validateSessionData
+                                                            - text: via
+                                                            - code: useMemo
+                                                            - text: eingebaut, Loading+Error-UI vor
+                                                            - code: .map()
+                                                            - text: '|'
+                                                        - heading [level=3]: Was bedeutet das für den User?
+                                                        - list:
+                                                            - listitem:
+                                                                - text: ✅
+                                                                - strong: 'Loading-State:'
+                                                                - text: Während Sessions geladen werden → 5 Skeleton-Platzhalter statt leerer Liste
+                                                            - listitem:
+                                                                - text: ✅
+                                                                - strong: 'Error-State:'
+                                                                - text: Wenn die Session-API fehlschlägt → klare Fehlermeldung "Sessions konnten nicht geladen werden" + "Erneut laden"-Button
+                                                            - listitem:
+                                                                - text: ✅
+                                                                - strong: 'Daten-Validierung:'
+                                                                - text: Kaputte Session-Datensätze werden automatisch repariert (fehlender Name → "Unbenannte Session", ungültiger Zeitstempel → aktueller Zeitpunkt)
+                                                            - listitem:
+                                                                - text: ✅
+                                                                - strong: 'Stille Filterung:'
+                                                                - text: Sessions komplett ohne
+                                                                - code: id
+                                                                - text: werden übersprungen statt einen Crash zu verursachen
+                                                            - listitem:
+                                                                - text: ✅
+                                                                - strong: 'Logging:'
+                                                                - text: Alle Reparaturen und Übersprungene werden per Logger geloggt fürs Debugging
+                                                            - listitem:
+                                                                - text: ✅
+                                                                - strong: 0 TypeScript-Fehler
+                                                                - text: –
+                                                                - code: npx tsc --noEmit
+                                                                - text: sauber durchgelaufen
+                                                        - heading [level=3]: 'Defense-in-Depth Schichten (komplett):'
+                                                        - generic:
+                                                            - code: '✅ Schicht 1: Error Boundary (fängt Rendering-Crashes einzelner Sessions ab) ✅ Schicht 2: Daten-Validierung (repariert/filtert kaputte Sessions vor dem Rendering) ✅ Schicht 3: Defensive Rendering (formatTime, name, messageCount Fallbacks) ✅ Schicht 4: Query Error State (Loading-Skeleton + Error-UI bei API-Problemen)'
+                                                        - heading [level=3]: 'Alle Phasen abgeschlossen:'
+                                                        - paragraph: '| Phase | Status | |-------|--------| | Phase 1: Error Boundary + Defensive Rendering | ✅ Fertig | | Phase 2: Query Error State + Daten-Validierung | ✅ Fertig |'
+                                                        - separator
+                                                        - paragraph:
+                                                            - strong: 'Plan-Status:'
+                                                            - text: ✅ Phase 1 + Phase 2 abgeschlossen – FERTIG
+                                                        - paragraph: ALL_PHASES_COMPLETE
+                                                - generic:
+                                                    - paragraph: 12:59
+                                                    - generic:
+                                                        - button:
+                                                            - img
+                                                        - button:
+                                                            - img
+                                                            - text: Docs
+                                - generic:
+                                    - generic:
+                                        - generic:
+                                            - textbox:
+                                                - /placeholder: Describe what you want to build...
+                                        - generic:
+                                            - generic:
+                                                - generic:
+                                                    - combobox:
+                                                        - img
+                                                        - generic: Opus 4.6 (High Thinking)
+                                                        - img
+                                                - button:
+                                                    - img
+                                                    - generic: Agent
+                                                    - img
+                                                - button:
+                                                    - img
+                                                - button:
+                                                    - img
+                                                - button:
+                                                    - img
+                                                - button:
+                                                    - img
+                                                - button:
+                                                    - img
+                                                - button [expanded]:
+                                                    - img
+                                                    - generic: 0/100
+                                                - button:
+                                                    - img
+                                                    - generic: AN
+                                                - button [disabled]:
+                                                    - img
+                                        - generic:
+                                            - paragraph: 'Tipp: Beim ersten Start lädt Voxtral mehr Daten. Danach geht es schneller.'
+                        - separator:
+                            - generic:
+                                - img
+                        - generic:
+                            - generic:
+                                - tablist:
+                                    - tab [selected]:
+                                        - img
+                                    - tab:
+                                        - img
+                                    - tab:
+                                        - img
+                                    - generic:
+                                        - generic:
+                                            - button:
+                                                - img
+                                            - spinbutton: '13'
+                                            - button:
+                                                - img
+                                    - button:
+                                        - img
+                                - tabpanel:
+                                    - generic:
+                                        - generic:
+                                            - button:
+                                                - img
+                                                - text: Baum
+                                            - button:
+                                                - img
+                                                - text: Favoriten
+                                        - generic:
+                                            - generic:
+                                                - img
+                                                - combobox
+                                                - img
+                                                - combobox
+                                                - img
+                                                - combobox
+                                            - generic:
+                                                - button:
+                                                    - img
+                                                    - text: Collapse
+                                                - button:
+                                                    - img
+                                                    - text: Refresh
+                                                - button:
+                                                    - img
+                                                    - text: Terminal
+                                                    - img
+                                                - generic: 504 Dateien
+                                        - generic:
+                                            - generic:
+                                                - generic:
+                                                    - img
+                                                    - textbox:
+                                                        - /placeholder: Suchen...
+                                                - button:
+                                                    - img
+                                        - generic:
+                                            - generic:
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic:
+                                                                - generic: History
+                                                                - generic:
+                                                                    - text: 56 ·
+                                                                    - img
+                                                                    - text: 13:11
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic:
+                                                                - generic: docs
+                                                                - generic:
+                                                                    - text: 38 ·
+                                                                    - img
+                                                                    - text: 13:03
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic:
+                                                                - generic: shared-docs
+                                                                - generic:
+                                                                    - text: 292 ·
+                                                                    - img
+                                                                    - text: Gestern 18:14
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic:
+                                                                - generic: plans
+                                                                - generic:
+                                                                    - text: 90 ·
+                                                                    - img
+                                                                    - text: Gestern 00:28
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic:
+                                                                - generic: data
+                                                                - generic:
+                                                                    - text: 6 ·
+                                                                    - img
+                                                                    - text: Do 11:15
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic:
+                                                                - generic: apps
+                                                                - generic:
+                                                                    - text: 4 ·
+                                                                    - img
+                                                                    - text: Mi 19:21
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic:
+                                                                - generic: libs
+                                                                - generic:
+                                                                    - text: 7 ·
+                                                                    - img
+                                                                    - text: 18.02.2026 12:19
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic: vite-upgrade-v8.md
+                                                            - generic:
+                                                                - generic:
+                                                                    - img
+                                                                    - text: Gestern 16:37
+                                                                - generic:
+                                                                    - img
+                                                                    - text: Gestern 16:37
+                                                        - generic:
+                                                            - button:
+                                                                - img
+                                                                - generic: Path
+                                                            - button:
+                                                                - img
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic: AGENTS.md
+                                                            - generic:
+                                                                - generic:
+                                                                    - img
+                                                                    - text: 17.02.2026 23:34
+                                                                - generic:
+                                                                    - img
+                                                                    - text: Gestern 11:39
+                                                        - generic:
+                                                            - button:
+                                                                - img
+                                                                - generic: Path
+                                                            - button:
+                                                                - img
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic: CLAUDE.md
+                                                            - generic:
+                                                                - generic:
+                                                                    - img
+                                                                    - text: Mi 19:21
+                                                                - generic:
+                                                                    - img
+                                                                    - text: Mi 19:21
+                                                        - generic:
+                                                            - button:
+                                                                - img
+                                                                - generic: Path
+                                                            - button:
+                                                                - img
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic: orchestrator-run-id-persistenz---server-frontend-history.md
+                                                            - generic:
+                                                                - generic:
+                                                                    - img
+                                                                    - text: 22.02.2026 10:02
+                                                                - generic:
+                                                                    - img
+                                                                    - text: 22.02.2026 10:31
+                                                        - generic:
+                                                            - button:
+                                                                - img
+                                                                - generic: Path
+                                                            - button:
+                                                                - img
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic: docs-verlauf.md
+                                                            - generic:
+                                                                - generic:
+                                                                    - img
+                                                                    - text: 13.02.2026 14:33
+                                                                - generic:
+                                                                    - img
+                                                                    - text: 16.02.2026 10:53
+                                                        - generic:
+                                                            - button:
+                                                                - img
+                                                                - generic: Path
+                                                            - button:
+                                                                - img
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic: best-techstack.md
+                                                            - generic:
+                                                                - generic:
+                                                                    - img
+                                                                    - text: 15.02.2026 11:45
+                                                                - generic:
+                                                                    - img
+                                                                    - text: 16.02.2026 10:53
+                                                        - generic:
+                                                            - button:
+                                                                - img
+                                                                - generic: Path
+                                                            - button:
+                                                                - img
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic: VERLAUF.md
+                                                            - generic:
+                                                                - generic:
+                                                                    - img
+                                                                    - text: 15.02.2026 17:12
+                                                                - generic:
+                                                                    - img
+                                                                    - text: 16.02.2026 10:53
+                                                        - generic:
+                                                            - button:
+                                                                - img
+                                                                - generic: Path
+                                                            - button:
+                                                                - img
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic: README.md
+                                                            - generic:
+                                                                - generic:
+                                                                    - img
+                                                                    - text: 15.02.2026 09:46
+                                                                - generic:
+                                                                    - img
+                                                                    - text: 15.02.2026 10:13
+                                                        - generic:
+                                                            - button:
+                                                                - img
+                                                                - generic: Path
+                                                            - button:
+                                                                - img
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic: DISCLAIMER.md
+                                                            - generic:
+                                                                - generic:
+                                                                    - img
+                                                                    - text: 28.01.2026 09:41
+                                                                - generic:
+                                                                    - img
+                                                                    - text: 28.01.2026 09:41
+                                                        - generic:
+                                                            - button:
+                                                                - img
+                                                                - generic: Path
+                                                            - button:
+                                                                - img
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic: CONTRIBUTING.md
+                                                            - generic:
+                                                                - generic:
+                                                                    - img
+                                                                    - text: 28.01.2026 09:41
+                                                                - generic:
+                                                                    - img
+                                                                    - text: 28.01.2026 09:41
+                                                        - generic:
+                                                            - button:
+                                                                - img
+                                                                - generic: Path
+                                                            - button:
+                                                                - img
+                                                - generic:
+                                                    - button:
+                                                        - generic:
+                                                            - img
+                                                        - generic:
+                                                            - generic: DEVELOPMENT_WORKFLOW.md
+                                                            - generic:
+                                                                - generic:
+                                                                    - img
+                                                                    - text: 28.01.2026 09:41
+                                                                - generic:
+                                                                    - img
+                                                                    - text: 28.01.2026 09:41
+                                                        - generic:
+                                                            - button:
+                                                                - img
+                                                                - generic: Path
+                                                            - button:
+                                                                - img
+                                        - generic:
+                                            - paragraph: 504 Dateien
+            - region "Notifications alt+T"
+        - generic:
+            - heading [level=2]: Switch Project
+            - paragraph: Search and switch to a project
+        - generic:
+            - generic:
+                - img
+            - button:
+                - img
+    - generic [ref=e222]:
+        - generic [ref=e224]:
+            - generic [ref=e225]:
+                - button [ref=e228] [cursor=pointer]:
+                    - img [ref=e229]
+                - button [ref=e234] [cursor=pointer]:
+                    - img [ref=e235]
+                - button:
+                    - img
+            - button [ref=e239] [cursor=pointer]
+        - button [ref=e242] [cursor=pointer]:
+            - img [ref=e243]
+    - menu "0/100" [ref=e1246]:
+        - generic [ref=e1222]:
+            - generic [ref=e1223]:
+                - img [ref=e1224]
+                - heading "Orchestrator" [level=4] [ref=e1227]
+            - paragraph [ref=e1228]: Startet den nächsten Chat automatisch, wenn das Stichwort passt.
+        - generic [ref=e1229]:
+            - generic [ref=e1230]:
+                - generic [ref=e1231]:
+                    - generic [ref=e1232]: Orchestrator aktiv
+                    - paragraph [ref=e1233]: Neue Phasen automatisch starten
+                - switch "Orchestrator aktiv" [checked] [active] [ref=e1234] [cursor=pointer]
+            - generic [ref=e1235]:
+                - generic [ref=e1236]: Stichwort
+                - textbox "Stichwort" [ref=e1247]:
+                    - /placeholder: NEXT_PHASE_READY
+                    - text: NEXT_PHASE_READY
+                - paragraph [ref=e1237]: Nur die letzte sinnvolle Zeile wird geprüft
+            - generic [ref=e1238]:
+                - generic [ref=e1239]: Max Schritte
+                - spinbutton "Max Schritte" [ref=e1248]: '100'
+                - paragraph [ref=e1240]: Nach diesem Limit stoppt die Automatik (1-999).
+            - generic [ref=e1241]:
+                - generic [ref=e1242]:
+                    - generic [ref=e1243]: Direkt senden
+                    - paragraph [ref=e1244]: Neue Phase sofort absenden
+                - switch "Direkt senden" [checked] [ref=e1245] [cursor=pointer]
+            - generic [ref=e1249]:
+                - generic [ref=e1250]:
+                    - img [ref=e1251]
+                    - generic [ref=e1256]: Bereit
+                - paragraph [ref=e1257]: 'Lauf-ID: orch-run-mmqaicjk-sdiz2p'
+                - generic [ref=e1258]:
+                    - paragraph [ref=e1259]: Schnelltest
+                    - paragraph [ref=e1260]: 'Nutze diese letzte Zeile für einen kurzen Live-Test:'
+                    - paragraph [ref=e1261]: 1) NEXT_PHASE_READY -> Treffer
+                    - paragraph [ref=e1262]: 2) - NEXT_PHASE_READY. -> Treffer (toleriert)
+                    - paragraph [ref=e1263]: 3) PHASE_READY -> Kein Treffer

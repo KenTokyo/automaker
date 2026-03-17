@@ -1,0 +1,27 @@
+- generic [active] [ref=e1]:
+    - generic [ref=e2]:
+        - main [ref=e3]:
+            - generic [ref=e4]:
+                - img [ref=e5]
+                - paragraph [ref=e7]: Loading...
+        - generic [ref=e8]:
+            - img [ref=e10]
+            - button "Open Tanstack query devtools" [ref=e58] [cursor=pointer]:
+                - img [ref=e59]
+        - generic [ref=e107]:
+            - img "Automaker Logo" [ref=e213]
+            - generic [ref=e220]: automaker.
+    - generic [ref=e222]:
+        - generic [ref=e224]:
+            - generic [ref=e225]:
+                - button [ref=e228] [cursor=pointer]:
+                    - img [ref=e229]
+                - button [ref=e234] [cursor=pointer]:
+                    - img [ref=e235]
+                - generic:
+                    - generic:
+                        - button:
+                            - img
+            - button [ref=e239] [cursor=pointer]
+        - button [ref=e242] [cursor=pointer]:
+            - img [ref=e243]

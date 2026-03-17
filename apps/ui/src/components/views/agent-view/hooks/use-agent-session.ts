@@ -1,11 +1,19 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, type MutableRefObject } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
+import { useShallow } from 'zustand/react/shallow';
+import { getElectronAPI } from '@/lib/electron';
+import { generateRandomSessionName } from '@/components/session-manager/session-name-generator';
+import { useOrchestratorStore } from '@/store/orchestrator-store';
+import { queryKeys } from '@/lib/query-keys';
 
 const logger = createLogger('AgentSession');
 
 interface UseAgentSessionOptions {
   projectPath: string | undefined;
+  /** Ref to the quick-create function exposed by SessionManager (used as fallback) */
+  quickCreateSessionRef?: MutableRefObject<(() => Promise<void>) | null>;
 }
 
 interface UseAgentSessionResult {
@@ -13,13 +21,26 @@ interface UseAgentSessionResult {
   handleSelectSession: (sessionId: string | null, sessionProjectPath?: string) => void;
 }
 
-export function useAgentSession({ projectPath }: UseAgentSessionOptions): UseAgentSessionResult {
+export function useAgentSession({
+  projectPath,
+  quickCreateSessionRef,
+}: UseAgentSessionOptions): UseAgentSessionResult {
   const { setLastSelectedSession, getLastSelectedSession, projects, setCurrentProject } =
-    useAppStore();
+    useAppStore(
+      useShallow((s) => ({
+        setLastSelectedSession: s.setLastSelectedSession,
+        getLastSelectedSession: s.getLastSelectedSession,
+        projects: s.projects,
+        setCurrentProject: s.setCurrentProject,
+      }))
+    );
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // Track if initial session has been loaded
   const initialSessionLoadedRef = useRef(false);
+  // Track if auto-create is in progress to prevent duplicate session creation
+  const autoCreateInProgressRef = useRef(false);
 
   // Handle session selection with persistence
   // If sessionProjectPath is provided and differs from the current project, switch projects
@@ -51,7 +72,59 @@ export function useAgentSession({ projectPath }: UseAgentSessionOptions): UseAge
     [projectPath, projects, setCurrentProject, setLastSelectedSession]
   );
 
+  // Auto-create a new session for a project
+  const autoCreateSession = useCallback(
+    async (forProjectPath: string) => {
+      if (autoCreateInProgressRef.current) return;
+      autoCreateInProgressRef.current = true;
+
+      try {
+        const api = getElectronAPI();
+        if (!api?.sessions) {
+          logger.warn('Sessions API not available for auto-create');
+          return;
+        }
+
+        // Resolve orchestrator run ID if orchestrator mode is enabled
+        const orchestratorState = useOrchestratorStore.getState();
+        let runIdForSession: string | undefined;
+        if (orchestratorState.isEnabled) {
+          const persistedRunId = orchestratorState.orchestratorRunId?.trim();
+          runIdForSession = persistedRunId || orchestratorState.startNewRun() || undefined;
+        }
+
+        const sessionName = generateRandomSessionName();
+        logger.info('Auto-creating new session for project:', forProjectPath, 'name:', sessionName);
+
+        const result = await api.sessions.create(
+          sessionName,
+          forProjectPath,
+          forProjectPath,
+          runIdForSession
+        );
+
+        if (result.success && result.session?.id) {
+          // Invalidate session queries so SessionManager picks up the new session
+          await queryClient.invalidateQueries({ queryKey: queryKeys.sessions.all(true) });
+
+          // Set the new session as current and persist
+          setCurrentSessionId(result.session.id);
+          setLastSelectedSession(forProjectPath, result.session.id);
+          logger.info('Auto-created session:', result.session.id, 'for project:', forProjectPath);
+        } else {
+          logger.error('Auto-create session failed:', result.error);
+        }
+      } catch (err) {
+        logger.error('Error auto-creating session:', err);
+      } finally {
+        autoCreateInProgressRef.current = false;
+      }
+    },
+    [queryClient, setLastSelectedSession]
+  );
+
   // Restore last selected session when switching to Agent view or when project changes
+  // If no previous session exists, auto-create one
   useEffect(() => {
     if (!projectPath) {
       // No project, reset
@@ -68,8 +141,12 @@ export function useAgentSession({ projectPath }: UseAgentSessionOptions): UseAge
     if (lastSessionId) {
       logger.info('Restoring last selected session:', lastSessionId);
       setCurrentSessionId(lastSessionId);
+    } else {
+      // No previous session for this project – auto-create one
+      logger.info('No previous session for project, auto-creating:', projectPath);
+      void autoCreateSession(projectPath);
     }
-  }, [projectPath, getLastSelectedSession]);
+  }, [projectPath, getLastSelectedSession, autoCreateSession]);
 
   // Reset initialSessionLoadedRef when project changes
   useEffect(() => {

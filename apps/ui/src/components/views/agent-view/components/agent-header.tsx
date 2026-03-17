@@ -534,7 +534,12 @@ export function AgentHeader({
                   variant="ghost"
                   size="sm"
                   disabled={isSavingToDoc}
-                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                  className={cn(
+                    'h-8 gap-1.5 px-2.5 text-emerald-400 hover:text-emerald-300',
+                    'hover:bg-emerald-500/15 border border-emerald-500/30 hover:border-emerald-500/50',
+                    'transition-all duration-200',
+                    isSavingToDoc && 'animate-pulse'
+                  )}
                   title="Klick: Verlauf in History/ speichern + Pfad ins Input. Alt+Klick: Optionen."
                   onPointerDown={(event) => {
                     const isAltLeftClick = event.altKey && event.button === 0;
@@ -550,6 +555,7 @@ export function AgentHeader({
                   }}
                 >
                   <FilePlus className="w-4 h-4" />
+                  <span className="text-xs font-medium hidden sm:inline">Save</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">

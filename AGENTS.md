@@ -172,3 +172,7 @@ UI bitte keine Fachbegriffe, soll einfach verständlich sein auch für 8.Klässl
 
 - **Frage stellen/Auf User warten()**: `powershell -c "[console::beep(400,400)"` (mittlere Dauer)
 - **Fertig**: `powershell -c "[console]::beep(400,800)"` (längere Dauer)
+
+Nutze subagents wenn es geht immer
+
+**Completed-Task Dokumentation**: Nach erfolgreichem Abschluss einer Aufgabe MUSS eine Datei in `.completed/<YYYY-MM-DD>_<slug>.md` erstellt werden. Format: YAML Frontmatter mit title, description, date, status, effort + Markdown Body. Siehe: `shared-docs/agents/completed-task-rule.md`

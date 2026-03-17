@@ -1,8 +1,8 @@
 /**
  * CompletedTasksPanel - Left sidebar panel for the "Fertig" (Done) tab.
  *
- * Phase 4: Full card layout with search, category/badge filters,
- * and sorting. Replaces the simple list from Phase 3.
+ * Full card layout with search, tag/status/effort filters,
+ * and sorting by date, title, or effort.
  */
 
 import { useCallback, useMemo, useState } from 'react';
@@ -10,10 +10,10 @@ import { AlertCircle, CheckCircle2, Loader2, RefreshCw, SearchX } from 'lucide-r
 import { useShallow } from 'zustand/react/shallow';
 import type {
   CompletedTask,
-  CompletedTaskBadge,
-  CompletedTaskCategory,
   CompletedTaskSortField,
   CompletedTaskSortOrder,
+  CompletedTaskStatus,
+  CompletedTaskEffort,
 } from '@automaker/types';
 import { useAppStore } from '@/store/app-store';
 import { useCompletedTasks, deleteCompletedTask } from '@/hooks/use-completed-tasks';
@@ -23,11 +23,13 @@ import { CompletedTaskCard } from './completed-task-card';
 import { CompletedTasksSearch } from './completed-tasks-search';
 import { CompletedTasksFilterBar } from './completed-tasks-filter-bar';
 import { HistoryViewerPanel } from './history-viewer-panel';
-import { getCategoryLabel } from './completed-task-utils';
+import { getStatusLabel } from './completed-task-utils';
 
 // ---------------------------------------------------------------------------
 // Client-side sort helper
 // ---------------------------------------------------------------------------
+
+const EFFORT_ORDER: Record<string, number> = { S: 1, M: 2, L: 3, XL: 4 };
 
 function sortTasks(
   tasks: CompletedTask[],
@@ -38,14 +40,14 @@ function sortTasks(
   sorted.sort((a, b) => {
     let cmp = 0;
     switch (field) {
-      case 'completedAt':
-        cmp = new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime();
+      case 'date':
+        cmp = a.date.localeCompare(b.date);
         break;
       case 'title':
         cmp = a.title.localeCompare(b.title, 'de');
         break;
-      case 'category':
-        cmp = a.category.localeCompare(b.category, 'de');
+      case 'effort':
+        cmp = (EFFORT_ORDER[a.effort] || 0) - (EFFORT_ORDER[b.effort] || 0);
         break;
     }
     return order === 'asc' ? cmp : -cmp;
@@ -60,17 +62,22 @@ function sortTasks(
 function filterTasksLocal(
   tasks: CompletedTask[],
   search: string | undefined,
-  categories: string[] | undefined,
-  badges: string[] | undefined
+  tags: string[] | undefined,
+  status: CompletedTaskStatus[] | undefined,
+  effort: CompletedTaskEffort[] | undefined
 ): CompletedTask[] {
   let result = tasks;
 
-  if (categories && categories.length > 0) {
-    result = result.filter((t) => categories.includes(t.category));
+  if (tags && tags.length > 0) {
+    result = result.filter((t) => t.tags.some((tag) => tags.includes(tag)));
   }
 
-  if (badges && badges.length > 0) {
-    result = result.filter((t) => t.badges.some((b) => badges.includes(b)));
+  if (status && status.length > 0) {
+    result = result.filter((t) => status.includes(t.status));
+  }
+
+  if (effort && effort.length > 0) {
+    result = result.filter((t) => t.effort && effort.includes(t.effort as CompletedTaskEffort));
   }
 
   if (search && search.trim()) {
@@ -115,35 +122,36 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
 
   const { refetch } = useCompletedTasks(projectPath);
 
-  // Extract available badges from loaded data
-  const availableBadges = useMemo(() => {
-    const badgeSet = new Set<CompletedTaskBadge>();
-    for (const task of tasks) {
-      for (const b of task.badges) badgeSet.add(b);
-    }
-    return Array.from(badgeSet).sort();
-  }, [tasks]);
-
   // Apply local filtering + sorting
   const filteredTasks = useMemo(() => {
-    const filtered = filterTasksLocal(tasks, filter.search, filter.categories, filter.badges);
+    const filtered = filterTasksLocal(
+      tasks,
+      filter.search,
+      filter.tags,
+      filter.status,
+      filter.effort
+    );
     return sortTasks(filtered, sortField, sortOrder);
   }, [tasks, filter, sortField, sortOrder]);
 
-  const hasActiveFilters = !!(filter.search || filter.categories?.length || filter.badges?.length);
+  const hasActiveFilters = !!(
+    filter.search ||
+    filter.tags?.length ||
+    filter.status?.length ||
+    filter.effort?.length
+  );
 
   // Stats summary for footer
   const statsLine = useMemo(() => {
     if (tasks.length === 0) return '';
     const counts: Record<string, number> = {};
     for (const t of tasks) {
-      counts[t.category] = (counts[t.category] || 0) + 1;
+      counts[t.status] = (counts[t.status] || 0) + 1;
     }
     const parts = Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([cat, n]) => `${n} ${getCategoryLabel(cat as CompletedTaskCategory)}`);
-    return `${tasks.length} Aufgaben · ${parts.join(' · ')}`;
+      .map(([st, n]) => `${n} ${getStatusLabel(st as CompletedTaskStatus)}`);
+    return `${tasks.length} Aufgaben -- ${parts.join(' -- ')}`;
   }, [tasks]);
 
   // Handlers
@@ -163,10 +171,10 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
   );
 
   const handleDelete = useCallback(
-    async (taskId: string) => {
-      const success = await deleteCompletedTask(taskId, projectPath);
+    async (filename: string) => {
+      const success = await deleteCompletedTask(filename, projectPath);
       if (success) {
-        removeFromStore(taskId);
+        removeFromStore(filename);
       }
     },
     [projectPath, removeFromStore]
@@ -218,7 +226,6 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
           sortField={sortField}
           sortOrder={sortOrder}
           onSortChange={handleSortChange}
-          availableBadges={availableBadges}
         />
       </div>
 
@@ -244,10 +251,9 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 py-2">
           {filteredTasks.map((task) => (
             <CompletedTaskCard
-              key={task.id}
+              key={task.filename}
               task={task}
-              onDelete={(id) => void handleDelete(id)}
-              onHistoryClick={setHistoryFile}
+              onDelete={(fn) => void handleDelete(fn)}
             />
           ))}
         </div>
@@ -326,7 +332,7 @@ function NoResultsState({ onClearFilters }: { onClearFilters: () => void }) {
         </p>
       </div>
       <Button variant="outline" size="sm" onClick={onClearFilters} className="gap-1.5 border-muted">
-        Filter zurücksetzen
+        Filter zuruecksetzen
       </Button>
     </div>
   );
