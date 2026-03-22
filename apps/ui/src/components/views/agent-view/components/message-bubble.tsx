@@ -1,5 +1,6 @@
 import { memo, useCallback, useMemo, useState, type CSSProperties } from 'react';
 import type { ChatDisplaySettings } from '@/store/types/ui-types';
+import { getGrayShadeColor, isDarkThemeActive } from './chat-settings-popover';
 import {
   Bot,
   User,
@@ -43,15 +44,18 @@ interface Message {
 interface MessageBubbleProps {
   message: Message;
   chatDisplaySettings: ChatDisplaySettings;
+  chatBubbleColor?: string;
+  userBubbleColor?: string;
 }
 
 export const MessageBubble = memo(function MessageBubble({
   message,
   chatDisplaySettings,
+  chatBubbleColor,
+  userBubbleColor,
 }: MessageBubbleProps) {
   const isError = message.isError && message.role === 'assistant';
-  const normalizedMessageContent =
-    message.role === 'assistant' ? message.content.replace(/\\n/g, '\n') : message.content;
+  const normalizedMessageContent = message.content.replace(/\\n/g, '\n');
   const visibleMessageContent = useMemo(
     () => stripEmbeddedSystemPrompts(normalizedMessageContent),
     [normalizedMessageContent]
@@ -63,51 +67,73 @@ export const MessageBubble = memo(function MessageBubble({
   const hasContent = visibleMessageContent.trim().length > 0;
   const showCopyButton = hasContent;
   const showInsertDocs = message.role === 'assistant' && !isError && mainMessage.length > 0;
+  const hasCustomFontColor =
+    chatDisplaySettings.fontColorGray != null && chatDisplaySettings.fontColorGray < 900;
   const markdownClassName = cn(
-    'prose-p:leading-relaxed prose-headings:text-foreground prose-strong:text-foreground prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded [&_p]:whitespace-pre-wrap [&_li]:whitespace-pre-wrap',
+    !hasCustomFontColor && 'prose-headings:text-foreground prose-strong:text-foreground',
+    hasCustomFontColor && 'prose-headings:text-inherit prose-strong:text-inherit',
+    '[&_p]:whitespace-pre-wrap [&_li]:whitespace-pre-wrap [&_code]:break-words',
     isError
       ? 'text-red-600 dark:text-red-400 prose-code:text-red-600 dark:prose-code:text-red-400 prose-code:bg-red-500/10'
-      : 'text-foreground prose-code:text-foreground prose-code:bg-muted/80'
+      : hasCustomFontColor
+        ? 'text-inherit'
+        : 'text-foreground'
   );
 
-  return (
-    <div
-      className={cn(
-        'group/msg flex gap-4 max-w-4xl',
-        message.role === 'user' ? 'flex-row-reverse ml-auto' : ''
-      )}
-    >
-      {/* Avatar */}
-      <div
-        className={cn(
-          'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm',
-          isError
-            ? 'bg-red-500/10 ring-1 ring-red-500/20'
-            : message.role === 'assistant'
-              ? 'bg-secondary ring-1 ring-border'
-              : 'bg-muted ring-1 ring-border'
-        )}
-      >
-        {isError ? (
-          <AlertCircle className="w-4 h-4 text-red-500" />
-        ) : message.role === 'assistant' ? (
-          <Bot className="w-4 h-4 text-foreground/80" />
-        ) : (
-          <User className="w-4 h-4 text-muted-foreground" />
-        )}
-      </div>
+  const isUserMessage = message.role === 'user';
 
+  // User messages: render as plain text with preserved whitespace, not Markdown
+  const renderUserContent = useCallback(() => {
+    if (!mainMessage) return null;
+    return (
+      <div className="whitespace-pre-wrap break-words text-foreground leading-relaxed">
+        {mainMessage}
+      </div>
+    );
+  }, [mainMessage]);
+
+  return (
+    <div className={cn('group/msg', isUserMessage ? 'flex justify-end' : '')}>
       {/* Message Bubble */}
       <div
         className={cn(
-          'flex-1 max-w-[85%] rounded-2xl px-4 py-3 shadow-sm',
+          'shadow-sm',
+          isUserMessage
+            ? 'rounded-2xl rounded-br-md px-4 py-3 max-w-[85%]'
+            : 'rounded-2xl px-4 py-3',
           isError
             ? 'bg-red-500/10 border border-red-500/30'
-            : message.role === 'user'
-              ? 'bg-secondary text-foreground border border-border'
+            : isUserMessage
+              ? 'bg-secondary/80 text-foreground border border-border/50'
               : 'bg-card border border-border'
         )}
+        style={
+          !isError && (isUserMessage ? userBubbleColor || chatBubbleColor : chatBubbleColor)
+            ? {
+                backgroundColor: `color-mix(in oklch, ${isUserMessage ? (userBubbleColor || chatBubbleColor)! : chatBubbleColor!} 25%, ${isUserMessage ? 'hsl(var(--secondary))' : 'hsl(var(--card))'} 75%)`,
+              }
+            : undefined
+        }
       >
+        {/* Inline role indicator */}
+        <div className={cn('flex items-center gap-1.5 mb-1.5', isUserMessage ? 'justify-end' : '')}>
+          {isError ? (
+            <AlertCircle className="w-3 h-3 text-red-500" />
+          ) : message.role === 'assistant' ? (
+            <Bot className="w-3 h-3 text-muted-foreground" />
+          ) : (
+            <User className="w-3 h-3 text-muted-foreground/70" />
+          )}
+          <span
+            className={cn(
+              'text-[11px] font-medium',
+              isUserMessage ? 'text-muted-foreground/70' : 'text-muted-foreground'
+            )}
+          >
+            {isError ? 'Error' : message.role === 'assistant' ? 'Assistant' : 'You'}
+          </span>
+        </div>
+
         <div
           className="chat-display-styled"
           style={
@@ -117,26 +143,32 @@ export const MessageBubble = memo(function MessageBubble({
               opacity: chatDisplaySettings.fontOpacity,
               lineHeight: chatDisplaySettings.lineHeight,
               '--code-font-size': `${chatDisplaySettings.fontSize + chatDisplaySettings.codeBlockRelativeSize}px`,
+              ...(chatDisplaySettings.fontColorGray != null &&
+                chatDisplaySettings.fontColorGray < 900 && {
+                  color: getGrayShadeColor(chatDisplaySettings.fontColorGray, isDarkThemeActive()),
+                }),
             } as CSSProperties
           }
         >
           {preMessage && (
             <OrchestratorContentDropdown title="Orchestrator Text Preview" content={preMessage} />
           )}
-          {mainMessage && <Markdown className={markdownClassName}>{mainMessage}</Markdown>}
+          {isUserMessage
+            ? renderUserContent()
+            : mainMessage && <Markdown className={markdownClassName}>{mainMessage}</Markdown>}
           {postMessage && (
             <OrchestratorContentDropdown title="Orchestrator Text After" content={postMessage} />
           )}
         </div>
 
         {/* Display attached images for user messages */}
-        {message.role === 'user' && message.images && message.images.length > 0 && (
+        {isUserMessage && message.images && message.images.length > 0 && (
           <div className="mt-3 space-y-2">
             {/* Show image paths in chat for traceability/recovery */}
             {message.images.map((image, index) => (
               <div
                 key={`path-${image.id || index}`}
-                className="text-xs text-foreground/80 font-mono whitespace-pre-wrap break-all rounded-md bg-muted/60 px-2 py-1 border border-border/60"
+                className="text-xs text-foreground/70 font-mono whitespace-pre-wrap break-all rounded-md bg-black/10 dark:bg-white/5 px-2 py-1"
               >
                 {`Bild ${index + 1}: ${image.savedPath || image.filename || `Image ${index + 1}`}`}
               </div>
@@ -167,15 +199,27 @@ export const MessageBubble = memo(function MessageBubble({
           </div>
         )}
 
-        {/* Footer: timestamp + Insert into Docs */}
-        <div className="flex items-center justify-between mt-2">
+        {/* Footer: timestamp + actions */}
+        <div
+          className={cn(
+            'flex items-center mt-2',
+            isUserMessage ? 'justify-between flex-row-reverse' : 'justify-between'
+          )}
+        >
+          <div className="flex items-center gap-1.5">
+            {showCopyButton && (
+              <CopyButton content={message.content} isUserMessage={isUserMessage} />
+            )}
+            {showInsertDocs && <InsertIntoDocsButton content={message.content} />}
+          </div>
+
           <p
             className={cn(
               'text-[11px] font-medium',
               isError
                 ? 'text-red-500/70'
-                : message.role === 'user'
-                  ? 'text-foreground/60'
+                : isUserMessage
+                  ? 'text-foreground/40'
                   : 'text-muted-foreground'
             )}
           >
@@ -184,13 +228,6 @@ export const MessageBubble = memo(function MessageBubble({
               minute: '2-digit',
             })}
           </p>
-
-          <div className="flex items-center gap-1.5">
-            {showCopyButton && (
-              <CopyButton content={message.content} isUserMessage={message.role === 'user'} />
-            )}
-            {showInsertDocs && <InsertIntoDocsButton content={message.content} />}
-          </div>
         </div>
       </div>
     </div>

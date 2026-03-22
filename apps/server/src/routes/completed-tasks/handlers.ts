@@ -9,6 +9,7 @@
 
 import type { Request, Response } from 'express';
 import { createLogger } from '@automaker/utils';
+import { validatePath, PathNotAllowedError } from '@automaker/platform';
 import { getErrorMessage, createLogError } from '../common.js';
 import { readCompletedTasks, writeCompletedTask, deleteCompletedTask } from './storage.js';
 import type { EventEmitter } from '../../lib/events.js';
@@ -46,12 +47,56 @@ export function createListHandler() {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const projectPath = req.query.projectPath as string;
-      if (!projectPath) {
-        res.status(400).json({ success: false, error: 'projectPath query param is required' });
+      const projectPaths = req.query.projectPaths as string | undefined;
+
+      if (!projectPath && !projectPaths) {
+        res
+          .status(400)
+          .json({ success: false, error: 'projectPath or projectPaths query param is required' });
         return;
       }
 
-      let tasks = await readCompletedTasks(projectPath);
+      let tasks: CompletedTask[];
+
+      if (projectPaths) {
+        // Multi-project mode: fetch from all specified projects
+        const paths = projectPaths.split('|').filter(Boolean);
+        const projectNames = ((req.query.projectNames as string) || '').split('|');
+
+        // Validate all paths
+        for (const p of paths) {
+          try {
+            validatePath(p);
+          } catch (err) {
+            if (err instanceof PathNotAllowedError) {
+              res.status(403).json({ success: false, error: err.message });
+              return;
+            }
+            throw err;
+          }
+        }
+        const allTasks: CompletedTask[] = [];
+
+        for (let i = 0; i < paths.length; i++) {
+          try {
+            const pTasks = await readCompletedTasks(paths[i]);
+            const pName = projectNames[i] || paths[i].split(/[\\/]/).pop() || paths[i];
+            for (const t of pTasks) {
+              t.projectPath = paths[i];
+              t.projectName = pName;
+            }
+            allTasks.push(...pTasks);
+          } catch {
+            logger.debug(`Skipping project ${paths[i]} – read error`);
+          }
+        }
+
+        // Sort newest first across all projects
+        allTasks.sort((a, b) => b.date.localeCompare(a.date));
+        tasks = allTasks;
+      } else {
+        tasks = await readCompletedTasks(projectPath);
+      }
 
       // --- Filters ---
       const search = req.query.search as string | undefined;

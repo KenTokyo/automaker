@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
-import { MessageSquare, FileText, BarChart3, CheckCircle } from 'lucide-react';
+import { MessageSquare, FileText, BarChart3, CheckCircle, ListTodo } from 'lucide-react';
 import { createLogger } from '@automaker/utils/logger';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,13 +11,15 @@ import { useSessions } from '@/hooks/queries';
 import { queryKeys } from '@/lib/query-keys';
 import { DeleteSessionDialog } from '@/components/dialogs/delete-session-dialog';
 import { DeleteAllArchivedSessionsDialog } from '@/components/dialogs/delete-all-archived-sessions-dialog';
+import { DeleteOldSessionsDialog } from '@/components/dialogs/delete-old-sessions-dialog';
 import { DocsPanel } from '@/components/views/agent-view/components/docs-panel';
 import { LeftOverviewPanel } from '@/components/session-manager/left-overview-panel';
 import { CompletedTasksPanel } from '@/components/session-manager/completed-tasks-panel';
+import { TasksPanel } from '@/components/session-manager/tasks-panel';
 import { useProjectLookup } from '@/hooks/use-project-lookup';
 import { useSessionSearch } from '@/hooks/use-session-search';
 import { useSessionFilter } from '@/hooks/use-session-filter';
-import { useSessionGrouping } from '@/hooks/use-session-grouping';
+import { useProjectGrouping } from '@/hooks/use-project-grouping';
 import { useAppStore } from '@/store/app-store';
 import { useOrchestratorStore } from '@/store/orchestrator-store';
 import { cn } from '@/lib/utils';
@@ -27,6 +29,11 @@ import { SessionListControls } from '@/components/session-manager/session-list-c
 import { SessionListItemRow } from '@/components/session-manager/session-list-item';
 import { SessionItemErrorBoundary } from '@/components/session-manager/session-item-error-boundary';
 import { OrchestratorRunHeader } from '@/components/session-manager/orchestrator-run-header';
+import {
+  ProjectGroupSection,
+  INITIAL_VISIBLE,
+  LOAD_MORE_COUNT,
+} from '@/components/session-manager/project-group-section';
 import { generateRandomSessionName } from '@/components/session-manager/session-name-generator';
 import { validateSessionData } from '@/lib/session-utils';
 import { SessionListSkeleton } from '@/components/session-manager/session-list-skeleton';
@@ -63,6 +70,11 @@ export function SessionManager({
   const [isMultiselectMode, setIsMultiselectMode] = useState(false);
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   const [timeFilterHours, setTimeFilterHours] = useState<number | null>(null);
+  const [isDeleteOldSessionsDialogOpen, setIsDeleteOldSessionsDialogOpen] = useState(false);
+
+  // Project tree: which projects are expanded + how many sessions are visible per project
+  const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
+  const [projectVisibleCounts, setProjectVisibleCounts] = useState<Record<string, number>>({});
 
   const {
     data: rawSessions = [],
@@ -378,10 +390,34 @@ export function SessionManager({
   const displayedSessions = activeTab === 'active' ? filteredActive : filteredArchived;
   const isFiltering = !!debouncedSearchTerm || !!filterProjectPath || timeFilterHours !== null;
 
-  const displayEntries = useSessionGrouping({
+  // Group sessions by project for tree view
+  const projectGroups = useProjectGrouping({
     sessions: displayedSessions,
+    getProjectName,
     expandedRunIds: expandedOrchestratorRuns,
   });
+
+  // Auto-expand the current project on initial load
+  useEffect(() => {
+    if (projectGroups.length > 0 && Object.keys(expandedProjects).length === 0) {
+      // Expand the current project by default
+      const currentProjectGroup = projectGroups.find((g) => g.projectPath === projectPath);
+      if (currentProjectGroup) {
+        setExpandedProjects((prev) => ({ ...prev, [currentProjectGroup.projectPath]: true }));
+      }
+    }
+  }, [projectGroups.length > 0]);
+
+  const toggleProjectExpanded = useCallback((projectPath: string) => {
+    setExpandedProjects((prev) => ({ ...prev, [projectPath]: !prev[projectPath] }));
+  }, []);
+
+  const showMoreForProject = useCallback((projectPath: string) => {
+    setProjectVisibleCounts((prev) => ({
+      ...prev,
+      [projectPath]: (prev[projectPath] || INITIAL_VISIBLE) + LOAD_MORE_COUNT,
+    }));
+  }, []);
 
   const selectAllInCurrentTab = () => {
     const sessionsToSelect = activeTab === 'active' ? filteredActive : filteredArchived;
@@ -451,6 +487,26 @@ export function SessionManager({
     [sessions, onSelectSession, invalidateSessions]
   );
 
+  const handleDeleteOldSessions = async (olderThanDays: number) => {
+    const api = getElectronAPI();
+    if (!api?.sessions) return;
+
+    const cutoffMs = Date.now() - olderThanDays * 24 * 60 * 60 * 1000;
+    const sessionsToDelete = sessions.filter((session) => {
+      const updatedAtMs = new Date(session.updatedAt).getTime();
+      return (
+        Number.isFinite(updatedAtMs) && updatedAtMs < cutoffMs && session.id !== currentSessionId
+      );
+    });
+
+    for (const session of sessionsToDelete) {
+      await api.sessions.delete(session.id);
+    }
+
+    await invalidateSessions();
+    setIsDeleteOldSessionsDialogOpen(false);
+  };
+
   const handleQuickCreateFromHeader = () => {
     if (activeTab === 'archived') {
       setActiveTab('active');
@@ -464,24 +520,40 @@ export function SessionManager({
         <Tabs
           value={leftPanelTab}
           onValueChange={(value) => setLeftPanelTab(value as typeof leftPanelTab)}
-          className="w-full gap-1"
+          className="w-full gap-0.5"
         >
-          <TabsList className="h-8 w-full rounded-md p-0.5">
-            <TabsTrigger value="sessions" className="h-6 flex-1 gap-1 px-2 text-xs font-semibold">
-              <MessageSquare className="mr-0.5 h-3.5 w-3.5" />
+          <TabsList className="h-6 w-full rounded-md p-0.5">
+            <TabsTrigger
+              value="sessions"
+              className="h-4.5 flex-1 gap-0.5 px-1 text-[10px] font-medium"
+            >
+              <MessageSquare className="h-2.5 w-2.5" />
               Sessions
             </TabsTrigger>
-            <TabsTrigger value="docs" className="h-6 flex-1 gap-1 px-2 text-xs font-semibold">
-              <FileText className="mr-0.5 h-3.5 w-3.5" />
+            <TabsTrigger
+              value="completed"
+              className="h-4.5 flex-1 gap-0.5 px-1 text-[10px] font-medium"
+            >
+              <CheckCircle className="h-2.5 w-2.5" />
+              Fertig
+            </TabsTrigger>
+            <TabsTrigger value="docs" className="h-4.5 flex-1 gap-0.5 px-1 text-[10px] font-medium">
+              <FileText className="h-2.5 w-2.5" />
               Docs
             </TabsTrigger>
-            <TabsTrigger value="overview" className="h-6 flex-1 gap-1 px-2 text-xs font-semibold">
-              <BarChart3 className="mr-0.5 h-3.5 w-3.5" />
+            <TabsTrigger
+              value="overview"
+              className="h-4.5 flex-1 gap-0.5 px-1 text-[10px] font-medium"
+            >
+              <BarChart3 className="h-2.5 w-2.5" />
               Übersicht
             </TabsTrigger>
-            <TabsTrigger value="completed" className="h-6 flex-1 gap-1 px-2 text-xs font-semibold">
-              <CheckCircle className="mr-0.5 h-3.5 w-3.5" />
-              Fertig
+            <TabsTrigger
+              value="tasks"
+              className="h-4.5 flex-1 gap-0.5 px-1 text-[10px] font-medium"
+            >
+              <ListTodo className="h-2.5 w-2.5" />
+              Tasks
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -494,6 +566,10 @@ export function SessionManager({
       ) : leftPanelTab === 'overview' ? (
         <div className="flex-1 overflow-hidden">
           <LeftOverviewPanel />
+        </div>
+      ) : leftPanelTab === 'tasks' ? (
+        <div className="flex-1 overflow-hidden">
+          <TasksPanel projectPath={projectPath} />
         </div>
       ) : leftPanelTab === 'completed' ? (
         <div className="flex-1 overflow-hidden">
@@ -529,6 +605,7 @@ export function SessionManager({
             sessionCountByProject={sessionCountByProject}
             sessionFontSize={sessionFontSize}
             onSessionFontSizeChange={setSessionFontSize}
+            onDeleteOldSessions={() => setIsDeleteOldSessionsDialogOpen(true)}
           />
 
           <CardContent
@@ -561,149 +638,167 @@ export function SessionManager({
               <SessionListError error={sessionsError} onRetry={() => void refetchSessions()} />
             )}
 
-            {displayEntries.map((displayEntry) => {
-              if (displayEntry.type === 'single') {
-                const session = displayEntry.session;
-                return (
-                  <SessionItemErrorBoundary
-                    key={`boundary-${session.id}`}
-                    sessionId={session.id}
-                    sessionName={session.name}
-                  >
-                    <SessionListItemRow
-                      key={session.id}
-                      session={session}
-                      currentSessionId={currentSessionId}
-                      isCurrentSessionThinking={isCurrentSessionThinking}
-                      runningSessions={runningSessions}
-                      sessionFontSize={sessionFontSize}
-                      isMultiselectMode={isMultiselectMode}
-                      isSelected={selectedSessionIds.has(session.id)}
-                      editingSessionId={editingSessionId}
-                      editingName={editingName}
-                      onEditingNameChange={setEditingName}
-                      onStartEditing={(sessionId, currentName) => {
-                        setEditingSessionId(sessionId);
-                        setEditingName(currentName);
-                      }}
-                      onStopEditing={() => {
-                        setEditingSessionId(null);
-                        setEditingName('');
-                      }}
-                      onRenameSession={(sessionId) => void handleRenameSession(sessionId)}
-                      onArchiveSession={(sessionId) => void handleArchiveSession(sessionId)}
-                      onUnarchiveSession={(sessionId) => void handleUnarchiveSession(sessionId)}
-                      onDeleteSession={handleDeleteSession}
-                      onSelectSession={handleSelectSession}
-                      onToggleSelection={toggleSessionSelection}
-                      getProjectName={getProjectName}
-                      getBadgeColor={getBadgeColor}
-                      getProject={getProject}
-                    />
-                  </SessionItemErrorBoundary>
-                );
-              }
+            {projectGroups.map((group) => (
+              <ProjectGroupSection
+                key={group.projectPath}
+                group={group}
+                expandedRunIds={expandedOrchestratorRuns}
+                isExpanded={!!expandedProjects[group.projectPath]}
+                onToggleExpanded={() => toggleProjectExpanded(group.projectPath)}
+                visibleCount={projectVisibleCounts[group.projectPath] || INITIAL_VISIBLE}
+                onShowMore={() => showMoreForProject(group.projectPath)}
+                renderDisplayEntry={(displayEntry) => {
+                  if (displayEntry.type === 'single') {
+                    const session = displayEntry.session;
+                    return (
+                      <SessionItemErrorBoundary
+                        key={`boundary-${session.id}`}
+                        sessionId={session.id}
+                        sessionName={session.name}
+                      >
+                        <SessionListItemRow
+                          session={session}
+                          currentSessionId={currentSessionId}
+                          isCurrentSessionThinking={isCurrentSessionThinking}
+                          runningSessions={runningSessions}
+                          sessionFontSize={sessionFontSize}
+                          isMultiselectMode={isMultiselectMode}
+                          isSelected={selectedSessionIds.has(session.id)}
+                          editingSessionId={editingSessionId}
+                          editingName={editingName}
+                          onEditingNameChange={setEditingName}
+                          onStartEditing={(sessionId, currentName) => {
+                            setEditingSessionId(sessionId);
+                            setEditingName(currentName);
+                          }}
+                          onStopEditing={() => {
+                            setEditingSessionId(null);
+                            setEditingName('');
+                          }}
+                          onRenameSession={(sessionId) => void handleRenameSession(sessionId)}
+                          onArchiveSession={(sessionId) => void handleArchiveSession(sessionId)}
+                          onUnarchiveSession={(sessionId) => void handleUnarchiveSession(sessionId)}
+                          onDeleteSession={handleDeleteSession}
+                          onSelectSession={handleSelectSession}
+                          onToggleSelection={toggleSessionSelection}
+                          getProjectName={getProjectName}
+                          getBadgeColor={getBadgeColor}
+                          getProject={getProject}
+                        />
+                      </SessionItemErrorBoundary>
+                    );
+                  }
 
-              const sessionIds = displayEntry.group.sessions.map((session) => session.id);
-              const selectedCount = sessionIds.reduce(
-                (count, sessionId) => count + (selectedSessionIds.has(sessionId) ? 1 : 0),
-                0
-              );
-              const allSessionsSelected =
-                sessionIds.length > 0 && selectedCount === sessionIds.length;
+                  const sessionIds = displayEntry.group.sessions.map((session) => session.id);
+                  const selectedCount = sessionIds.reduce(
+                    (count, sessionId) => count + (selectedSessionIds.has(sessionId) ? 1 : 0),
+                    0
+                  );
+                  const allSessionsSelected =
+                    sessionIds.length > 0 && selectedCount === sessionIds.length;
 
-              return (
-                <div
-                  key={`orchestrator-${displayEntry.group.runId}`}
-                  className="space-y-1.5 animate-in fade-in slide-in-from-bottom-1 duration-200"
-                >
-                  <OrchestratorRunHeader
-                    group={displayEntry.group}
-                    isExpanded={displayEntry.group.isExpanded}
-                    onToggle={() => handleGroupHeaderAction(displayEntry.group.runId, sessionIds)}
-                    runningSessions={runningSessions}
-                    currentSessionId={currentSessionId}
-                    isCurrentSessionThinking={isCurrentSessionThinking}
-                    sessionFontSize={sessionFontSize}
-                    isMultiselectMode={isMultiselectMode}
-                    selectedSessionCount={selectedCount}
-                    allSessionsSelected={allSessionsSelected}
-                  />
+                  return (
+                    <div
+                      key={`orchestrator-${displayEntry.group.runId}`}
+                      className="space-y-1 animate-in fade-in slide-in-from-bottom-1 duration-200"
+                    >
+                      <OrchestratorRunHeader
+                        group={displayEntry.group}
+                        isExpanded={displayEntry.group.isExpanded}
+                        onToggle={() =>
+                          handleGroupHeaderAction(displayEntry.group.runId, sessionIds)
+                        }
+                        runningSessions={runningSessions}
+                        currentSessionId={currentSessionId}
+                        isCurrentSessionThinking={isCurrentSessionThinking}
+                        sessionFontSize={sessionFontSize}
+                        isMultiselectMode={isMultiselectMode}
+                        selectedSessionCount={selectedCount}
+                        allSessionsSelected={allSessionsSelected}
+                      />
 
-                  <div
-                    className={cn(
-                      'ml-2 grid transition-[grid-template-rows,opacity,margin] duration-300 ease-out',
-                      displayEntry.group.isExpanded
-                        ? 'mt-1 grid-rows-[1fr] opacity-100'
-                        : 'mt-0 grid-rows-[0fr] opacity-0 pointer-events-none'
-                    )}
-                  >
-                    <div className="min-h-0 overflow-hidden">
-                      <div className="space-y-1.5 border-l border-dashed border-muted-foreground/30 pl-2">
-                        {displayEntry.group.sessions.map((session, index) => (
-                          <SessionItemErrorBoundary
-                            key={`boundary-${session.id}`}
-                            sessionId={session.id}
-                            sessionName={session.name}
-                          >
-                            <SessionListItemRow
-                              session={session}
-                              currentSessionId={currentSessionId}
-                              isCurrentSessionThinking={isCurrentSessionThinking}
-                              runningSessions={runningSessions}
-                              sessionFontSize={Math.max(10, sessionFontSize - 1)}
-                              isMultiselectMode={isMultiselectMode}
-                              isSelected={selectedSessionIds.has(session.id)}
-                              editingSessionId={editingSessionId}
-                              editingName={editingName}
-                              onEditingNameChange={setEditingName}
-                              onStartEditing={(sessionId, currentName) => {
-                                setEditingSessionId(sessionId);
-                                setEditingName(currentName);
-                              }}
-                              onStopEditing={() => {
-                                setEditingSessionId(null);
-                                setEditingName('');
-                              }}
-                              onRenameSession={(sessionId) => void handleRenameSession(sessionId)}
-                              onArchiveSession={(sessionId) => void handleArchiveSession(sessionId)}
-                              onUnarchiveSession={(sessionId) =>
-                                void handleUnarchiveSession(sessionId)
-                              }
-                              onDeleteSession={handleDeleteSession}
-                              onSelectSession={handleSelectSession}
-                              onToggleSelection={toggleSessionSelection}
-                              getProjectName={getProjectName}
-                              getBadgeColor={getBadgeColor}
-                              getProject={getProject}
-                              phaseIndex={index + 1}
-                            />
-                          </SessionItemErrorBoundary>
-                        ))}
+                      <div
+                        className={cn(
+                          'ml-2 grid transition-[grid-template-rows,opacity,margin] duration-300 ease-out',
+                          displayEntry.group.isExpanded
+                            ? 'mt-1 grid-rows-[1fr] opacity-100'
+                            : 'mt-0 grid-rows-[0fr] opacity-0 pointer-events-none'
+                        )}
+                      >
+                        <div className="min-h-0 overflow-hidden">
+                          <div className="space-y-1 border-l border-dashed border-muted-foreground/30 pl-2">
+                            {displayEntry.group.sessions.map((session, index) => (
+                              <SessionItemErrorBoundary
+                                key={`boundary-${session.id}`}
+                                sessionId={session.id}
+                                sessionName={session.name}
+                              >
+                                <SessionListItemRow
+                                  session={session}
+                                  currentSessionId={currentSessionId}
+                                  isCurrentSessionThinking={isCurrentSessionThinking}
+                                  runningSessions={runningSessions}
+                                  sessionFontSize={Math.max(10, sessionFontSize - 1)}
+                                  isMultiselectMode={isMultiselectMode}
+                                  isSelected={selectedSessionIds.has(session.id)}
+                                  editingSessionId={editingSessionId}
+                                  editingName={editingName}
+                                  onEditingNameChange={setEditingName}
+                                  onStartEditing={(sessionId, currentName) => {
+                                    setEditingSessionId(sessionId);
+                                    setEditingName(currentName);
+                                  }}
+                                  onStopEditing={() => {
+                                    setEditingSessionId(null);
+                                    setEditingName('');
+                                  }}
+                                  onRenameSession={(sessionId) =>
+                                    void handleRenameSession(sessionId)
+                                  }
+                                  onArchiveSession={(sessionId) =>
+                                    void handleArchiveSession(sessionId)
+                                  }
+                                  onUnarchiveSession={(sessionId) =>
+                                    void handleUnarchiveSession(sessionId)
+                                  }
+                                  onDeleteSession={handleDeleteSession}
+                                  onSelectSession={handleSelectSession}
+                                  onToggleSelection={toggleSessionSelection}
+                                  getProjectName={getProjectName}
+                                  getBadgeColor={getBadgeColor}
+                                  getProject={getProject}
+                                  phaseIndex={index + 1}
+                                />
+                              </SessionItemErrorBoundary>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                }}
+              />
+            ))}
 
-            {displayEntries.length === 0 && (
+            {projectGroups.length === 0 && (
               <div className="py-8 text-center text-muted-foreground">
-                <MessageSquare className="mx-auto mb-2 h-12 w-12 opacity-50" />
+                <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
                 {isFiltering ? (
                   <>
-                    <p className="text-sm">No matching sessions</p>
-                    <p className="text-xs">Try adjusting your search or filter</p>
+                    <p className="text-xs">Keine passenden Sessions</p>
+                    <p className="text-[10px]">Filter anpassen</p>
                   </>
                 ) : (
                   <>
-                    <p className="text-sm">
-                      {activeTab === 'active' ? 'No active sessions' : 'No archived sessions'}
-                    </p>
                     <p className="text-xs">
                       {activeTab === 'active'
-                        ? 'Create your first session to get started'
-                        : 'Archive sessions to see them here'}
+                        ? 'Keine aktiven Sessions'
+                        : 'Keine archivierten Sessions'}
+                    </p>
+                    <p className="text-[10px]">
+                      {activeTab === 'active'
+                        ? 'Erstelle eine neue Session'
+                        : 'Archiviere Sessions um sie hier zu sehen'}
                     </p>
                   </>
                 )}
@@ -723,6 +818,13 @@ export function SessionManager({
             onOpenChange={setIsDeleteAllArchivedDialogOpen}
             archivedCount={archivedSessions.length}
             onConfirm={handleDeleteAllArchivedSessions}
+          />
+
+          <DeleteOldSessionsDialog
+            open={isDeleteOldSessionsDialogOpen}
+            onOpenChange={setIsDeleteOldSessionsDialogOpen}
+            totalSessionCount={sessions.length}
+            onConfirm={handleDeleteOldSessions}
           />
         </>
       )}

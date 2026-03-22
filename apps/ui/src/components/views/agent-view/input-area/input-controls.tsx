@@ -57,6 +57,8 @@ interface InputControlsProps {
   accentColor?: string;
   /** Called when the textarea height changes (e.g. during speech input) so the parent can scroll the message list */
   onInputHeightChange?: () => void;
+  /** Callback to create a new session */
+  onNewSession?: () => void;
 }
 
 /**
@@ -92,6 +94,7 @@ export function InputControls({
   inputRef: externalInputRef,
   accentColor,
   onInputHeightChange,
+  onNewSession,
 }: InputControlsProps) {
   const internalInputRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = externalInputRef || internalInputRef;
@@ -450,6 +453,20 @@ export function InputControls({
       {/* Controls row - compact single line (scrolls on small widths) */}
       <div className="overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex min-w-max items-center gap-1 whitespace-nowrap">
+          {/* New Session Button */}
+          {onNewSession && (
+            <Button
+              onClick={onNewSession}
+              disabled={!isConnected}
+              className="h-7 w-7 shrink-0 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm shadow-emerald-600/25 hover:shadow-emerald-500/30 transition-all duration-200"
+              size="icon"
+              data-testid="new-session-input"
+              title="New Session"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </Button>
+          )}
+
           {/* Model Selector */}
           <div className="shrink-0">
             <AgentModelSelector

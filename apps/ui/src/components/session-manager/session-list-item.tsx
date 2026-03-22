@@ -1,13 +1,18 @@
+import { useCallback, useState } from 'react';
 import {
   AlertCircle,
   Archive,
   ArchiveRestore,
   Check,
   CheckCircle2,
+  ChevronDown,
+  Copy,
   Edit2,
-  Info,
+  FileCode2,
+  FileText,
   MessageSquare,
   StopCircle,
+  Timer,
   Trash2,
   X,
 } from 'lucide-react';
@@ -16,6 +21,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { ProjectBadge } from '@/components/project-badge';
+import { useElapsedTime } from '@/hooks/use-elapsed-time';
+import { useSessionFiles } from '@/hooks/use-session-files';
+import { buildSessionFilesCopyText } from '@/lib/extract-session-files';
 import { cn } from '@/lib/utils';
 import type { Project } from '@/lib/electron';
 import type { SessionListItem } from '@/types/electron';
@@ -89,10 +97,46 @@ export function SessionListItemRow({
   const wasStopped = session.status === 'stopped' && !isRunning;
   const isDirty = session.isDirty && !isRunning && !hasFailed && !wasStopped;
 
+  const elapsedTime = useElapsedTime(session.totalElapsedMs, session.lastStartedAt, isRunning);
+  const hasElapsedTime = (session.totalElapsedMs && session.totalElapsedMs > 0) || isRunning;
+
   const project = getProject(session.projectPath);
   const sessionBadgeColor = getBadgeColor(session.projectPath);
   const isEditing = editingSessionId === session.id;
   const isPhaseItem = typeof phaseIndex === 'number';
+
+  // File extraction for completed (dirty) sessions
+  const [filesExpanded, setFilesExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const { files: sessionFiles } = useSessionFiles(
+    session.id,
+    !!isDirty && (filesExpanded || copied)
+  );
+
+  const handleCopyFiles = useCallback(
+    async (event: React.MouseEvent) => {
+      event.stopPropagation();
+      if (!sessionFiles) return;
+      const text = buildSessionFilesCopyText(
+        session.name || 'Unbenannte Session',
+        session.description,
+        sessionFiles
+      );
+      try {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        // clipboard not available
+      }
+    },
+    [session.name, session.description, sessionFiles]
+  );
+
+  const handleToggleExpand = useCallback((event: React.MouseEvent) => {
+    event.stopPropagation();
+    setFilesExpanded((v) => !v);
+  }, []);
 
   return (
     <div
@@ -277,41 +321,41 @@ export function SessionListItemRow({
                     Fehler
                   </span>
                 )}
+
+                {hasElapsedTime && (
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-mono tabular-nums',
+                      isRunning ? 'bg-red-500/10 text-red-500' : 'bg-muted text-muted-foreground'
+                    )}
+                    style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
+                    title="Elapsed time"
+                  >
+                    <Timer
+                      className="shrink-0"
+                      style={{
+                        width: `${Math.max(8, sessionFontSize - 5)}px`,
+                        height: `${Math.max(8, sessionFontSize - 5)}px`,
+                      }}
+                    />
+                    {elapsedTime}
+                  </span>
+                )}
               </div>
 
               {session.description && (
-                <div
+                <p
                   className={cn(
-                    'mt-1 rounded-md border border-muted-foreground/25 bg-muted/35 px-2 py-1.5',
-                    'transition-colors duration-200',
+                    'mt-0.5 overflow-hidden whitespace-pre-line text-muted-foreground',
+                    'transition-colors duration-300 ease-out',
                     isCurrentSession
-                      ? 'bg-muted/45'
-                      : 'group-hover:border-muted-foreground/35 group-hover:bg-muted/45'
+                      ? 'line-clamp-none text-foreground/70'
+                      : 'line-clamp-2 group-hover:line-clamp-4 group-hover:text-foreground/60'
                   )}
+                  style={{ fontSize: `${Math.max(10, sessionFontSize - 2)}px` }}
                 >
-                  <div className="flex items-start gap-1.5">
-                    <Info
-                      className="mt-0.5 shrink-0 text-muted-foreground"
-                      style={{
-                        width: `${Math.max(10, sessionFontSize - 3)}px`,
-                        height: `${Math.max(10, sessionFontSize - 3)}px`,
-                      }}
-                      aria-hidden
-                    />
-                    <p
-                      className={cn(
-                        'overflow-hidden whitespace-pre-line italic text-foreground/85',
-                        'transition-colors duration-300 ease-out',
-                        isCurrentSession
-                          ? 'line-clamp-none text-foreground'
-                          : 'line-clamp-2 group-hover:line-clamp-4 group-hover:text-foreground/95'
-                      )}
-                      style={{ fontSize: `${Math.max(10, sessionFontSize - 2)}px` }}
-                    >
-                      {session.description}
-                    </p>
-                  </div>
-                </div>
+                  {session.description}
+                </p>
               )}
 
               {!session.description && session.preview && (
@@ -429,6 +473,79 @@ export function SessionListItemRow({
                 }}
               />
             </Button>
+
+            {/* Copy & Expand buttons for completed sessions */}
+            {isDirty && (
+              <>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={(e) => {
+                    // Trigger lazy load by briefly setting copied, then actually copy
+                    if (!sessionFiles) {
+                      setCopied(true);
+                      // Will re-render, load files, then user clicks again
+                      setTimeout(() => setCopied(false), 200);
+                      return;
+                    }
+                    void handleCopyFiles(e);
+                  }}
+                  className={cn(
+                    'p-0 transition-transform duration-200 hover:scale-105',
+                    copied ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'
+                  )}
+                  style={{
+                    width: `${sessionFontSize + 6}px`,
+                    height: `${sessionFontSize + 6}px`,
+                  }}
+                  title="Session-Dateien kopieren"
+                >
+                  {copied ? (
+                    <Check
+                      style={{
+                        width: `${sessionFontSize - 2}px`,
+                        height: `${sessionFontSize - 2}px`,
+                      }}
+                    />
+                  ) : (
+                    <Copy
+                      style={{
+                        width: `${sessionFontSize - 2}px`,
+                        height: `${sessionFontSize - 2}px`,
+                      }}
+                    />
+                  )}
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleToggleExpand}
+                  className={cn(
+                    'p-0 transition-all duration-200 hover:scale-105',
+                    filesExpanded
+                      ? 'text-emerald-500'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                  style={{
+                    width: `${sessionFontSize + 6}px`,
+                    height: `${sessionFontSize + 6}px`,
+                  }}
+                  title={filesExpanded ? 'Dateien einklappen' : 'Dateien anzeigen'}
+                >
+                  <ChevronDown
+                    className={cn(
+                      'transition-transform duration-200',
+                      filesExpanded && 'rotate-180'
+                    )}
+                    style={{
+                      width: `${sessionFontSize - 2}px`,
+                      height: `${sessionFontSize - 2}px`,
+                    }}
+                  />
+                </Button>
+              </>
+            )}
           </div>
         )}
 
@@ -478,6 +595,163 @@ export function SessionListItemRow({
           </div>
         )}
       </div>
+
+      {/* Expandable file detail panel for completed sessions */}
+      {isDirty && filesExpanded && (
+        <div
+          className="mt-2 animate-in fade-in slide-in-from-top-1 duration-200"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-2">
+            {!sessionFiles ? (
+              <div
+                className="flex items-center gap-2 text-muted-foreground"
+                style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
+              >
+                <Spinner size="sm" className="text-emerald-500" />
+                <span>Dateien werden geladen...</span>
+              </div>
+            ) : sessionFiles.totalCount === 0 ? (
+              <p
+                className="text-muted-foreground italic"
+                style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
+              >
+                Keine Dateipfade in dieser Session erkannt.
+              </p>
+            ) : (
+              <>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span
+                    className="font-medium text-emerald-600 dark:text-emerald-400"
+                    style={{ fontSize: `${Math.max(9, sessionFontSize - 3)}px` }}
+                  >
+                    {sessionFiles.totalCount} Dateien referenziert
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-5 px-1.5 text-muted-foreground hover:text-foreground"
+                    onClick={(e) => void handleCopyFiles(e)}
+                    title="Alle Dateien kopieren"
+                  >
+                    {copied ? (
+                      <Check className="mr-1 h-3 w-3 text-emerald-500" />
+                    ) : (
+                      <Copy className="mr-1 h-3 w-3" />
+                    )}
+                    <span style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}>
+                      Kopieren
+                    </span>
+                  </Button>
+                </div>
+
+                {/* File categories */}
+                <div className="space-y-1.5">
+                  {sessionFiles.mdFiles.length > 0 && (
+                    <FileCategory
+                      label="Dokumentation"
+                      files={sessionFiles.mdFiles}
+                      icon={<FileText className="h-3 w-3 text-blue-400" />}
+                      fontSize={sessionFontSize}
+                    />
+                  )}
+                  {sessionFiles.tsFiles.length > 0 && (
+                    <FileCategory
+                      label="TypeScript"
+                      files={sessionFiles.tsFiles}
+                      icon={<FileCode2 className="h-3 w-3 text-blue-500" />}
+                      fontSize={sessionFontSize}
+                    />
+                  )}
+                  {sessionFiles.jsFiles.length > 0 && (
+                    <FileCategory
+                      label="JavaScript"
+                      files={sessionFiles.jsFiles}
+                      icon={<FileCode2 className="h-3 w-3 text-yellow-500" />}
+                      fontSize={sessionFontSize}
+                    />
+                  )}
+                  {sessionFiles.configFiles.length > 0 && (
+                    <FileCategory
+                      label="Konfiguration"
+                      files={sessionFiles.configFiles}
+                      icon={<FileText className="h-3 w-3 text-orange-400" />}
+                      fontSize={sessionFontSize}
+                    />
+                  )}
+                  {sessionFiles.styleFiles.length > 0 && (
+                    <FileCategory
+                      label="Styles"
+                      files={sessionFiles.styleFiles}
+                      icon={<FileText className="h-3 w-3 text-pink-400" />}
+                      fontSize={sessionFontSize}
+                    />
+                  )}
+                  {sessionFiles.otherFiles.length > 0 && (
+                    <FileCategory
+                      label="Sonstige"
+                      files={sessionFiles.otherFiles}
+                      icon={<FileText className="h-3 w-3 text-muted-foreground" />}
+                      fontSize={sessionFontSize}
+                    />
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sub-component: FileCategory
+// ---------------------------------------------------------------------------
+
+function FileCategory({
+  label,
+  files,
+  icon,
+  fontSize,
+}: {
+  label: string;
+  files: string[];
+  icon: React.ReactNode;
+  fontSize: number;
+}) {
+  return (
+    <div>
+      <div
+        className="mb-0.5 flex items-center gap-1 font-medium text-muted-foreground"
+        style={{ fontSize: `${Math.max(9, fontSize - 4)}px` }}
+      >
+        {icon}
+        <span>{label}</span>
+        <span className="text-muted-foreground/60">({files.length})</span>
+      </div>
+      <ul className="space-y-0">
+        {files.map((file) => (
+          <li key={file} className="group/file flex items-center gap-1 pl-4">
+            <span
+              className="min-w-0 flex-1 truncate font-mono text-muted-foreground"
+              style={{ fontSize: `${Math.max(9, fontSize - 4)}px` }}
+              title={file}
+            >
+              {file}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-4 w-4 shrink-0 p-0 text-muted-foreground opacity-0 transition-opacity group-hover/file:opacity-100 hover:text-foreground"
+              onClick={() => void navigator.clipboard.writeText(file)}
+              title="Pfad kopieren"
+            >
+              <Copy className="h-2.5 w-2.5" />
+            </Button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

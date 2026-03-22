@@ -2,9 +2,11 @@ import { memo } from 'react';
 import type { ImageAttachment } from '@/store/app-store';
 import type { ToolUse } from '@/types/electron';
 import type { ChatDisplaySettings } from '@/store/types/ui-types';
+import type { ActiveSubAgent } from '@/hooks/use-electron-agent';
 import { MessageBubble } from './message-bubble';
 import { ThinkingIndicator } from './thinking-indicator';
 import { ToolCallGroup } from './tool-call-group';
+import { SubAgentIndicator } from '../sub-agent-indicator';
 
 interface Message {
   id: string;
@@ -18,18 +20,24 @@ interface Message {
 interface MessageListProps {
   messages: Message[];
   isProcessing: boolean;
+  activeSubAgents?: ActiveSubAgent[];
   messagesContainerRef: React.RefObject<HTMLDivElement | null>;
   onScroll: () => void;
   chatBackgroundColor?: string;
+  chatBubbleColor?: string;
+  userBubbleColor?: string;
   chatDisplaySettings: ChatDisplaySettings;
 }
 
 export const MessageList = memo(function MessageList({
   messages,
   isProcessing,
+  activeSubAgents,
   messagesContainerRef,
   onScroll,
   chatBackgroundColor,
+  chatBubbleColor,
+  userBubbleColor,
   chatDisplaySettings,
 }: MessageListProps) {
   const mutedChatBackground = chatBackgroundColor
@@ -39,7 +47,7 @@ export const MessageList = memo(function MessageList({
   return (
     <div
       ref={messagesContainerRef}
-      className="flex-1 overflow-y-auto px-6 py-6 space-y-6"
+      className="flex-1 overflow-y-auto px-2 py-4 space-y-4"
       data-testid="message-list"
       onScroll={onScroll}
       style={{ backgroundColor: mutedChatBackground }}
@@ -55,9 +63,19 @@ export const MessageList = memo(function MessageList({
               <ToolCallGroup toolCalls={message.toolCalls} />
             </div>
           )}
-          <MessageBubble message={message} chatDisplaySettings={chatDisplaySettings} />
+          <MessageBubble
+            message={message}
+            chatDisplaySettings={chatDisplaySettings}
+            chatBubbleColor={chatBubbleColor}
+            userBubbleColor={userBubbleColor}
+          />
         </div>
       ))}
+
+      {/* Sub-Agent Activity Indicator */}
+      {activeSubAgents && activeSubAgents.length > 0 && (
+        <SubAgentIndicator activeSubAgents={activeSubAgents} />
+      )}
 
       {/* Thinking Indicator */}
       {isProcessing && <ThinkingIndicator />}

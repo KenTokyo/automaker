@@ -11,22 +11,22 @@ interface SessionSearchInputProps {
 export function SessionSearchInput({ value, onChange, onClear }: SessionSearchInputProps) {
   return (
     <Input
-      placeholder="Search chats..."
+      placeholder="Search..."
       value={value}
       onChange={(e) => onChange(e.target.value)}
       aria-label="Search chats"
-      className="h-8 text-xs"
-      startAddon={<Search className="w-3.5 h-3.5" />}
+      className="h-6 text-[10px]"
+      startAddon={<Search className="w-2.5 h-2.5" />}
       endAddon={
         value ? (
           <Button
             variant="ghost"
             size="sm"
-            className="h-5 w-5 p-0 hover:bg-transparent"
+            className="h-4 w-4 p-0 hover:bg-transparent"
             onClick={onClear}
             aria-label="Clear search"
           >
-            <X className="w-3 h-3" />
+            <X className="w-2.5 h-2.5" />
           </Button>
         ) : undefined
       }

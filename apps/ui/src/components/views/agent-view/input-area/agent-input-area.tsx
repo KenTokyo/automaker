@@ -52,6 +52,8 @@ interface AgentInputAreaProps {
   accentColor?: string;
   /** Called when the textarea height changes (e.g. during speech input) so the parent can scroll the message list */
   onInputHeightChange?: () => void;
+  /** Callback to create a new session */
+  onNewSession?: () => void;
 }
 
 export function AgentInputArea({
@@ -85,6 +87,7 @@ export function AgentInputArea({
   inputRef,
   accentColor,
   onInputHeightChange,
+  onNewSession,
 }: AgentInputAreaProps) {
   const hasFiles = selectedImages.length > 0 || selectedTextFiles.length > 0;
 
@@ -147,6 +150,7 @@ export function AgentInputArea({
         inputRef={inputRef}
         accentColor={accentColor}
         onInputHeightChange={onInputHeightChange}
+        onNewSession={onNewSession}
       />
     </div>
   );

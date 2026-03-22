@@ -590,7 +590,10 @@ type EventType =
   | 'test-runner:completed'
   | 'notification:created'
   | 'completed-task:created'
-  | 'completed-task:deleted';
+  | 'completed-task:deleted'
+  | 'task:created'
+  | 'task:updated'
+  | 'task:deleted';
 
 /**
  * Dev server log event payloads for WebSocket streaming
@@ -936,6 +939,18 @@ export class HttpApiClient implements ElectronAPI {
 
   onCompletedTaskDeleted(callback: (payload: unknown) => void): () => void {
     return this.subscribeToEvent('completed-task:deleted', callback as EventCallback);
+  }
+
+  onTaskCreated(callback: (payload: unknown) => void): () => void {
+    return this.subscribeToEvent('task:created', callback as EventCallback);
+  }
+
+  onTaskUpdated(callback: (payload: unknown) => void): () => void {
+    return this.subscribeToEvent('task:updated', callback as EventCallback);
+  }
+
+  onTaskDeleted(callback: (payload: unknown) => void): () => void {
+    return this.subscribeToEvent('task:deleted', callback as EventCallback);
   }
 
   private getHeaders(): Record<string, string> {

@@ -87,7 +87,7 @@ export const RIGHT_PANEL_FONT_SIZE_DEFAULT = 13;
 export const RIGHT_PANEL_SPLIT_SIZE_DEFAULT = 50;
 
 /** Which content the left panel shows in Agent View */
-export type LeftPanelTab = 'sessions' | 'docs' | 'overview' | 'completed';
+export type LeftPanelTab = 'sessions' | 'docs' | 'overview' | 'completed' | 'tasks';
 
 // Keyboard Shortcut with optional modifiers
 export interface ShortcutKey {
@@ -104,6 +104,7 @@ export interface ChatDisplaySettings {
   fontOpacity: number; // 0.5-1.0
   lineHeight: number; // 1.2-2.0
   codeBlockRelativeSize: number; // offset in px relative to fontSize
+  fontColorGray: number; // 400-900 gray shade (400=lighter, 900=darker)
 }
 
 export type ChatDisplayPresetName = 'standard' | 'gedaempft' | 'kraeftig' | 'kompakt' | 'gross';
@@ -118,8 +119,9 @@ export const DEFAULT_CHAT_DISPLAY_SETTINGS: ChatDisplaySettings = {
   fontSize: 14,
   fontWeight: 400,
   fontOpacity: 1.0,
-  lineHeight: 1.6,
+  lineHeight: 1.5,
   codeBlockRelativeSize: 0,
+  fontColorGray: 900,
 };
 
 export const CHAT_DISPLAY_PRESETS: ChatDisplayPreset[] = [
@@ -130,8 +132,9 @@ export const CHAT_DISPLAY_PRESETS: ChatDisplayPreset[] = [
       fontSize: 14,
       fontWeight: 400,
       fontOpacity: 1.0,
-      lineHeight: 1.6,
+      lineHeight: 1.5,
       codeBlockRelativeSize: 0,
+      fontColorGray: 900,
     },
   },
   {
@@ -141,8 +144,9 @@ export const CHAT_DISPLAY_PRESETS: ChatDisplayPreset[] = [
       fontSize: 13,
       fontWeight: 400,
       fontOpacity: 0.8,
-      lineHeight: 1.6,
+      lineHeight: 1.5,
       codeBlockRelativeSize: 0,
+      fontColorGray: 600,
     },
   },
   {
@@ -152,8 +156,9 @@ export const CHAT_DISPLAY_PRESETS: ChatDisplayPreset[] = [
       fontSize: 14,
       fontWeight: 500,
       fontOpacity: 1.0,
-      lineHeight: 1.5,
+      lineHeight: 1.45,
       codeBlockRelativeSize: 0,
+      fontColorGray: 900,
     },
   },
   {
@@ -163,8 +168,9 @@ export const CHAT_DISPLAY_PRESETS: ChatDisplayPreset[] = [
       fontSize: 12,
       fontWeight: 400,
       fontOpacity: 0.9,
-      lineHeight: 1.4,
+      lineHeight: 1.35,
       codeBlockRelativeSize: 0,
+      fontColorGray: 800,
     },
   },
   {
@@ -174,8 +180,9 @@ export const CHAT_DISPLAY_PRESETS: ChatDisplayPreset[] = [
       fontSize: 16,
       fontWeight: 400,
       fontOpacity: 1.0,
-      lineHeight: 1.8,
+      lineHeight: 1.65,
       codeBlockRelativeSize: 0,
+      fontColorGray: 900,
     },
   },
 ];

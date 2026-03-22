@@ -3,6 +3,9 @@
  *
  * Fetches completed tasks from the server API and listens for
  * real-time WebSocket updates (created/deleted events).
+ *
+ * Supports multi-project mode: pass `allProjects` to fetch
+ * completed tasks from ALL registered projects simultaneously.
  */
 
 import { useCallback, useEffect, useRef } from 'react';
@@ -10,6 +13,11 @@ import type { CompletedTask, CompletedTaskFilter } from '@automaker/types';
 import { apiFetch } from '@/lib/api-fetch';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { useAppStore } from '@/store/app-store';
+
+interface ProjectInfo {
+  path: string;
+  name: string;
+}
 
 /**
  * Build query string from filter options
@@ -32,10 +40,15 @@ function buildFilterQuery(filter?: CompletedTaskFilter): string {
  * Main hook for loading and managing completed tasks.
  *
  * - Fetches tasks on mount and when `projectPath` or `filter` changes
+ * - When `allProjects` is provided, fetches from all projects at once
  * - Subscribes to WebSocket events for real-time updates
  * - Updates the Zustand store with results
  */
-export function useCompletedTasks(projectPath: string | null, filter?: CompletedTaskFilter) {
+export function useCompletedTasks(
+  projectPath: string | null,
+  filter?: CompletedTaskFilter,
+  allProjects?: ProjectInfo[]
+) {
   const setCompletedTasks = useAppStore((s) => s.setCompletedTasks);
   const setLoading = useAppStore((s) => s.setCompletedTasksLoading);
   const setError = useAppStore((s) => s.setCompletedTasksError);
@@ -44,8 +57,17 @@ export function useCompletedTasks(projectPath: string | null, filter?: Completed
 
   const abortRef = useRef<AbortController | null>(null);
 
+  // Serialize allProjects for dependency tracking (avoid re-fetching on referential changes)
+  const projectsKey = allProjects
+    ? allProjects
+        .map((p) => p.path)
+        .sort()
+        .join('|')
+    : '';
+
   const fetchTasks = useCallback(async () => {
-    if (!projectPath) {
+    const hasMulti = allProjects && allProjects.length > 0;
+    if (!projectPath && !hasMulti) {
       setCompletedTasks([]);
       return;
     }
@@ -60,11 +82,21 @@ export function useCompletedTasks(projectPath: string | null, filter?: Completed
 
     try {
       const query = buildFilterQuery(filter);
-      const response = await apiFetch(
-        `/api/completed-tasks${query}${query ? '&' : '?'}projectPath=${encodeURIComponent(projectPath)}`,
-        'GET',
-        { signal: controller.signal }
-      );
+      let url: string;
+
+      if (hasMulti) {
+        // Multi-project mode
+        const pathsParam = allProjects!.map((p) => encodeURIComponent(p.path)).join('|');
+        const namesParam = allProjects!.map((p) => encodeURIComponent(p.name)).join('|');
+        const separator = query ? '&' : '?';
+        url = `/api/completed-tasks${query}${separator}projectPaths=${pathsParam}&projectNames=${namesParam}`;
+      } else {
+        // Single project mode (backward compatible)
+        const separator = query ? '&' : '?';
+        url = `/api/completed-tasks${query}${separator}projectPath=${encodeURIComponent(projectPath!)}`;
+      }
+
+      const response = await apiFetch(url, 'GET', { signal: controller.signal });
 
       if (!response.ok) {
         throw new Error(`Server error: ${response.status}`);
@@ -83,7 +115,8 @@ export function useCompletedTasks(projectPath: string | null, filter?: Completed
         setLoading(false);
       }
     }
-  }, [projectPath, filter, setCompletedTasks, setLoading, setError]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectPath, projectsKey, filter, setCompletedTasks, setLoading, setError]);
 
   // Fetch on mount / when deps change
   useEffect(() => {
@@ -98,17 +131,19 @@ export function useCompletedTasks(projectPath: string | null, filter?: Completed
     const client = getHttpApiClient();
     const unsubCreated = client.onCompletedTaskCreated((payload) => {
       const task = payload as CompletedTask;
-      // The new model no longer has projectPath on the task itself,
-      // so we accept all WS events when they arrive (server already scopes by project)
       if (task) {
         addCompletedTask(task);
       }
     });
     const unsubDeleted = client.onCompletedTaskDeleted((payload) => {
       const data = payload as { taskId: string; projectPath: string };
-      if (data && data.projectPath === projectPath) {
-        // taskId is now the filename
-        removeCompletedTask(data.taskId);
+      if (data) {
+        // In multi-project mode accept all delete events,
+        // in single-project mode check projectPath match
+        const hasMulti = allProjects && allProjects.length > 0;
+        if (hasMulti || data.projectPath === projectPath) {
+          removeCompletedTask(data.taskId);
+        }
       }
     });
 
@@ -116,7 +151,8 @@ export function useCompletedTasks(projectPath: string | null, filter?: Completed
       unsubCreated();
       unsubDeleted();
     };
-  }, [projectPath, addCompletedTask, removeCompletedTask]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectPath, projectsKey, addCompletedTask, removeCompletedTask]);
 
   return { refetch: fetchTasks };
 }

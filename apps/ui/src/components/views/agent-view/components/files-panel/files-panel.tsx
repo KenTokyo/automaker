@@ -43,6 +43,25 @@ import { FilesPanelTerminalSplit } from './files-panel-terminal-split';
 
 const logger = createLogger('FilesPanel');
 const EMPTY_FAVORITES: string[] = [];
+const EXPLORER_LOAD_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        window.clearTimeout(timeoutId);
+        resolve(value);
+      })
+      .catch((error: unknown) => {
+        window.clearTimeout(timeoutId);
+        reject(error);
+      });
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -111,7 +130,11 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
 
     try {
       const api = getHttpApiClient();
-      const result = await api.explorerFilesByTime(path, 0, 1000);
+      const result = await withTimeout(
+        api.explorerFilesByTime(path, 0, 5000),
+        EXPLORER_LOAD_TIMEOUT_MS,
+        'Markdown Explorer loading timeout'
+      );
 
       if (result.success && result.files) {
         store.setAllFiles(result.files, path);
@@ -547,7 +570,7 @@ function FilesFooter({
           className="hover:text-foreground transition-colors underline"
           onClick={() => useExplorerStore.getState().selectFile(null)}
         >
-          &#8592; Zurueck zur Liste
+          &#8592; Zurück zur Liste
         </button>
       ) : isFiltered ? (
         `${filteredFileCount} von ${totalFileCount} Dateien`

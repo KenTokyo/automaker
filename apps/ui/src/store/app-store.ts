@@ -551,6 +551,8 @@ const initialState: AppState = {
   editorTheme: JSON.parse(getItem('automaker:editorTheme') || 'null') || DEFAULT_EDITOR_THEME,
   // Session History Limit
   maxSessionsPerProject: parseInt(getItem('automaker:maxSessionsPerProject') || '15', 10),
+  // Skip clear chat confirmation dialog
+  skipClearChatConfirm: getItem('automaker:skipClearChatConfirm') === 'true',
   // Session Panel Font Size
   sessionFontSize: parseInt(getItem('automaker:sessionFontSize') || '14', 10),
   // Docs Auto-Save
@@ -577,6 +579,14 @@ const initialState: AppState = {
   completedTasksSortField: 'date',
   completedTasksSortOrder: 'desc',
   completedTasksAutoCapture: false,
+
+  // Tasks (Tasks Tab)
+  tasks: [],
+  tasksLoading: false,
+  tasksError: null,
+  tasksFilter: {},
+  tasksSortField: 'date',
+  tasksSortOrder: 'desc',
 };
 
 export const useAppStore = create<AppState & AppActions>()((set, get) => ({
@@ -918,6 +928,48 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
           ? {
               ...state.currentProject,
               chatBackgroundColor: chatBackgroundColor === null ? undefined : chatBackgroundColor,
+            }
+          : state.currentProject,
+    }));
+    saveProjects(get().projects);
+  },
+
+  setProjectChatBubbleColor: (projectId, chatBubbleColor) => {
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              chatBubbleColor: chatBubbleColor === null ? undefined : chatBubbleColor,
+            }
+          : p
+      ),
+      currentProject:
+        state.currentProject?.id === projectId
+          ? {
+              ...state.currentProject,
+              chatBubbleColor: chatBubbleColor === null ? undefined : chatBubbleColor,
+            }
+          : state.currentProject,
+    }));
+    saveProjects(get().projects);
+  },
+
+  setProjectUserBubbleColor: (projectId, userBubbleColor) => {
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              userBubbleColor: userBubbleColor === null ? undefined : userBubbleColor,
+            }
+          : p
+      ),
+      currentProject:
+        state.currentProject?.id === projectId
+          ? {
+              ...state.currentProject,
+              userBubbleColor: userBubbleColor === null ? undefined : userBubbleColor,
             }
           : state.currentProject,
     }));
@@ -3026,6 +3078,12 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     setItem('automaker:maxSessionsPerProject', String(clamped));
   },
 
+  // Clear chat confirmation actions
+  setSkipClearChatConfirm: (skip) => {
+    set({ skipClearChatConfirm: skip });
+    setItem('automaker:skipClearChatConfirm', String(skip));
+  },
+
   // Session Panel Font Size actions
   setSessionFontSize: (size) => {
     const clamped = Math.max(10, Math.min(18, size));
@@ -3213,6 +3271,23 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   setCompletedTasksSortField: (field) => set({ completedTasksSortField: field }),
   setCompletedTasksSortOrder: (order) => set({ completedTasksSortOrder: order }),
   setCompletedTasksAutoCapture: (enabled) => set({ completedTasksAutoCapture: enabled }),
+
+  // Tasks actions (Tasks Tab)
+  setTasks: (tasks) => set({ tasks }),
+  addTask: (task) => set((state) => ({ tasks: [task, ...state.tasks] })),
+  updateTaskInStore: (filename, updates) =>
+    set((state) => ({
+      tasks: state.tasks.map((t) => (t.filename === filename ? { ...t, ...updates } : t)),
+    })),
+  removeTask: (filename) =>
+    set((state) => ({
+      tasks: state.tasks.filter((t) => t.filename !== filename),
+    })),
+  setTasksLoading: (loading) => set({ tasksLoading: loading }),
+  setTasksError: (error) => set({ tasksError: error }),
+  setTasksFilter: (filter) => set({ tasksFilter: filter }),
+  setTasksSortField: (field) => set({ tasksSortField: field }),
+  setTasksSortOrder: (order) => set({ tasksSortOrder: order }),
 
   // Reset
   reset: () => set(initialState),

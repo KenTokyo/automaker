@@ -1,12 +1,25 @@
 /**
  * CompletedTasksPanel - Left sidebar panel for the "Fertig" (Done) tab.
  *
- * Full card layout with search, tag/status/effort filters,
+ * Full card layout with project filter, search, tag/status/effort filters,
  * and sorting by date, title, or effort.
+ *
+ * Default: "Alle Projekte" mode — loads completed tasks from ALL
+ * registered projects simultaneously so tasks are always visible
+ * regardless of which project is currently active.
  */
 
 import { useCallback, useMemo, useState } from 'react';
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw, SearchX } from 'lucide-react';
+import {
+  AArrowDown,
+  AArrowUp,
+  AlertCircle,
+  CheckCircle2,
+  FolderOpen,
+  Loader2,
+  RefreshCw,
+  SearchX,
+} from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import type {
   CompletedTask,
@@ -18,6 +31,7 @@ import type {
 import { useAppStore } from '@/store/app-store';
 import { useCompletedTasks, deleteCompletedTask } from '@/hooks/use-completed-tasks';
 import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { CompletedTaskCard } from './completed-task-card';
 import { CompletedTasksSearch } from './completed-tasks-search';
@@ -64,9 +78,15 @@ function filterTasksLocal(
   search: string | undefined,
   tags: string[] | undefined,
   status: CompletedTaskStatus[] | undefined,
-  effort: CompletedTaskEffort[] | undefined
+  effort: CompletedTaskEffort[] | undefined,
+  projectFilter: string | null
 ): CompletedTask[] {
   let result = tasks;
+
+  // Project filter (client-side, applied to multi-project results)
+  if (projectFilter) {
+    result = result.filter((t) => t.projectPath === projectFilter);
+  }
 
   if (tags && tags.length > 0) {
     result = result.filter((t) => t.tags.some((tag) => tags.includes(tag)));
@@ -94,6 +114,12 @@ function filterTasksLocal(
 }
 
 // ---------------------------------------------------------------------------
+// Project filter constants
+// ---------------------------------------------------------------------------
+
+const ALL_PROJECTS_VALUE = '__all__';
+
+// ---------------------------------------------------------------------------
 // Main panel
 // ---------------------------------------------------------------------------
 
@@ -113,14 +139,41 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
     }))
   );
 
+  const projects = useAppStore((s) => s.projects);
   const setFilter = useAppStore((s) => s.setCompletedTasksFilter);
   const setSortField = useAppStore((s) => s.setCompletedTasksSortField);
   const setSortOrder = useAppStore((s) => s.setCompletedTasksSortOrder);
   const removeFromStore = useAppStore((s) => s.removeCompletedTask);
+  const sessionFontSize = useAppStore((s) => s.sessionFontSize);
+  const setSessionFontSize = useAppStore((s) => s.setSessionFontSize);
 
   const [historyFile, setHistoryFile] = useState<string | null>(null);
+  // Project filter: null = all projects
+  const [projectFilter, setProjectFilter] = useState<string | null>(null);
 
-  const { refetch } = useCompletedTasks(projectPath);
+  // Build allProjects list for the hook (always fetch from all)
+  const allProjects = useMemo(
+    () => projects.map((p) => ({ path: p.path, name: p.name })),
+    [projects]
+  );
+
+  // Always use multi-project mode — pass null as projectPath when we have projects
+  const { refetch } = useCompletedTasks(
+    allProjects.length > 0 ? null : projectPath,
+    undefined,
+    allProjects.length > 0 ? allProjects : undefined
+  );
+
+  // Extract unique project names from loaded tasks for the filter dropdown
+  const projectsInTasks = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of tasks) {
+      if (t.projectPath && t.projectName) {
+        map.set(t.projectPath, t.projectName);
+      }
+    }
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1], 'de'));
+  }, [tasks]);
 
   // Apply local filtering + sorting
   const filteredTasks = useMemo(() => {
@@ -129,16 +182,18 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
       filter.search,
       filter.tags,
       filter.status,
-      filter.effort
+      filter.effort,
+      projectFilter
     );
     return sortTasks(filtered, sortField, sortOrder);
-  }, [tasks, filter, sortField, sortOrder]);
+  }, [tasks, filter, sortField, sortOrder, projectFilter]);
 
   const hasActiveFilters = !!(
     filter.search ||
     filter.tags?.length ||
     filter.status?.length ||
-    filter.effort?.length
+    filter.effort?.length ||
+    projectFilter
   );
 
   // Stats summary for footer
@@ -172,16 +227,20 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
 
   const handleDelete = useCallback(
     async (filename: string) => {
-      const success = await deleteCompletedTask(filename, projectPath);
+      // In multi-project mode, find the task to get its projectPath
+      const task = tasks.find((t) => t.filename === filename);
+      const deletePath = task?.projectPath || projectPath;
+      const success = await deleteCompletedTask(filename, deletePath);
       if (success) {
         removeFromStore(filename);
       }
     },
-    [projectPath, removeFromStore]
+    [tasks, projectPath, removeFromStore]
   );
 
   const handleClearFilters = useCallback(() => {
     setFilter({});
+    setProjectFilter(null);
   }, [setFilter]);
 
   // Full-page loading
@@ -217,6 +276,32 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
         </Button>
       </div>
 
+      {/* Project filter (only show if multiple projects have tasks) */}
+      {projectsInTasks.length > 1 && (
+        <div className="border-b border-muted px-3 py-1.5">
+          <div className="flex items-center gap-1.5">
+            <FolderOpen className="h-3 w-3 shrink-0 text-muted-foreground" />
+            <select
+              className="min-w-0 flex-1 truncate rounded-md border border-muted bg-transparent px-1.5 py-0.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              value={projectFilter || ALL_PROJECTS_VALUE}
+              onChange={(e) =>
+                setProjectFilter(e.target.value === ALL_PROJECTS_VALUE ? null : e.target.value)
+              }
+            >
+              <option value={ALL_PROJECTS_VALUE}>Alle Projekte ({tasks.length})</option>
+              {projectsInTasks.map(([path, name]) => {
+                const count = tasks.filter((t) => t.projectPath === path).length;
+                return (
+                  <option key={path} value={path}>
+                    {name} ({count})
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* Search + Filter bar */}
       <div className="space-y-2 border-b border-muted px-3 py-2">
         <CompletedTasksSearch value={filter.search ?? ''} onChange={handleSearchChange} />
@@ -227,6 +312,25 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
           sortOrder={sortOrder}
           onSortChange={handleSortChange}
         />
+      </div>
+
+      <div className="border-b border-muted px-3 py-1.5">
+        <div className="flex items-center gap-1.5">
+          <AArrowDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+          <Slider
+            value={[sessionFontSize]}
+            onValueChange={([value]) => setSessionFontSize(value)}
+            min={10}
+            max={18}
+            step={1}
+            className="flex-1"
+            aria-label="Schriftgröße für erledigte Aufgaben"
+          />
+          <AArrowUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="w-7 text-right text-xs tabular-nums text-muted-foreground">
+            {sessionFontSize}
+          </span>
+        </div>
       </div>
 
       {/* Error banner (inline, when we have data but also an error) */}
@@ -251,8 +355,9 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 py-2">
           {filteredTasks.map((task) => (
             <CompletedTaskCard
-              key={task.filename}
+              key={`${task.projectPath || ''}:${task.filename}`}
               task={task}
+              fontSize={sessionFontSize}
               onDelete={(fn) => void handleDelete(fn)}
             />
           ))}
@@ -332,7 +437,7 @@ function NoResultsState({ onClearFilters }: { onClearFilters: () => void }) {
         </p>
       </div>
       <Button variant="outline" size="sm" onClick={onClearFilters} className="gap-1.5 border-muted">
-        Filter zuruecksetzen
+        Filter zurücksetzen
       </Button>
     </div>
   );

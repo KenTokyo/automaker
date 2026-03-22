@@ -15,6 +15,8 @@ export interface AgentSession {
   tags?: string[];
   status?: 'idle' | 'running' | 'failed' | 'stopped';
   lastError?: string;
+  totalElapsedMs?: number; // Accumulated running time in milliseconds
+  lastStartedAt?: string; // ISO timestamp of when the session last started running
 }
 
 export interface SessionListItem extends AgentSession {

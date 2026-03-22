@@ -422,6 +422,17 @@ export {
   COMPLETED_TASK_STATUSES,
 } from './completed-task.js';
 
+// Task types (Tasks tab)
+export type {
+  Task,
+  TaskStatus,
+  TaskPriority,
+  TaskFilter,
+  TaskSortField,
+  TaskSortOrder,
+} from './task.js';
+export { TASK_STATUSES, TASK_PRIORITIES } from './task.js';
+
 // Markdown Explorer types (project file browser)
 export type {
   ExplorerSearchResult,

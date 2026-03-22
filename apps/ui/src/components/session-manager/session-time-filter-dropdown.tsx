@@ -37,13 +37,13 @@ export function SessionTimeFilterDropdown({
     >
       <SelectTrigger
         className={cn(
-          'h-8 w-[96px] shrink-0 gap-1 px-2 text-xs',
+          'h-6 w-[76px] shrink-0 gap-0.5 px-1.5 text-[10px]',
           selectedHours !== null && 'border-primary/50'
         )}
         aria-label="Filter by recent activity"
       >
-        <span className="flex items-center gap-1">
-          <Clock3 className="h-3.5 w-3.5 shrink-0" />
+        <span className="flex items-center gap-0.5">
+          <Clock3 className="h-2.5 w-2.5 shrink-0" />
           <SelectValue />
         </span>
       </SelectTrigger>

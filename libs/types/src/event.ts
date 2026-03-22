@@ -58,6 +58,9 @@ export type EventType =
   | 'overview:error'
   | 'completed-task:created'
   | 'completed-task:deleted'
+  | 'task:created'
+  | 'task:updated'
+  | 'task:deleted'
   | 'agent:subagent_started'
   | 'agent:subagent_progress'
   | 'agent:subagent_stopped';

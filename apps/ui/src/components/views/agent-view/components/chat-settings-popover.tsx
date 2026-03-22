@@ -19,6 +19,71 @@ const FONT_WEIGHT_LABELS: Record<number, string> = {
   600: 'Kräftig',
 };
 
+const GRAY_SHADE_LABELS: Record<number, string> = {
+  400: 'Hell',
+  500: 'Mittel-Hell',
+  600: 'Mittel',
+  700: 'Mittel-Dunkel',
+  800: 'Dunkel',
+  900: 'Sehr Dunkel',
+};
+
+/** Map gray shade to a Tailwind-like gray color for both light and dark mode */
+const GRAY_SHADE_COLORS: Record<number, { light: string; dark: string }> = {
+  400: { light: '#9ca3af', dark: '#9ca3af' },
+  500: { light: '#6b7280', dark: '#a1a1aa' },
+  600: { light: '#4b5563', dark: '#b4b4bc' },
+  700: { light: '#374151', dark: '#c8c8ce' },
+  800: { light: '#1f2937', dark: '#dcdce0' },
+  900: { light: '#111827', dark: '#eeeeef' },
+};
+
+const GRAY_KEYS = [400, 500, 600, 700, 800, 900] as const;
+
+function snapToClosestGray(shade: number): number {
+  return GRAY_KEYS.reduce((prev, curr) =>
+    Math.abs(curr - shade) < Math.abs(prev - shade) ? curr : prev
+  );
+}
+
+function getClosestGrayLabel(shade: number): string {
+  return GRAY_SHADE_LABELS[snapToClosestGray(shade)];
+}
+
+export function getGrayShadeColor(shade: number, isDark: boolean): string {
+  const closest = snapToClosestGray(shade);
+  return isDark ? GRAY_SHADE_COLORS[closest].dark : GRAY_SHADE_COLORS[closest].light;
+}
+
+/** Check if the current theme is dark by looking at the light theme list */
+export function isDarkThemeActive(): boolean {
+  const root = document.documentElement;
+  // Light themes explicitly listed — everything else is dark
+  const lightClasses = [
+    'light',
+    'cream',
+    'solarizedlight',
+    'github',
+    'paper',
+    'rose',
+    'mint',
+    'lavender',
+    'sand',
+    'sky',
+    'peach',
+    'snow',
+    'sepia',
+    'gruvboxlight',
+    'nordlight',
+    'blossom',
+    'ayu-light',
+    'onelight',
+    'bluloco',
+    'feather',
+  ];
+  return !lightClasses.some((cls) => root.classList.contains(cls));
+}
+
 function getClosestWeightLabel(weight: number): string {
   const keys = [300, 400, 500, 600];
   const closest = keys.reduce((prev, curr) =>
@@ -37,7 +102,8 @@ export function ChatSettingsPopover({ settings, onChange }: ChatSettingsPopoverP
         s.fontWeight === settings.fontWeight &&
         s.fontOpacity === settings.fontOpacity &&
         s.lineHeight === settings.lineHeight &&
-        s.codeBlockRelativeSize === settings.codeBlockRelativeSize
+        s.codeBlockRelativeSize === settings.codeBlockRelativeSize &&
+        s.fontColorGray === (settings.fontColorGray ?? 900)
       ) {
         return preset.name;
       }
@@ -173,6 +239,23 @@ export function ChatSettingsPopover({ settings, onChange }: ChatSettingsPopoverP
                 onValueChange={([v]) => updateField('lineHeight', Math.round(v * 10) / 10)}
               />
             </div>
+
+            {/* Font Color (Gray Shade) */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Schriftfarbe</span>
+                <span className="text-xs font-mono text-foreground">
+                  {getClosestGrayLabel(settings.fontColorGray ?? 900)}
+                </span>
+              </div>
+              <Slider
+                value={[settings.fontColorGray ?? 900]}
+                min={400}
+                max={900}
+                step={100}
+                onValueChange={([v]) => updateField('fontColorGray', v)}
+              />
+            </div>
           </div>
 
           {/* Live Preview */}
@@ -185,9 +268,10 @@ export function ChatSettingsPopover({ settings, onChange }: ChatSettingsPopoverP
                 fontWeight: settings.fontWeight,
                 opacity: settings.fontOpacity,
                 lineHeight: settings.lineHeight,
+                color: getGrayShadeColor(settings.fontColorGray ?? 900, isDarkThemeActive()),
               }}
             >
-              <span className="text-foreground">Das ist ein Beispieltext für die Vorschau.</span>
+              Das ist ein Beispieltext für die Vorschau.
             </div>
           </div>
         </div>

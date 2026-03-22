@@ -26,7 +26,7 @@ export function createCompletedTasksRoutes(events: EventEmitter): Router {
   router.get('/history-files', validatePathParams('projectPath'), createListHistoryFilesHandler());
   router.get('/history-file', validatePathParams('projectPath'), createReadHistoryFileHandler());
 
-  router.get('/', validatePathParams('projectPath'), createListHandler());
+  router.get('/', validatePathParams('projectPath?', 'projectPaths?'), createListHandler());
   router.post('/', validatePathParams('projectPath'), createCreateHandler(events));
   router.delete('/:taskId', validatePathParams('projectPath'), createDeleteHandler(events));
 

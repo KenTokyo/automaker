@@ -245,6 +245,37 @@ export async function ensureDocsDir(projectPath: string): Promise<string> {
 }
 
 // ============================================================================
+// Tasks Paths
+// ============================================================================
+
+/**
+ * Get the tasks directory for a project
+ *
+ * Contains task files (.md) with YAML frontmatter for the Tasks tab.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Absolute path to {projectPath}/.automaker/tasks
+ */
+export function getTasksDir(projectPath: string): string {
+  return path.join(getAutomakerDir(projectPath), 'tasks');
+}
+
+/**
+ * Create the tasks directory for a project if it doesn't exist
+ *
+ * Creates {projectPath}/.automaker/tasks recursively.
+ * Safe to call multiple times - uses recursive: true.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Promise resolving to the created tasks directory path
+ */
+export async function ensureTasksDir(projectPath: string): Promise<string> {
+  const tasksDir = getTasksDir(projectPath);
+  await secureFs.mkdir(tasksDir, { recursive: true });
+  return tasksDir;
+}
+
+// ============================================================================
 // Ideation Paths
 // ============================================================================
 

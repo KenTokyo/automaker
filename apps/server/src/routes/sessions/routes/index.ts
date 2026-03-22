@@ -51,6 +51,8 @@ export function createIndexHandler(agentService: AgentService) {
                   ? 'failed'
                   : 'idle',
             lastError,
+            totalElapsedMs: s.totalElapsedMs || 0,
+            lastStartedAt: s.lastStartedAt,
           };
         })
       );

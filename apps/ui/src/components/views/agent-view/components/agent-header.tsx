@@ -579,10 +579,11 @@ export function AgentHeader({
               size="sm"
               onClick={onClearChat}
               disabled={isProcessing}
-              className="text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/15"
+              title="Clear conversation"
+              aria-label="Clear conversation"
             >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Clear
+              <Trash2 className="w-4 h-4" />
             </Button>
           )}
 

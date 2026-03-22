@@ -63,6 +63,10 @@ export interface CompletedTask {
   tags: string[];
   /** Markdown body (summary, notes, learnings) */
   summary: string;
+  /** Project path (set in multi-project mode) */
+  projectPath?: string;
+  /** Project display name (set in multi-project mode) */
+  projectName?: string;
 }
 
 // ============================================================================

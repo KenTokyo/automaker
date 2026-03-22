@@ -37,7 +37,9 @@ import {
 import { DevServerLogsPanel } from '../views/board-view/worktree-panel/components';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { TestLogsPanel } from '@/components/ui/test-logs-panel';
-import { Undo2 } from 'lucide-react';
+import { Undo2, Trash2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 /** Tailwind lg breakpoint in pixels */
 const LG_BREAKPOINT = 1024;
@@ -110,6 +112,10 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
   // Initialize session manager state - starts as true to match SSR
   // Then updates on mount based on actual screen size to prevent hydration mismatch
   const [showSessionManager, setShowSessionManager] = useState(true);
+  const [showClearDialog, setShowClearDialog] = useState(false);
+
+  const skipClearChatConfirm = useAppStore((s) => s.skipClearChatConfirm);
+  const setSkipClearChatConfirm = useAppStore((s) => s.setSkipClearChatConfirm);
 
   const handleChatDisplaySettingsChange = useCallback((settings: ChatDisplaySettings) => {
     setChatDisplaySettings(settings);
@@ -196,6 +202,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     addToServerQueue,
     removeFromServerQueue,
     clearServerQueue,
+    activeSubAgents,
   } = useElectronAgent({
     sessionId: currentSessionId || '',
     workingDirectory: currentProject?.path,
@@ -607,8 +614,22 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     ]
   );
 
+  const handleNewSession = useCallback(() => {
+    quickCreateSessionRef.current?.();
+  }, []);
+
   const handleClearChat = async () => {
-    if (!confirm('Are you sure you want to clear this conversation?')) return;
+    if (skipClearChatConfirm) {
+      await clearHistory();
+      if (currentSessionId) {
+        sessionsWithInjectedSystemPromptsRef.current.delete(currentSessionId);
+      }
+    } else {
+      setShowClearDialog(true);
+    }
+  };
+
+  const handleConfirmClear = async () => {
     await clearHistory();
     if (currentSessionId) {
       sessionsWithInjectedSystemPromptsRef.current.delete(currentSessionId);
@@ -887,11 +908,14 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
                 currentSessionId={currentSessionId}
                 messages={displayMessages}
                 isProcessing={isProcessing}
+                activeSubAgents={activeSubAgents}
                 showSessionManager={showSessionManager}
                 messagesContainerRef={messagesContainerRef}
                 onScroll={handleScroll}
                 onShowSessionManager={handleShowSessionManager}
                 chatBackgroundColor={currentProject?.chatBackgroundColor}
+                chatBubbleColor={currentProject?.chatBubbleColor}
+                userBubbleColor={currentProject?.userBubbleColor}
                 chatDisplaySettings={chatDisplaySettings}
               />
 
@@ -928,6 +952,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
                   inputRef={inputRef}
                   accentColor={currentProject?.badgeColor || currentProject?.backgroundColor}
                   onInputHeightChange={handleInputHeightChange}
+                  onNewSession={handleNewSession}
                 />
               )}
             </div>
@@ -977,11 +1002,14 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
             currentSessionId={currentSessionId}
             messages={displayMessages}
             isProcessing={isProcessing}
+            activeSubAgents={activeSubAgents}
             showSessionManager={showSessionManager}
             messagesContainerRef={messagesContainerRef}
             onScroll={handleScroll}
             onShowSessionManager={handleShowSessionManager}
             chatBackgroundColor={currentProject?.chatBackgroundColor}
+            chatBubbleColor={currentProject?.chatBubbleColor}
+            userBubbleColor={currentProject?.userBubbleColor}
             chatDisplaySettings={chatDisplaySettings}
           />
 
@@ -1017,6 +1045,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
               onClearQueue={clearServerQueue}
               inputRef={inputRef}
               onInputHeightChange={handleInputHeightChange}
+              onNewSession={handleNewSession}
             />
           )}
         </div>
@@ -1076,6 +1105,33 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
             : undefined
         }
       />
+
+      {/* Clear Chat Confirmation Dialog */}
+      <ConfirmDialog
+        open={showClearDialog}
+        onOpenChange={setShowClearDialog}
+        onConfirm={handleConfirmClear}
+        title="Clear Conversation"
+        description="Are you sure you want to clear this conversation? All messages will be permanently deleted."
+        icon={Trash2}
+        iconClassName="text-red-400"
+        confirmText="Clear"
+        confirmVariant="destructive"
+      >
+        <div className="flex items-center gap-2 pt-2">
+          <Checkbox
+            id="skip-clear-confirm"
+            checked={skipClearChatConfirm}
+            onCheckedChange={(checked) => setSkipClearChatConfirm(checked)}
+          />
+          <Label
+            htmlFor="skip-clear-confirm"
+            className="text-sm text-muted-foreground cursor-pointer select-none"
+          >
+            Don&apos;t ask again
+          </Label>
+        </div>
+      </ConfirmDialog>
     </div>
   );
 }

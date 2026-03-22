@@ -124,13 +124,13 @@ export function CompletedTasksFilterBar({
             variant="outline"
             size="sm"
             className={cn(
-              'h-7 gap-1 text-xs',
+              'h-6 gap-1 px-1.5 text-[11px]',
               activeTags.length > 0 && 'border-sky-500/50 text-sky-600'
             )}
           >
-            <Tag className="h-3 w-3" />
+            <Tag className="h-2.5 w-2.5" />
             {activeTags.length > 0 ? `${activeTags.length} Tags` : 'Tags'}
-            <ChevronDown className="h-3 w-3" />
+            <ChevronDown className="h-2.5 w-2.5" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-48 p-1" align="start">
@@ -167,13 +167,13 @@ export function CompletedTasksFilterBar({
             variant="outline"
             size="sm"
             className={cn(
-              'h-7 gap-1 text-xs',
+              'h-6 gap-1 px-1.5 text-[11px]',
               activeStatuses.length > 0 && 'border-sky-500/50 text-sky-600'
             )}
           >
-            <CircleDot className="h-3 w-3" />
+            <CircleDot className="h-2.5 w-2.5" />
             {activeStatuses.length > 0 ? `${activeStatuses.length} Status` : 'Status'}
-            <ChevronDown className="h-3 w-3" />
+            <ChevronDown className="h-2.5 w-2.5" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-44 p-1" align="start">
@@ -211,13 +211,13 @@ export function CompletedTasksFilterBar({
             variant="outline"
             size="sm"
             className={cn(
-              'h-7 gap-1 text-xs',
+              'h-6 gap-1 px-1.5 text-[11px]',
               activeEfforts.length > 0 && 'border-sky-500/50 text-sky-600'
             )}
           >
-            <Gauge className="h-3 w-3" />
+            <Gauge className="h-2.5 w-2.5" />
             {activeEfforts.length > 0 ? `${activeEfforts.length} Effort` : 'Effort'}
-            <ChevronDown className="h-3 w-3" />
+            <ChevronDown className="h-2.5 w-2.5" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-40 p-1" align="start">
@@ -258,8 +258,8 @@ export function CompletedTasksFilterBar({
       {/* Sort Dropdown */}
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" className="h-7 gap-1 text-xs">
-            <ArrowUpDown className="h-3 w-3" />
+          <Button variant="outline" size="sm" className="h-6 gap-1 px-1.5 text-[11px]">
+            <ArrowUpDown className="h-2.5 w-2.5" />
             {currentSortLabel}
           </Button>
         </PopoverTrigger>

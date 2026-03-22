@@ -45,16 +45,16 @@ export function ProjectFilterDropdown({
           variant="outline"
           size="sm"
           className={cn(
-            'h-8 text-xs gap-1 shrink-0 max-w-[160px]',
+            'h-6 text-[10px] gap-0.5 shrink-0 max-w-[120px] px-1.5',
             selectedProjectPath && 'border-primary/50'
           )}
           aria-label="Filter by project"
           aria-expanded={open}
           aria-haspopup="listbox"
         >
-          <Folder className="w-3.5 h-3.5 shrink-0" />
-          <span className="truncate">{selectedName || 'All Projects'}</span>
-          <ChevronDown className="w-3 h-3 shrink-0 opacity-50" />
+          <Folder className="w-2.5 h-2.5 shrink-0" />
+          <span className="truncate">{selectedName || 'All'}</span>
+          <ChevronDown className="w-2 h-2 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent

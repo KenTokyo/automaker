@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 import ReactMarkdown, { Components } from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
@@ -13,30 +13,6 @@ const lowlight = createLowlight(common);
 interface MarkdownProps {
   children: string;
   className?: string;
-}
-
-/**
- * Preprocess text to preserve single line breaks as <br> tags
- * This ensures that newlines in the source text are rendered properly
- */
-function preserveLineBreaks(text: string): string {
-  if (!text) return text;
-
-  // Split by code blocks to avoid processing them
-  const codeBlockRegex = /(```[\s\S]*?```|`[^`\n]+`)/g;
-  const parts = text.split(codeBlockRegex);
-
-  return parts
-    .map((part, index) => {
-      // Even indices are regular text, odd indices are code blocks
-      if (index % 2 === 0) {
-        // Replace single newlines with <br> tags for proper line breaks
-        // This works because we have rehype-raw enabled
-        return part.replace(/(?<!\n)\n(?!\n)/g, '<br>\n');
-      }
-      return part;
-    })
-    .join('');
 }
 
 /**
@@ -168,46 +144,62 @@ const CodeBlock = memo(function CodeBlock({
 });
 
 /**
+ * Wrap tables so they remain readable in narrow cards/bubbles.
+ */
+const TableBlock = memo(function TableBlock({
+  children,
+  className,
+  ...props
+}: React.ComponentProps<'table'> & { node?: unknown }) {
+  return (
+    <div className="my-3 w-full overflow-x-auto rounded-md border border-muted/60">
+      <table className={cn('w-full border-collapse', className)} {...props}>
+        {children}
+      </table>
+    </div>
+  );
+});
+
+/**
  * Reusable Markdown component for rendering markdown content
  * Theme-aware styling that adapts to all predefined themes
  * Supports raw HTML elements including images
  * Includes syntax highlighting for code blocks via lowlight
  */
 export const Markdown = memo(function Markdown({ children, className }: MarkdownProps) {
-  const processedContent = useMemo(() => preserveLineBreaks(children), [children]);
-
   return (
     <div
       className={cn(
         'prose prose-sm prose-invert max-w-none',
-        // Headings
-        '[&_h1]:text-xl [&_h1]:text-foreground [&_h1]:font-semibold [&_h1]:mt-4 [&_h1]:mb-2',
-        '[&_h2]:text-lg [&_h2]:text-foreground [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2',
-        '[&_h3]:text-base [&_h3]:text-foreground [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-2',
-        '[&_h4]:text-sm [&_h4]:text-foreground [&_h4]:font-semibold [&_h4]:mt-2 [&_h4]:mb-1',
-        // Paragraphs
-        '[&_p]:text-foreground-secondary [&_p]:leading-relaxed [&_p]:my-2',
-        // Lists
-        '[&_ul]:my-2 [&_ul]:pl-4 [&_ol]:my-2 [&_ol]:pl-4',
-        '[&_li]:text-foreground-secondary [&_li]:my-0.5',
-        // Code
-        '[&_code]:text-chart-2 [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-sm',
-        '[&_pre]:bg-card [&_pre]:border [&_pre]:border-border [&_pre]:rounded-lg [&_pre]:my-2 [&_pre]:p-3 [&_pre]:overflow-x-auto',
+        // Headings — compact, closer to body text size (terminal-style)
+        '[&_h1]:text-base [&_h1]:text-foreground [&_h1]:font-bold [&_h1]:mt-3 [&_h1]:mb-1',
+        '[&_h2]:text-[0.94rem] [&_h2]:text-foreground [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-1',
+        '[&_h3]:text-[0.88rem] [&_h3]:text-foreground [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-0.5',
+        '[&_h4]:text-sm [&_h4]:text-foreground [&_h4]:font-semibold [&_h4]:mt-2 [&_h4]:mb-0.5',
+        // Paragraphs — breathable spacing between paragraphs
+        '[&_p]:text-foreground-secondary [&_p]:leading-relaxed [&_p]:my-2 [&_p]:whitespace-pre-wrap',
+        // Lists — modern, clean look with comfortable spacing (markers via CSS below)
+        '[&_ul]:my-2 [&_ul]:pl-0 [&_ul]:list-none [&_ol]:my-2 [&_ol]:pl-0 [&_ol]:list-none',
+        '[&_ul_ul]:my-0.5 [&_ol_ol]:my-0.5',
+        '[&_li]:text-foreground-secondary [&_li]:my-1 [&_li]:whitespace-pre-wrap [&_li]:leading-relaxed',
+        '[&_li>p]:my-0',
+        // Code — subtle inline code, no distracting color
+        '[&_code]:text-foreground [&_code]:bg-muted/60 [&_code]:px-1 [&_code]:py-px [&_code]:rounded-sm [&_code]:text-[0.85em]',
+        '[&_pre]:bg-card [&_pre]:border [&_pre]:border-border [&_pre]:rounded-lg [&_pre]:my-1.5 [&_pre]:p-3 [&_pre]:overflow-x-auto',
         '[&_pre_code]:bg-transparent [&_pre_code]:p-0',
         // Strong/Bold
         '[&_strong]:text-foreground [&_strong]:font-semibold',
         // Links
         '[&_a]:text-brand-500 [&_a]:no-underline hover:[&_a]:underline',
         // Blockquotes
-        '[&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_blockquote]:text-muted-foreground [&_blockquote]:italic [&_blockquote]:my-2',
+        '[&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_blockquote]:italic [&_blockquote]:my-1',
         // Horizontal rules
-        '[&_hr]:border-border [&_hr]:my-4',
+        '[&_hr]:border-border [&_hr]:my-3',
         // Images
-        '[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-2 [&_img]:border [&_img]:border-border',
+        '[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-1.5 [&_img]:border [&_img]:border-border',
         // Tables
-        '[&_table]:w-full [&_table]:border-collapse [&_table]:my-3',
-        '[&_th]:border [&_th]:border-border [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:text-sm [&_th]:font-semibold [&_th]:text-foreground [&_th]:bg-muted/50',
-        '[&_td]:border [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_td]:text-sm [&_td]:text-foreground-secondary',
+        '[&_th]:border [&_th]:border-border [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:text-sm [&_th]:font-semibold [&_th]:text-foreground [&_th]:bg-muted/50',
+        '[&_td]:border [&_td]:border-border [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-sm [&_td]:text-foreground-secondary [&_td]:align-top',
         '[&_tr:nth-child(even)_td]:bg-muted/25',
         className
       )}
@@ -217,9 +209,10 @@ export const Markdown = memo(function Markdown({ children, className }: Markdown
         rehypePlugins={[rehypeRaw, rehypeSanitize]}
         components={{
           code: CodeBlock as React.ComponentType<React.ComponentProps<'code'>>,
+          table: TableBlock as React.ComponentType<React.ComponentProps<'table'>>,
         }}
       >
-        {processedContent}
+        {children}
       </ReactMarkdown>
 
       <style>{syntaxStyles}</style>
@@ -232,6 +225,55 @@ export const Markdown = memo(function Markdown({ children, className }: Markdown
  * Uses CSS variables so they adapt to all app themes.
  */
 const syntaxStyles = `
+  /* Modern list styling — custom markers */
+  .prose ul, .prose ol {
+    padding-left: 0;
+    list-style: none;
+  }
+  .prose li {
+    position: relative;
+    padding-left: 1.25em;
+  }
+  /* Unordered list bullets */
+  .prose ul > li::before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    color: var(--muted-foreground);
+    font-weight: 700;
+    font-size: 1.1em;
+    line-height: inherit;
+  }
+  .prose ul ul > li::before {
+    content: "◦";
+    font-weight: 400;
+  }
+  .prose ul ul ul > li::before {
+    content: "▪";
+    font-size: 0.7em;
+    top: 0.3em;
+  }
+  /* Ordered list numbers */
+  .prose ol {
+    counter-reset: list-counter;
+  }
+  .prose ol > li {
+    counter-increment: list-counter;
+  }
+  .prose ol > li::before {
+    content: counter(list-counter) ".";
+    position: absolute;
+    left: 0;
+    color: var(--muted-foreground);
+    font-weight: 600;
+    font-size: 0.85em;
+    font-variant-numeric: tabular-nums;
+    min-width: 1.25em;
+  }
+  .prose ol ol > li::before {
+    content: counter(list-counter, lower-alpha) ".";
+  }
+
   .prose .hljs-keyword { color: var(--chart-4, oklch(0.7 0.15 280)); }
   .prose .hljs-string { color: var(--chart-1, oklch(0.646 0.222 41.116)); }
   .prose .hljs-number { color: var(--chart-3, oklch(0.7 0.15 150)); }

@@ -305,6 +305,7 @@ export function useElectronAgent({
     // drop messages in session B).
     setIsConnected(false);
     setIsProcessing(false);
+    setActiveSubAgents([]); // Clear sub-agents from previous session to prevent bleeding
 
     const initialize = async () => {
       // Reset error state when switching sessions

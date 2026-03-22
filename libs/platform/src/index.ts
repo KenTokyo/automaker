@@ -33,6 +33,9 @@ export {
   // Docs paths
   getDocsDir,
   ensureDocsDir,
+  // Tasks paths
+  getTasksDir,
+  ensureTasksDir,
   // Ideation paths
   getIdeationDir,
   getIdeasDir,

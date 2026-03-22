@@ -3,7 +3,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Upload, X, ImageIcon, Check, Folder, Palette, Settings2 } from 'lucide-react';
+import { Upload, X, ImageIcon, Check, Folder, Palette, Settings2, Trash2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import * as LucideIcons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAppStore } from '@/store/app-store';
@@ -138,8 +139,12 @@ export function EditProjectDialog({
     setProjectTextColor,
     setProjectIconColor,
     setProjectChatBackgroundColor,
+    setProjectChatBubbleColor,
+    setProjectUserBubbleColor,
     maxSessionsPerProject,
     setMaxSessionsPerProject,
+    skipClearChatConfirm,
+    setSkipClearChatConfirm,
   } = useAppStore();
   const [name, setName] = useState(project.name);
   const [icon, setIcon] = useState<string | null>(project.icon || null);
@@ -168,6 +173,8 @@ export function EditProjectDialog({
   const textColor = project.textColor || null;
   const iconColor = project.iconColor || null;
   const chatBackgroundColor = project.chatBackgroundColor || null;
+  const chatBubbleColor = project.chatBubbleColor || null;
+  const userBubbleColor = project.userBubbleColor || null;
 
   // Get the icon component for preview
   const getIconComponent = (): LucideIcon => {
@@ -227,6 +234,18 @@ export function EditProjectDialog({
 
   const handleChatBackgroundColorChange = async (color: string | null) => {
     setProjectChatBackgroundColor(project.id, color);
+    const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+    await syncSettingsToServer();
+  };
+
+  const handleChatBubbleColorChange = async (color: string | null) => {
+    setProjectChatBubbleColor(project.id, color);
+    const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+    await syncSettingsToServer();
+  };
+
+  const handleUserBubbleColorChange = async (color: string | null) => {
+    setProjectUserBubbleColor(project.id, color);
     const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
     await syncSettingsToServer();
   };
@@ -300,6 +319,8 @@ export function EditProjectDialog({
     setProjectTextColor(project.id, null);
     setProjectIconColor(project.id, null);
     setProjectChatBackgroundColor(project.id, null);
+    setProjectChatBubbleColor(project.id, null);
+    setProjectUserBubbleColor(project.id, null);
     const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
     await syncSettingsToServer();
   };
@@ -486,6 +507,34 @@ export function EditProjectDialog({
                 />
               </div>
 
+              {/* Assistant Bubble Color */}
+              <div className="space-y-2">
+                <Label>Assistant Bubble Color</Label>
+                <p className="text-xs text-muted-foreground">
+                  Tint color for assistant message bubbles
+                </p>
+                <ColorPicker
+                  value={chatBubbleColor}
+                  onChange={handleChatBubbleColorChange}
+                  colors={BACKGROUND_COLORS}
+                  label="assistant bubble"
+                />
+              </div>
+
+              {/* User Bubble Color */}
+              <div className="space-y-2">
+                <Label>User Bubble Color</Label>
+                <p className="text-xs text-muted-foreground">
+                  Tint color for your own message bubbles
+                </p>
+                <ColorPicker
+                  value={userBubbleColor}
+                  onChange={handleUserBubbleColorChange}
+                  colors={BACKGROUND_COLORS}
+                  label="user bubble"
+                />
+              </div>
+
               {/* Badge Border Color */}
               <div className="space-y-2">
                 <Label>Border Color</Label>
@@ -563,6 +612,30 @@ export function EditProjectDialog({
                       ? 'Unlimited'
                       : `${maxSessionsPerProject} sessions`}
                   </span>
+                </div>
+              </div>
+
+              {/* Skip Clear Chat Confirmation */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Trash2 className="w-4 h-4 text-red-400" />
+                  <Label htmlFor="skip-clear-chat-confirm">Clear Chat Confirmation</Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Skip the confirmation dialog when clearing a conversation.
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Checkbox
+                    id="skip-clear-chat-confirm"
+                    checked={skipClearChatConfirm}
+                    onCheckedChange={(checked) => setSkipClearChatConfirm(checked)}
+                  />
+                  <Label
+                    htmlFor="skip-clear-chat-confirm"
+                    className="text-sm text-muted-foreground cursor-pointer select-none"
+                  >
+                    Don&apos;t ask before clearing
+                  </Label>
                 </div>
               </div>
             </TabsContent>

@@ -2,6 +2,7 @@ import { memo } from 'react';
 import type { ImageAttachment } from '@/store/app-store';
 import type { ToolUse } from '@/types/electron';
 import type { ChatDisplaySettings } from '@/store/types/ui-types';
+import type { ActiveSubAgent } from '@/hooks/use-electron-agent';
 import { MessageList } from './message-list';
 import { NoSessionState } from './empty-states';
 
@@ -19,11 +20,14 @@ interface ChatAreaProps {
   currentSessionId: string | null;
   messages: Message[];
   isProcessing: boolean;
+  activeSubAgents?: ActiveSubAgent[];
   showSessionManager: boolean;
   messagesContainerRef: React.RefObject<HTMLDivElement | null>;
   onScroll: () => void;
   onShowSessionManager: () => void;
   chatBackgroundColor?: string;
+  chatBubbleColor?: string;
+  userBubbleColor?: string;
   chatDisplaySettings: ChatDisplaySettings;
 }
 
@@ -31,11 +35,14 @@ export const ChatArea = memo(function ChatArea({
   currentSessionId,
   messages,
   isProcessing,
+  activeSubAgents,
   showSessionManager,
   messagesContainerRef,
   onScroll,
   onShowSessionManager,
   chatBackgroundColor,
+  chatBubbleColor,
+  userBubbleColor,
   chatDisplaySettings,
 }: ChatAreaProps) {
   if (!currentSessionId) {
@@ -51,9 +58,12 @@ export const ChatArea = memo(function ChatArea({
     <MessageList
       messages={messages}
       isProcessing={isProcessing}
+      activeSubAgents={activeSubAgents}
       messagesContainerRef={messagesContainerRef}
       onScroll={onScroll}
       chatBackgroundColor={chatBackgroundColor}
+      chatBubbleColor={chatBubbleColor}
+      userBubbleColor={userBubbleColor}
       chatDisplaySettings={chatDisplaySettings}
     />
   );

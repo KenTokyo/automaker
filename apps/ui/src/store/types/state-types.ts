@@ -30,6 +30,10 @@ import type {
   CompletedTaskFilter,
   CompletedTaskSortField,
   CompletedTaskSortOrder,
+  Task,
+  TaskFilter,
+  TaskSortField,
+  TaskSortOrder,
 } from '@automaker/types';
 
 import type {
@@ -379,6 +383,9 @@ export interface AppState {
   // Session History Limit
   maxSessionsPerProject: number;
 
+  // Skip clear chat confirmation dialog
+  skipClearChatConfirm: boolean;
+
   // Session Panel Font Size (10-18px, default 14)
   sessionFontSize: number;
 
@@ -405,6 +412,14 @@ export interface AppState {
   completedTasksSortField: CompletedTaskSortField;
   completedTasksSortOrder: CompletedTaskSortOrder;
   completedTasksAutoCapture: boolean; // Per-project toggle for automatic task capture by AI agent
+
+  // Tasks State (Tasks Tab)
+  tasks: Task[];
+  tasksLoading: boolean;
+  tasksError: string | null;
+  tasksFilter: TaskFilter;
+  tasksSortField: TaskSortField;
+  tasksSortOrder: TaskSortOrder;
 }
 
 export interface AppActions {
@@ -865,6 +880,8 @@ export interface AppActions {
   setProjectTextColor: (projectId: string, textColor: string | null) => void;
   setProjectIconColor: (projectId: string, iconColor: string | null) => void;
   setProjectChatBackgroundColor: (projectId: string, chatBackgroundColor: string | null) => void;
+  setProjectChatBubbleColor: (projectId: string, chatBubbleColor: string | null) => void;
+  setProjectUserBubbleColor: (projectId: string, userBubbleColor: string | null) => void;
 
   // Selected Agent Model actions
   setSelectedAgentModel: (entry: PhaseModelEntry) => void;
@@ -886,6 +903,9 @@ export interface AppActions {
 
   // Session Limit actions
   setMaxSessionsPerProject: (max: number) => void;
+
+  // Clear chat confirmation actions
+  setSkipClearChatConfirm: (skip: boolean) => void;
 
   // Session Panel Font Size actions
   setSessionFontSize: (size: number) => void;
@@ -919,6 +939,17 @@ export interface AppActions {
   setCompletedTasksSortField: (field: CompletedTaskSortField) => void;
   setCompletedTasksSortOrder: (order: CompletedTaskSortOrder) => void;
   setCompletedTasksAutoCapture: (enabled: boolean) => void;
+
+  // Tasks actions (Tasks Tab)
+  setTasks: (tasks: Task[]) => void;
+  addTask: (task: Task) => void;
+  updateTaskInStore: (filename: string, updates: Partial<Task>) => void;
+  removeTask: (filename: string) => void;
+  setTasksLoading: (loading: boolean) => void;
+  setTasksError: (error: string | null) => void;
+  setTasksFilter: (filter: TaskFilter) => void;
+  setTasksSortField: (field: TaskSortField) => void;
+  setTasksSortOrder: (order: TaskSortOrder) => void;
 
   // Reset
   reset: () => void;

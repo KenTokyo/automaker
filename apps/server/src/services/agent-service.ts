@@ -85,6 +85,8 @@ interface SessionMetadata {
   model?: string;
   orchestratorRunId?: string;
   sdkSessionId?: string; // Claude SDK session ID for conversation continuity
+  totalElapsedMs?: number; // Accumulated running time in milliseconds
+  lastStartedAt?: string; // ISO timestamp of when the session last started running
 }
 
 export class AgentService {
@@ -210,6 +212,9 @@ export class AgentService {
     session.isRunning = true;
     session.wasStopped = false;
     session.abortController = new AbortController();
+
+    // Track elapsed time: record when this run started
+    await this.updateSession(sessionId, { lastStartedAt: new Date().toISOString() });
 
     // Read images and convert to base64
     const images: Message['images'] = [];
@@ -661,6 +666,7 @@ export class AgentService {
           // Mark session as no longer running so the UI and queue stay in sync
           session.isRunning = false;
           session.abortController = null;
+          await this.accumulateElapsedTime(sessionId);
 
           const errorMessage: Message = {
             id: this.generateId(),
@@ -712,6 +718,7 @@ export class AgentService {
 
       session.isRunning = false;
       session.abortController = null;
+      await this.accumulateElapsedTime(sessionId);
 
       // Emit a single terminal completion event after the provider stream ends.
       // Some providers can emit multiple "result" events during one execution.
@@ -736,6 +743,7 @@ export class AgentService {
       if (isAbortError(error)) {
         session.isRunning = false;
         session.abortController = null;
+        await this.accumulateElapsedTime(sessionId);
         return { success: false, aborted: true };
       }
 
@@ -743,6 +751,7 @@ export class AgentService {
 
       session.isRunning = false;
       session.abortController = null;
+      await this.accumulateElapsedTime(sessionId);
 
       const errorMessage: Message = {
         id: this.generateId(),
@@ -808,6 +817,7 @@ export class AgentService {
       session.isRunning = false;
       session.wasStopped = true;
       session.abortController = null;
+      await this.accumulateElapsedTime(sessionId);
 
       this.emitAgentEvent(sessionId, {
         type: 'stopped',
@@ -874,6 +884,29 @@ export class AgentService {
       metadata[sessionId].updatedAt = new Date().toISOString();
       await this.saveMetadata(metadata);
     }
+  }
+
+  /**
+   * Accumulate elapsed time when a session run ends.
+   * Adds the duration since lastStartedAt to totalElapsedMs and clears lastStartedAt.
+   */
+  private async accumulateElapsedTime(sessionId: string): Promise<void> {
+    const metadata = await this.loadMetadata();
+    const session = metadata[sessionId];
+    if (!session?.lastStartedAt) return;
+
+    const startedAt = new Date(session.lastStartedAt).getTime();
+    const now = Date.now();
+    const elapsed = Math.max(0, now - startedAt);
+    const totalElapsedMs = (session.totalElapsedMs || 0) + elapsed;
+
+    metadata[sessionId] = {
+      ...session,
+      totalElapsedMs,
+      lastStartedAt: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.saveMetadata(metadata);
   }
 
   /**

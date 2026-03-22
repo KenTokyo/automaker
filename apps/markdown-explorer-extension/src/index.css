@@ -1,0 +1,8 @@
+/*
+ * UniAI Chat - Standalone styles
+ * Imports the shared global CSS from apps/ui which includes:
+ * - Tailwind CSS 4
+ * - Theme variables (40+ themes)
+ * - Scrollbar styling, animations, utilities
+ */
+@import '../../ui/src/styles/global.css';
