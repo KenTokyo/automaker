@@ -127,6 +127,9 @@ export interface SessionListItem {
   isDirty?: boolean; // Indicates session has completed work that needs review
   tags: string[];
   orchestratorRunId?: string;
+  sourceType?: 'manual' | 'orchestrator' | 'subagent';
+  parentSessionId?: string;
+  parentToolUseId?: string;
   preview: string;
   status?: 'idle' | 'running' | 'failed' | 'stopped';
   lastError?: string;
@@ -189,7 +192,10 @@ export interface SessionsAPI {
     name: string,
     projectPath: string,
     workingDirectory?: string,
-    orchestratorRunId?: string
+    orchestratorRunId?: string,
+    sourceType?: 'manual' | 'orchestrator' | 'subagent',
+    parentSessionId?: string,
+    parentToolUseId?: string
   ) => Promise<{
     success: boolean;
     sessionId?: string;

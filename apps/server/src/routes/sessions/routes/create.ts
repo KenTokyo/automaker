@@ -9,12 +9,24 @@ import { getErrorMessage, logError } from '../common.js';
 export function createCreateHandler(agentService: AgentService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { name, projectPath, workingDirectory, model, orchestratorRunId } = req.body as {
+      const {
+        name,
+        projectPath,
+        workingDirectory,
+        model,
+        orchestratorRunId,
+        sourceType,
+        parentSessionId,
+        parentToolUseId,
+      } = req.body as {
         name: string;
         projectPath?: string;
         workingDirectory?: string;
         model?: string;
         orchestratorRunId?: string;
+        sourceType?: 'manual' | 'orchestrator' | 'subagent';
+        parentSessionId?: string;
+        parentToolUseId?: string;
       };
 
       if (!name) {
@@ -27,7 +39,10 @@ export function createCreateHandler(agentService: AgentService) {
         projectPath,
         workingDirectory,
         model,
-        orchestratorRunId
+        orchestratorRunId,
+        sourceType,
+        parentSessionId,
+        parentToolUseId
       );
       res.json({ success: true, session });
     } catch (error) {

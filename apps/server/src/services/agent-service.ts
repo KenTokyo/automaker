@@ -58,6 +58,8 @@ interface QueuedPrompt {
   addedAt: string;
 }
 
+type SessionSourceType = 'manual' | 'orchestrator' | 'subagent';
+
 interface Session {
   messages: Message[];
   isRunning: boolean;
@@ -84,6 +86,9 @@ interface SessionMetadata {
   tags?: string[];
   model?: string;
   orchestratorRunId?: string;
+  sourceType?: SessionSourceType;
+  parentSessionId?: string;
+  parentToolUseId?: string;
   sdkSessionId?: string; // Claude SDK session ID for conversation continuity
   totalElapsedMs?: number; // Accumulated running time in milliseconds
   lastStartedAt?: string; // ISO timestamp of when the session last started running
@@ -955,7 +960,10 @@ export class AgentService {
     projectPath?: string,
     workingDirectory?: string,
     model?: string,
-    orchestratorRunId?: string
+    orchestratorRunId?: string,
+    sourceType?: SessionSourceType,
+    parentSessionId?: string,
+    parentToolUseId?: string
   ): Promise<SessionMetadata> {
     const sessionId = this.generateId();
     const metadata = await this.loadMetadata();
@@ -972,6 +980,9 @@ export class AgentService {
       validateWorkingDirectory(projectPath);
     }
 
+    const resolvedSourceType: SessionSourceType =
+      sourceType || (parentSessionId ? 'subagent' : orchestratorRunId ? 'orchestrator' : 'manual');
+
     const session: SessionMetadata = {
       id: sessionId,
       name,
@@ -981,6 +992,9 @@ export class AgentService {
       updatedAt: new Date().toISOString(),
       model,
       orchestratorRunId,
+      sourceType: resolvedSourceType,
+      parentSessionId,
+      parentToolUseId,
     };
 
     metadata[sessionId] = session;

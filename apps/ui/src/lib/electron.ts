@@ -826,7 +826,10 @@ export interface ElectronAPI {
       name: string,
       projectPath: string,
       workingDirectory?: string,
-      orchestratorRunId?: string
+      orchestratorRunId?: string,
+      sourceType?: 'manual' | 'orchestrator' | 'subagent',
+      parentSessionId?: string,
+      parentToolUseId?: string
     ) => Promise<{
       success: boolean;
       session?: {
@@ -835,6 +838,9 @@ export interface ElectronAPI {
         projectPath: string;
         workingDirectory?: string;
         orchestratorRunId?: string;
+        sourceType?: 'manual' | 'orchestrator' | 'subagent';
+        parentSessionId?: string;
+        parentToolUseId?: string;
         createdAt: string;
         updatedAt: string;
       };

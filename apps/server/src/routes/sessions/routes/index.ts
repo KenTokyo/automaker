@@ -41,6 +41,9 @@ export function createIndexHandler(agentService: AgentService) {
             isDirty: s.isDirty || false,
             tags: s.tags || [],
             orchestratorRunId: s.orchestratorRunId,
+            sourceType: s.sourceType,
+            parentSessionId: s.parentSessionId,
+            parentToolUseId: s.parentToolUseId,
             messageCount: messages.length,
             preview,
             status: isRunning

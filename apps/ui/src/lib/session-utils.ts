@@ -101,9 +101,19 @@ function repairSessionItem(raw: unknown): SessionListItem | null {
   const description = typeof item.description === 'string' ? item.description : undefined;
   const orchestratorRunId =
     typeof item.orchestratorRunId === 'string' ? item.orchestratorRunId : undefined;
+  const sourceType = isValidSourceType(item.sourceType) ? item.sourceType : undefined;
+  const parentSessionId =
+    typeof item.parentSessionId === 'string' ? item.parentSessionId : undefined;
+  const parentToolUseId =
+    typeof item.parentToolUseId === 'string' ? item.parentToolUseId : undefined;
   const isDirty = typeof item.isDirty === 'boolean' ? item.isDirty : undefined;
   const status = isValidStatus(item.status) ? item.status : undefined;
   const lastError = typeof item.lastError === 'string' ? item.lastError : undefined;
+  const totalElapsedMs =
+    typeof item.totalElapsedMs === 'number' && Number.isFinite(item.totalElapsedMs)
+      ? item.totalElapsedMs
+      : undefined;
+  const lastStartedAt = isValidTimestamp(item.lastStartedAt) ? item.lastStartedAt : undefined;
 
   if (repairs.length > 0) {
     logger.warn(
@@ -123,9 +133,14 @@ function repairSessionItem(raw: unknown): SessionListItem | null {
     isDirty,
     tags,
     orchestratorRunId,
+    sourceType,
+    parentSessionId,
+    parentToolUseId,
     preview,
     status,
     lastError,
+    totalElapsedMs,
+    lastStartedAt,
   };
 }
 
@@ -134,6 +149,10 @@ function repairSessionItem(raw: unknown): SessionListItem | null {
  */
 function isValidStatus(value: unknown): value is SessionListItem['status'] {
   return value === 'idle' || value === 'running' || value === 'failed' || value === 'stopped';
+}
+
+function isValidSourceType(value: unknown): value is SessionListItem['sourceType'] {
+  return value === 'manual' || value === 'orchestrator' || value === 'subagent';
 }
 
 /**

@@ -435,7 +435,9 @@ export function useElectronAgent({
           // Agent finished processing for THIS session
           logger.info('Processing complete for session:', sessionId);
           setIsProcessing(false);
-          setActiveSubAgents([]); // Clear all sub-agents on completion
+          // Keep background sub-agents visible until they emit subagent_stopped.
+          // This prevents them from disappearing when the parent agent completes first.
+          setActiveSubAgents((prev) => prev.filter((agent) => agent.runInBackground));
           const completedToolCalls =
             pendingToolCallsRef.current.length > 0 ? [...pendingToolCallsRef.current] : undefined;
           pendingToolCallsRef.current = [];
@@ -497,7 +499,8 @@ export function useElectronAgent({
           // Session was manually stopped by the user
           logger.info('Session stopped for:', sessionId);
           setIsProcessing(false);
-          setActiveSubAgents([]); // Clear all sub-agents on stop
+          // Keep background sub-agents visible until explicit stop events arrive.
+          setActiveSubAgents((prev) => prev.filter((agent) => agent.runInBackground));
           break;
 
         case 'session_metadata_updated':
