@@ -81,8 +81,6 @@ export function useFileAttachments({
   // Process dropped files (images and text files)
   const processDroppedFiles = useCallback(
     async (files: FileList) => {
-      if (isProcessing) return;
-
       const newImages: ImageAttachment[] = [];
       const newTextFiles: TextFileAttachment[] = [];
       const errors: string[] = [];
@@ -206,7 +204,6 @@ export function useFileAttachments({
     [
       effectiveMaxFiles,
       effectiveMaxImageFileSize,
-      isProcessing,
       onInsertText,
       projectPath,
       selectedImages,

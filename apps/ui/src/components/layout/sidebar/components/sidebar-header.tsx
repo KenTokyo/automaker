@@ -1,6 +1,15 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { ChevronsUpDown, Folder, Plus, FolderOpen } from 'lucide-react';
+import {
+  ChevronsUpDown,
+  Folder,
+  Plus,
+  FolderOpen,
+  EyeOff,
+  Eye,
+  Pencil,
+  Trash2,
+} from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn, isMac } from '@/lib/utils';
@@ -34,8 +43,23 @@ export function SidebarHeader({
   onProjectContextMenu,
 }: SidebarHeaderProps) {
   const navigate = useNavigate();
-  const { projects, setCurrentProject } = useAppStore();
+  const { projects, setCurrentProject, toggleProjectHidden, moveProjectToTrash } = useAppStore();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  // Sort projects alphabetically, hidden projects at the end
+  const sortedProjects = useMemo(() => {
+    const visible = projects.filter((p) => !p.isHidden);
+    const hidden = projects.filter((p) => p.isHidden);
+    const sortFn = (a: Project, b: Project) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    return [...visible.sort(sortFn), ...hidden.sort(sortFn)];
+  }, [projects]);
+
+  const visibleProjects = useMemo(
+    () => sortedProjects.filter((p) => !p.isHidden),
+    [sortedProjects]
+  );
+  const hiddenProjects = useMemo(() => sortedProjects.filter((p) => p.isHidden), [sortedProjects]);
 
   const handleLogoClick = useCallback(() => {
     navigate({ to: '/overview' });
@@ -169,9 +193,11 @@ export function SidebarHeader({
                 data-testid="collapsed-project-dropdown-content"
               >
                 <div className="px-2 py-1.5">
-                  <span className="text-xs font-medium text-muted-foreground">Projects</span>
+                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Projects
+                  </span>
                 </div>
-                {projects.map((project, index) => {
+                {visibleProjects.map((project, index) => {
                   const isActive = currentProject?.id === project.id;
                   const hotkeyLabel = index < 9 ? `${index + 1}` : index === 9 ? '0' : undefined;
 
@@ -185,26 +211,77 @@ export function SidebarHeader({
                         setDropdownOpen(false);
                         onProjectContextMenu(project, e);
                       }}
-                      className="flex items-center gap-3 cursor-pointer"
+                      className="flex items-center gap-2 cursor-pointer group py-1.5"
                       data-testid={`collapsed-project-item-${project.id}`}
                     >
                       {renderProjectIcon(project, 'sm')}
                       <span
                         className={cn(
-                          'flex-1 truncate',
+                          'flex-1 truncate text-xs',
                           isActive && 'font-semibold text-foreground'
                         )}
                       >
                         {project.name}
                       </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleProjectHidden(project.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-all"
+                        title="Hide project"
+                      >
+                        <EyeOff className="w-3 h-3" />
+                      </button>
                       {hotkeyLabel && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-[10px] text-muted-foreground">
                           {formatShortcut(`Cmd+${hotkeyLabel}`, true)}
                         </span>
                       )}
                     </DropdownMenuItem>
                   );
                 })}
+                {hiddenProjects.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <div className="px-2 py-1">
+                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                        Hidden
+                      </span>
+                    </div>
+                    {hiddenProjects.map((project) => {
+                      const isActive = currentProject?.id === project.id;
+                      return (
+                        <DropdownMenuItem
+                          key={project.id}
+                          onClick={() => handleProjectSelect(project)}
+                          className="flex items-center gap-2 cursor-pointer group py-1.5 opacity-50 hover:opacity-100"
+                          data-testid={`collapsed-project-item-hidden-${project.id}`}
+                        >
+                          {renderProjectIcon(project, 'sm')}
+                          <span
+                            className={cn(
+                              'flex-1 truncate text-xs',
+                              isActive && 'font-semibold text-foreground'
+                            )}
+                          >
+                            {project.name}
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleProjectHidden(project.id);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-all"
+                            title="Show project"
+                          >
+                            <Eye className="w-3 h-3" />
+                          </button>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => {
@@ -214,8 +291,8 @@ export function SidebarHeader({
                   className="cursor-pointer"
                   data-testid="collapsed-new-project-dropdown-item"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  <span>New Project</span>
+                  <Plus className="w-3.5 h-3.5 mr-2" />
+                  <span className="text-xs">New Project</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => {
@@ -225,8 +302,8 @@ export function SidebarHeader({
                   className="cursor-pointer"
                   data-testid="collapsed-open-project-dropdown-item"
                 >
-                  <FolderOpen className="w-4 h-4 mr-2" />
-                  <span>Open Project</span>
+                  <FolderOpen className="w-3.5 h-3.5 mr-2" />
+                  <span className="text-xs">Open Project</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -315,10 +392,12 @@ export function SidebarHeader({
               className="w-64"
               data-testid="project-dropdown-content"
             >
-              <div className="px-2 py-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Projects</span>
+              <div className="px-2 py-1">
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                  Projects
+                </span>
               </div>
-              {projects.map((project, index) => {
+              {visibleProjects.map((project, index) => {
                 const isActive = currentProject?.id === project.id;
                 const hotkeyLabel = index < 9 ? `${index + 1}` : index === 9 ? '0' : undefined;
 
@@ -332,23 +411,77 @@ export function SidebarHeader({
                       setDropdownOpen(false);
                       onProjectContextMenu(project, e);
                     }}
-                    className="flex items-center gap-3 cursor-pointer"
+                    className="flex items-center gap-2 cursor-pointer group py-1.5"
                     data-testid={`project-item-${project.id}`}
                   >
                     {renderProjectIcon(project, 'sm')}
                     <span
-                      className={cn('flex-1 truncate', isActive && 'font-semibold text-foreground')}
+                      className={cn(
+                        'flex-1 truncate text-xs',
+                        isActive && 'font-semibold text-foreground'
+                      )}
                     >
                       {project.name}
                     </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleProjectHidden(project.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-all"
+                      title="Hide project"
+                    >
+                      <EyeOff className="w-3 h-3" />
+                    </button>
                     {hotkeyLabel && (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-[10px] text-muted-foreground">
                         {formatShortcut(`Cmd+${hotkeyLabel}`, true)}
                       </span>
                     )}
                   </DropdownMenuItem>
                 );
               })}
+              {hiddenProjects.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1">
+                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                      Hidden
+                    </span>
+                  </div>
+                  {hiddenProjects.map((project) => {
+                    const isActive = currentProject?.id === project.id;
+                    return (
+                      <DropdownMenuItem
+                        key={project.id}
+                        onClick={() => handleProjectSelect(project)}
+                        className="flex items-center gap-2 cursor-pointer group py-1.5 opacity-50 hover:opacity-100"
+                        data-testid={`project-item-hidden-${project.id}`}
+                      >
+                        {renderProjectIcon(project, 'sm')}
+                        <span
+                          className={cn(
+                            'flex-1 truncate text-xs',
+                            isActive && 'font-semibold text-foreground'
+                          )}
+                        >
+                          {project.name}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleProjectHidden(project.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent/50 text-muted-foreground hover:text-foreground transition-all"
+                          title="Show project"
+                        >
+                          <Eye className="w-3 h-3" />
+                        </button>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => {
@@ -358,8 +491,8 @@ export function SidebarHeader({
                 className="cursor-pointer"
                 data-testid="new-project-dropdown-item"
               >
-                <Plus className="w-4 h-4 mr-2" />
-                <span>New Project</span>
+                <Plus className="w-3.5 h-3.5 mr-2" />
+                <span className="text-xs">New Project</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
@@ -369,8 +502,8 @@ export function SidebarHeader({
                 className="cursor-pointer"
                 data-testid="open-project-dropdown-item"
               >
-                <FolderOpen className="w-4 h-4 mr-2" />
-                <span>Open Project</span>
+                <FolderOpen className="w-3.5 h-3.5 mr-2" />
+                <span className="text-xs">Open Project</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -5,7 +5,6 @@ import { useAppStore } from '@/store/app-store';
 import { useShallow } from 'zustand/react/shallow';
 import { getElectronAPI } from '@/lib/electron';
 import { generateRandomSessionName } from '@/components/session-manager/session-name-generator';
-import { useOrchestratorStore } from '@/store/orchestrator-store';
 import { queryKeys } from '@/lib/query-keys';
 
 const logger = createLogger('AgentSession');
@@ -85,22 +84,15 @@ export function useAgentSession({
           return;
         }
 
-        // Resolve orchestrator run ID if orchestrator mode is enabled
-        const orchestratorState = useOrchestratorStore.getState();
-        let runIdForSession: string | undefined;
-        if (orchestratorState.isEnabled) {
-          const persistedRunId = orchestratorState.orchestratorRunId?.trim();
-          runIdForSession = persistedRunId || orchestratorState.startNewRun() || undefined;
-        }
-
         const sessionName = generateRandomSessionName();
         logger.info('Auto-creating new session for project:', forProjectPath, 'name:', sessionName);
 
+        // Auto-created sessions on project switch are independent (no orchestrator run ID)
         const result = await api.sessions.create(
           sessionName,
           forProjectPath,
           forProjectPath,
-          runIdForSession
+          undefined
         );
 
         if (result.success && result.session?.id) {

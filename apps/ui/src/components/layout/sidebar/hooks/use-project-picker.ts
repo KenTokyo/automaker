@@ -21,13 +21,28 @@ export function useProjectPicker({
   const projectSearchInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Filtered projects based on search query
+  // Filtered and sorted projects based on search query
+  // - Hidden projects are excluded unless searching (search shows everything)
+  // - Results are sorted alphabetically (A-Z), with hidden projects at the end when searching
   const filteredProjects = useMemo(() => {
-    if (!projectSearchQuery.trim()) {
-      return projects;
-    }
+    const isSearching = projectSearchQuery.trim().length > 0;
     const query = projectSearchQuery.toLowerCase();
-    return projects.filter((project) => project.name.toLowerCase().includes(query));
+
+    let result = isSearching
+      ? projects.filter((project) => project.name.toLowerCase().includes(query))
+      : projects.filter((project) => !project.isHidden);
+
+    // Sort alphabetically: visible first, then hidden (when searching), all A-Z within groups
+    result = [...result].sort((a, b) => {
+      // When searching, push hidden projects to the end
+      if (isSearching) {
+        if (a.isHidden && !b.isHidden) return 1;
+        if (!a.isHidden && b.isHidden) return -1;
+      }
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+
+    return result;
   }, [projects, projectSearchQuery]);
 
   // Helper function to scroll to a specific project

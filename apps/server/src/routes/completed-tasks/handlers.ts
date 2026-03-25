@@ -288,6 +288,43 @@ export function createDeleteHandler(events: EventEmitter) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// BULK DELETE
+// ────────────────────────────────────────────────────────────────────────────
+
+export function createBulkDeleteHandler(events: EventEmitter) {
+  return async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { projectPath, filenames } = req.body;
+
+      if (!projectPath || typeof projectPath !== 'string') {
+        res.status(400).json({ success: false, error: 'projectPath is required' });
+        return;
+      }
+      if (!Array.isArray(filenames) || filenames.length === 0) {
+        res.status(400).json({ success: false, error: 'filenames array is required' });
+        return;
+      }
+
+      let deletedCount = 0;
+      for (const filename of filenames) {
+        if (typeof filename !== 'string') continue;
+        const deleted = await deleteCompletedTask(projectPath, filename);
+        if (deleted) {
+          deletedCount++;
+          events.emit('completed-task:deleted', { taskId: filename, projectPath });
+        }
+      }
+
+      logger.info(`Bulk-deleted ${deletedCount}/${filenames.length} tasks from ${projectPath}`);
+      res.json({ success: true, deletedCount });
+    } catch (error) {
+      logError(error, 'Failed to bulk-delete completed tasks');
+      res.status(500).json({ success: false, error: getErrorMessage(error) });
+    }
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // STATS
 // ────────────────────────────────────────────────────────────────────────────
 

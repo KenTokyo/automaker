@@ -189,3 +189,23 @@ export async function deleteCompletedTask(filename: string, projectPath: string)
     return false;
   }
 }
+
+/**
+ * Bulk-delete completed tasks via POST /api/completed-tasks/bulk-delete.
+ * Returns the number of actually deleted files.
+ */
+export async function bulkDeleteCompletedTasks(
+  filenames: string[],
+  projectPath: string
+): Promise<number> {
+  try {
+    const response = await apiFetch('/api/completed-tasks/bulk-delete', 'POST', {
+      body: { projectPath, filenames },
+    });
+    if (!response.ok) return 0;
+    const data = (await response.json()) as { deletedCount: number };
+    return data.deletedCount ?? 0;
+  } catch {
+    return 0;
+  }
+}

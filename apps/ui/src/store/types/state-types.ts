@@ -438,6 +438,7 @@ export interface AppActions {
   cycleNextProject: () => void; // Cycle forward through project history (E)
   clearProjectHistory: () => void; // Clear history, keeping only current project
   toggleProjectFavorite: (projectId: string) => void; // Toggle project favorite status
+  toggleProjectHidden: (projectId: string) => void; // Toggle project hidden/visible status
   setProjectIcon: (projectId: string, icon: string | null) => void; // Set project icon (null to clear)
   setProjectCustomIcon: (projectId: string, customIconPath: string | null) => void; // Set custom project icon image path (null to clear)
   setProjectName: (projectId: string, name: string) => void; // Update project name

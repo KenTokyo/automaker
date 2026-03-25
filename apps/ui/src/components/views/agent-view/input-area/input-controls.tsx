@@ -11,6 +11,7 @@ import {
   Loader2,
   Cpu,
   RotateCcw,
+  FileDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -24,6 +25,7 @@ import { CompletedTasksToggle } from './completed-tasks-toggle';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 import { useVoxtralSpeechRecognition } from '@/hooks/use-voxtral-speech-recognition';
 import { useAppStore } from '@/store/app-store';
+import { useSaveAsMarkdown } from '@/hooks/use-save-as-markdown';
 import type { PhaseModelEntry } from '@automaker/types';
 
 interface InputControlsProps {
@@ -334,6 +336,28 @@ export function InputControls({
   const setDocsOpen = useAppStore((s) => s.setDocsOpen);
   const [docsPopoverOpen, setDocsPopoverOpen] = useState(false);
 
+  // Save-as-Markdown
+  const {
+    saveAsMarkdown,
+    isSaving,
+    canSave: canSaveMarkdown,
+  } = useSaveAsMarkdown({
+    projectPath,
+    input: draftInput,
+    onInputChange: (value: string) => {
+      setDraftInput(value);
+      syncInputToParent(value, true);
+      scheduleTextareaResize(inputRef.current);
+    },
+  });
+
+  const handleSaveAsMarkdown = useCallback(async () => {
+    const result = await saveAsMarkdown();
+    if (!result.success && result.error) {
+      console.error('Markdown speichern fehlgeschlagen:', result.error);
+    }
+  }, [saveAsMarkdown]);
+
   const handleInsertRecentDoc = useCallback(
     (absolutePath: string) => {
       setDraftInput((previous) => {
@@ -409,7 +433,7 @@ export function InputControls({
           data-testid="agent-input"
           rows={1}
           className={cn(
-            'w-full bg-background border-border rounded-lg pl-3 pr-3 sm:pr-16 text-sm resize-none py-2',
+            'w-full bg-background border-border rounded-lg pl-3 pr-3 sm:pr-16 !text-[13px] !leading-[1.45] resize-none py-2',
             !accentColor && 'focus:ring-2 focus:ring-primary/20 focus:border-primary/50',
             'min-h-[44px]',
             hasFiles && !accentColor && 'border-primary/30',
@@ -478,6 +502,28 @@ export function InputControls({
 
           {/* Agent Prompts Selector */}
           <AgentPromptsSelector projectPath={projectPath} disabled={!isConnected} />
+
+          {/* Save as Markdown Button */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleSaveAsMarkdown}
+            disabled={!canSaveMarkdown || !isConnected}
+            className={cn(
+              'h-7 w-7 rounded-md shrink-0 transition-all duration-200',
+              canSaveMarkdown && isConnected
+                ? 'bg-emerald-600/10 text-emerald-600 border-emerald-500/40 hover:bg-emerald-600/20 hover:border-emerald-500/60'
+                : 'border-border',
+              isSaving && 'animate-pulse'
+            )}
+            title="Text als Markdown speichern"
+          >
+            {isSaving ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <FileDown className="w-3.5 h-3.5" />
+            )}
+          </Button>
 
           {/* Microphone Button */}
           {isSpeechSupported && (

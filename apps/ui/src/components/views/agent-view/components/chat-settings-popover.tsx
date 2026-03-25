@@ -103,7 +103,8 @@ export function ChatSettingsPopover({ settings, onChange }: ChatSettingsPopoverP
         s.fontOpacity === settings.fontOpacity &&
         s.lineHeight === settings.lineHeight &&
         s.codeBlockRelativeSize === settings.codeBlockRelativeSize &&
-        s.fontColorGray === (settings.fontColorGray ?? 900)
+        s.fontColorGray === (settings.fontColorGray ?? 900) &&
+        s.headingScale === (settings.headingScale ?? 1.0)
       ) {
         return preset.name;
       }
@@ -237,6 +238,23 @@ export function ChatSettingsPopover({ settings, onChange }: ChatSettingsPopoverP
                 max={2.0}
                 step={0.1}
                 onValueChange={([v]) => updateField('lineHeight', Math.round(v * 10) / 10)}
+              />
+            </div>
+
+            {/* Heading Scale */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Titelgröße</span>
+                <span className="text-xs font-mono text-foreground">
+                  {Math.round((settings.headingScale ?? 1.0) * 100)}%
+                </span>
+              </div>
+              <Slider
+                value={[settings.headingScale ?? 1.0]}
+                min={0.7}
+                max={1.3}
+                step={0.05}
+                onValueChange={([v]) => updateField('headingScale', Math.round(v * 100) / 100)}
               />
             </div>
 

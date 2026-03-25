@@ -105,6 +105,7 @@ export interface ChatDisplaySettings {
   lineHeight: number; // 1.2-2.0
   codeBlockRelativeSize: number; // offset in px relative to fontSize
   fontColorGray: number; // 400-900 gray shade (400=lighter, 900=darker)
+  headingScale: number; // 0.7-1.3 scale factor for heading sizes (1.0 = default)
 }
 
 export type ChatDisplayPresetName = 'standard' | 'gedaempft' | 'kraeftig' | 'kompakt' | 'gross';
@@ -122,6 +123,7 @@ export const DEFAULT_CHAT_DISPLAY_SETTINGS: ChatDisplaySettings = {
   lineHeight: 1.5,
   codeBlockRelativeSize: 0,
   fontColorGray: 900,
+  headingScale: 1.0,
 };
 
 export const CHAT_DISPLAY_PRESETS: ChatDisplayPreset[] = [
@@ -135,6 +137,7 @@ export const CHAT_DISPLAY_PRESETS: ChatDisplayPreset[] = [
       lineHeight: 1.5,
       codeBlockRelativeSize: 0,
       fontColorGray: 900,
+      headingScale: 1.0,
     },
   },
   {
@@ -147,6 +150,7 @@ export const CHAT_DISPLAY_PRESETS: ChatDisplayPreset[] = [
       lineHeight: 1.5,
       codeBlockRelativeSize: 0,
       fontColorGray: 600,
+      headingScale: 0.9,
     },
   },
   {
@@ -159,6 +163,7 @@ export const CHAT_DISPLAY_PRESETS: ChatDisplayPreset[] = [
       lineHeight: 1.45,
       codeBlockRelativeSize: 0,
       fontColorGray: 900,
+      headingScale: 1.0,
     },
   },
   {
@@ -171,6 +176,7 @@ export const CHAT_DISPLAY_PRESETS: ChatDisplayPreset[] = [
       lineHeight: 1.35,
       codeBlockRelativeSize: 0,
       fontColorGray: 800,
+      headingScale: 0.85,
     },
   },
   {
@@ -183,6 +189,7 @@ export const CHAT_DISPLAY_PRESETS: ChatDisplayPreset[] = [
       lineHeight: 1.65,
       codeBlockRelativeSize: 0,
       fontColorGray: 900,
+      headingScale: 1.1,
     },
   },
 ];

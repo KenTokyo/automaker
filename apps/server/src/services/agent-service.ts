@@ -744,6 +744,12 @@ export class AgentService {
         session.isRunning = false;
         session.abortController = null;
         await this.accumulateElapsedTime(sessionId);
+
+        // Process next queued prompt after user stop
+        // This enables the "stop to send next" workflow:
+        // User queues a prompt → clicks Stop → queued prompt sends immediately
+        setImmediate(() => this.processNextInQueue(sessionId));
+
         return { success: false, aborted: true };
       }
 

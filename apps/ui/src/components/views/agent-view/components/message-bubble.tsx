@@ -70,8 +70,6 @@ export const MessageBubble = memo(function MessageBubble({
   const hasCustomFontColor =
     chatDisplaySettings.fontColorGray != null && chatDisplaySettings.fontColorGray < 900;
   const markdownClassName = cn(
-    !hasCustomFontColor && 'prose-headings:text-foreground prose-strong:text-foreground',
-    hasCustomFontColor && 'prose-headings:text-inherit prose-strong:text-inherit',
     '[&_p]:whitespace-pre-wrap [&_li]:whitespace-pre-wrap [&_code]:break-words',
     isError
       ? 'text-red-600 dark:text-red-400 prose-code:text-red-600 dark:prose-code:text-red-400 prose-code:bg-red-500/10'
@@ -86,11 +84,16 @@ export const MessageBubble = memo(function MessageBubble({
   const renderUserContent = useCallback(() => {
     if (!mainMessage) return null;
     return (
-      <div className="whitespace-pre-wrap break-words text-foreground leading-relaxed">
+      <div
+        className={cn(
+          'whitespace-pre-wrap break-words leading-relaxed',
+          hasCustomFontColor ? 'text-inherit' : 'text-foreground'
+        )}
+      >
         {mainMessage}
       </div>
     );
-  }, [mainMessage]);
+  }, [mainMessage, hasCustomFontColor]);
 
   return (
     <div className={cn('group/msg', isUserMessage ? 'flex justify-end' : '')}>
@@ -135,7 +138,7 @@ export const MessageBubble = memo(function MessageBubble({
         </div>
 
         <div
-          className="chat-display-styled"
+          className={cn('chat-display-styled', hasCustomFontColor && 'chat-color-override')}
           style={
             {
               fontSize: `${chatDisplaySettings.fontSize}px`,
@@ -143,6 +146,7 @@ export const MessageBubble = memo(function MessageBubble({
               opacity: chatDisplaySettings.fontOpacity,
               lineHeight: chatDisplaySettings.lineHeight,
               '--code-font-size': `${chatDisplaySettings.fontSize + chatDisplaySettings.codeBlockRelativeSize}px`,
+              '--heading-scale': chatDisplaySettings.headingScale ?? 1.0,
               ...(chatDisplaySettings.fontColorGray != null &&
                 chatDisplaySettings.fontColorGray < 900 && {
                   color: getGrayShadeColor(chatDisplaySettings.fontColorGray, isDarkThemeActive()),

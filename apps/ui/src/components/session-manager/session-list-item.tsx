@@ -97,7 +97,12 @@ export function SessionListItemRow({
   const wasStopped = session.status === 'stopped' && !isRunning;
   const isDirty = session.isDirty && !isRunning && !hasFailed && !wasStopped;
 
-  const elapsedTime = useElapsedTime(session.totalElapsedMs, session.lastStartedAt, isRunning);
+  const elapsedTime = useElapsedTime(
+    session.totalElapsedMs,
+    session.lastStartedAt,
+    isRunning,
+    session.id
+  );
   const hasElapsedTime = (session.totalElapsedMs && session.totalElapsedMs > 0) || isRunning;
 
   const project = getProject(session.projectPath);

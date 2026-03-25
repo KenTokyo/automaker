@@ -3688,6 +3688,7 @@ export interface Project {
   fontFamilySans?: string; // Per-project UI/sans font override
   fontFamilyMono?: string; // Per-project code/mono font override
   isFavorite?: boolean; // Pin project to top of dashboard
+  isHidden?: boolean; // Hide project from project selectors (still accessible via search/settings)
   icon?: string; // Lucide icon name for project identification
   customIconPath?: string; // Path to custom uploaded icon image in .automaker/images/
   badgeColor?: string; // Border color for project badge (hex color, e.g., "#ff0000")

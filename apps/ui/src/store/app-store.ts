@@ -810,6 +810,22 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     saveProjects(get().projects);
   },
 
+  toggleProjectHidden: (projectId: string) => {
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId ? { ...p, isHidden: !p.isHidden } : p
+      ),
+      // Also update currentProject if it's the one being modified
+      currentProject:
+        state.currentProject?.id === projectId
+          ? { ...state.currentProject, isHidden: !state.currentProject.isHidden }
+          : state.currentProject,
+    }));
+
+    // Persist to storage
+    saveProjects(get().projects);
+  },
+
   setProjectIcon: (projectId: string, icon: string | null) => {
     set((state) => ({
       projects: state.projects.map((p) =>

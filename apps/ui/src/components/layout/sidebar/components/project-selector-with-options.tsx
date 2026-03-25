@@ -11,6 +11,8 @@ import {
   RotateCcw,
   Trash2,
   Search,
+  EyeOff,
+  Eye,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatShortcut, type ThemeMode, useAppStore } from '@/store/app-store';
@@ -80,6 +82,7 @@ export function ProjectSelectorWithOptions({
     cyclePrevProject,
     cycleNextProject,
     clearProjectHistory,
+    toggleProjectHidden,
   } = useAppStore();
 
   const shortcuts = useKeyboardShortcutsConfig();
@@ -371,8 +374,30 @@ export function ProjectSelectorWithOptions({
               </>
             )}
 
-            {/* Move to Trash Section */}
+            {/* Hide / Unhide Project */}
             <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                if (currentProject) {
+                  toggleProjectHidden(currentProject.id);
+                }
+              }}
+              data-testid="toggle-project-hidden"
+            >
+              {currentProject?.isHidden ? (
+                <>
+                  <Eye className="w-4 h-4 mr-2" />
+                  <span>Show Project</span>
+                </>
+              ) : (
+                <>
+                  <EyeOff className="w-4 h-4 mr-2" />
+                  <span>Hide Project</span>
+                </>
+              )}
+            </DropdownMenuItem>
+
+            {/* Move to Trash Section */}
             <DropdownMenuItem
               onClick={() => setShowDeleteProjectDialog(true)}
               className="text-destructive focus:text-destructive focus:bg-destructive/10"

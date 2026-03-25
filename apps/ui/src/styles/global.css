@@ -431,6 +431,65 @@
   font-size: var(--code-font-size) !important;
 }
 
+/* ---------------------------------------------------------------------------
+   Prose Accent Colors — makes headings, bold, italic, and inline code
+   visually distinct with colored accents. Applied to all Markdown instances
+   via the .prose-accents class.
+   --------------------------------------------------------------------------- */
+
+/* Headings — warm red/coral accent */
+.prose-accents h1,
+.prose-accents h2,
+.prose-accents h3,
+.prose-accents h4 {
+  color: oklch(0.75 0.14 25);
+}
+
+/* Bold — golden/amber accent */
+.prose-accents strong {
+  color: oklch(0.82 0.12 85);
+}
+
+/* Italic — soft teal/cyan accent */
+.prose-accents em {
+  color: oklch(0.78 0.1 190);
+}
+
+/* Inline code — muted purple accent (not inside code blocks) */
+.prose-accents code:not(pre code) {
+  color: oklch(0.75 0.1 280);
+}
+
+/* ---------------------------------------------------------------------------
+   Chat color override — when a custom font color is set via the Schriftfarbe
+   slider, force body text to inherit the color while keeping prose accents.
+   The .chat-color-override class is toggled by MessageBubble.
+   --------------------------------------------------------------------------- */
+.chat-color-override p,
+.chat-color-override li,
+.chat-color-override td,
+.chat-color-override th,
+.chat-color-override span:not([class*='hljs-']):not(code span) {
+  color: inherit !important;
+}
+
+/* Override accent specificity so they win over Tailwind text-* classes */
+.chat-color-override h1,
+.chat-color-override h2,
+.chat-color-override h3,
+.chat-color-override h4 {
+  color: oklch(0.75 0.14 25) !important;
+}
+.chat-color-override strong {
+  color: oklch(0.82 0.12 85) !important;
+}
+.chat-color-override em {
+  color: oklch(0.78 0.1 190) !important;
+}
+.chat-color-override code:not(pre code) {
+  color: oklch(0.75 0.1 280) !important;
+}
+
 /* Universal scrollbar styling using theme CSS variables */
 ::-webkit-scrollbar {
   width: 8px;

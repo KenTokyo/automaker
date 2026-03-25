@@ -174,7 +174,9 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Ref for quick create session function from SessionManager
-  const quickCreateSessionRef = useRef<(() => Promise<void>) | null>(null);
+  const quickCreateSessionRef = useRef<
+    ((attachOrchestratorRunId?: boolean) => Promise<void>) | null
+  >(null);
 
   // Session management hook
   const { currentSessionId, handleSelectSession } = useAgentSession({
@@ -347,9 +349,9 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       // Store the content to paste into new session
       setPendingCopiedContent(contextSummary);
 
-      // Create new session
+      // Create new session (time-limiter: attach orchestrator run ID)
       if (quickCreateSessionRef.current) {
-        await quickCreateSessionRef.current();
+        await quickCreateSessionRef.current(true);
       }
     };
 
@@ -464,9 +466,9 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       orchestratorSetAutoSendStatus('waiting');
     }
 
-    // Create a new session
+    // Create a new session (orchestrator-triggered: attach run ID)
     if (quickCreateSessionRef.current) {
-      quickCreateSessionRef.current();
+      quickCreateSessionRef.current(true);
     }
   }, [
     isProcessing,

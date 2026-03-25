@@ -1,24 +1,25 @@
 /**
  * CompletedTasksPanel - Left sidebar panel for the "Fertig" (Done) tab.
  *
- * Full card layout with project filter, search, tag/status/effort filters,
- * and sorting by date, title, or effort.
+ * Groups completed tasks by project (like the Sessions tab) with collapsible
+ * tree nodes. Each project shows 3 tasks initially, with "show more" loading
+ * 10 at a time. Includes a per-project cleanup button that trims tasks > 20.
  *
  * Default: "Alle Projekte" mode — loads completed tasks from ALL
  * registered projects simultaneously so tasks are always visible
  * regardless of which project is currently active.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AArrowDown,
   AArrowUp,
   AlertCircle,
   CheckCircle2,
-  FolderOpen,
   Loader2,
   RefreshCw,
   SearchX,
+  Trash2,
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import type {
@@ -29,15 +30,24 @@ import type {
   CompletedTaskEffort,
 } from '@automaker/types';
 import { useAppStore } from '@/store/app-store';
-import { useCompletedTasks, deleteCompletedTask } from '@/hooks/use-completed-tasks';
+import {
+  useCompletedTasks,
+  deleteCompletedTask,
+  bulkDeleteCompletedTasks,
+} from '@/hooks/use-completed-tasks';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
-import { CompletedTaskCard } from './completed-task-card';
 import { CompletedTasksSearch } from './completed-tasks-search';
 import { CompletedTasksFilterBar } from './completed-tasks-filter-bar';
 import { HistoryViewerPanel } from './history-viewer-panel';
 import { getStatusLabel } from './completed-task-utils';
+import {
+  CompletedTaskProjectGroup,
+  INITIAL_VISIBLE,
+  LOAD_MORE_COUNT,
+  MAX_TASKS_KEEP,
+} from './completed-task-project-group';
 
 // ---------------------------------------------------------------------------
 // Client-side sort helper
@@ -78,15 +88,9 @@ function filterTasksLocal(
   search: string | undefined,
   tags: string[] | undefined,
   status: CompletedTaskStatus[] | undefined,
-  effort: CompletedTaskEffort[] | undefined,
-  projectFilter: string | null
+  effort: CompletedTaskEffort[] | undefined
 ): CompletedTask[] {
   let result = tasks;
-
-  // Project filter (client-side, applied to multi-project results)
-  if (projectFilter) {
-    result = result.filter((t) => t.projectPath === projectFilter);
-  }
 
   if (tags && tags.length > 0) {
     result = result.filter((t) => t.tags.some((tag) => tags.includes(tag)));
@@ -114,10 +118,54 @@ function filterTasksLocal(
 }
 
 // ---------------------------------------------------------------------------
-// Project filter constants
+// Project grouping helper for completed tasks
 // ---------------------------------------------------------------------------
 
-const ALL_PROJECTS_VALUE = '__all__';
+interface CompletedTaskProjectGroup_ {
+  projectName: string;
+  projectPath: string;
+  tasks: CompletedTask[];
+  totalCount: number;
+}
+
+function groupTasksByProject(tasks: CompletedTask[]): CompletedTaskProjectGroup_[] {
+  const byProject = new Map<string, { name: string; tasks: CompletedTask[] }>();
+
+  for (const task of tasks) {
+    const key = task.projectPath || '__no_project__';
+    const existing = byProject.get(key);
+    if (existing) {
+      existing.tasks.push(task);
+    } else {
+      byProject.set(key, {
+        name: task.projectName || extractFolderName(key),
+        tasks: [task],
+      });
+    }
+  }
+
+  const groups: CompletedTaskProjectGroup_[] = [];
+  for (const [projectPath, { name, tasks: projectTasks }] of byProject) {
+    // Tasks should already be sorted newest-first from API, but ensure it
+    const sorted = [...projectTasks].sort((a, b) => b.date.localeCompare(a.date));
+    groups.push({
+      projectName: name,
+      projectPath,
+      tasks: sorted,
+      totalCount: sorted.length,
+    });
+  }
+
+  // Sort groups alphabetically
+  groups.sort((a, b) => a.projectName.toLowerCase().localeCompare(b.projectName.toLowerCase()));
+  return groups;
+}
+
+function extractFolderName(path: string): string {
+  if (path === '__no_project__') return 'Unbekannt';
+  const normalized = path.replace(/[\\/]+$/, '');
+  return normalized.split(/[\\/]/).pop() || path;
+}
 
 // ---------------------------------------------------------------------------
 // Main panel
@@ -148,8 +196,10 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
   const setSessionFontSize = useAppStore((s) => s.setSessionFontSize);
 
   const [historyFile, setHistoryFile] = useState<string | null>(null);
-  // Project filter: null = all projects
-  const [projectFilter, setProjectFilter] = useState<string | null>(null);
+
+  // Project tree state: which groups are expanded + visible counts
+  const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
+  const [projectVisibleCounts, setProjectVisibleCounts] = useState<Record<string, number>>({});
 
   // Build allProjects list for the hook (always fetch from all)
   const allProjects = useMemo(
@@ -164,17 +214,6 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
     allProjects.length > 0 ? allProjects : undefined
   );
 
-  // Extract unique project names from loaded tasks for the filter dropdown
-  const projectsInTasks = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const t of tasks) {
-      if (t.projectPath && t.projectName) {
-        map.set(t.projectPath, t.projectName);
-      }
-    }
-    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1], 'de'));
-  }, [tasks]);
-
   // Apply local filtering + sorting
   const filteredTasks = useMemo(() => {
     const filtered = filterTasksLocal(
@@ -182,18 +221,32 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
       filter.search,
       filter.tags,
       filter.status,
-      filter.effort,
-      projectFilter
+      filter.effort
     );
     return sortTasks(filtered, sortField, sortOrder);
-  }, [tasks, filter, sortField, sortOrder, projectFilter]);
+  }, [tasks, filter, sortField, sortOrder]);
+
+  // Group filtered tasks by project
+  const projectGroups = useMemo(() => groupTasksByProject(filteredTasks), [filteredTasks]);
+
+  // Auto-expand current project on first load
+  useEffect(() => {
+    if (projectGroups.length > 0 && Object.keys(expandedProjects).length === 0) {
+      const currentGroup = projectGroups.find((g) => g.projectPath === projectPath);
+      if (currentGroup) {
+        setExpandedProjects((prev) => ({ ...prev, [currentGroup.projectPath]: true }));
+      } else if (projectGroups.length > 0) {
+        // Expand the first group if current project has no tasks
+        setExpandedProjects((prev) => ({ ...prev, [projectGroups[0].projectPath]: true }));
+      }
+    }
+  }, [projectGroups.length > 0]);
 
   const hasActiveFilters = !!(
     filter.search ||
     filter.tags?.length ||
     filter.status?.length ||
-    filter.effort?.length ||
-    projectFilter
+    filter.effort?.length
   );
 
   // Stats summary for footer
@@ -227,7 +280,6 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
 
   const handleDelete = useCallback(
     async (filename: string) => {
-      // In multi-project mode, find the task to get its projectPath
       const task = tasks.find((t) => t.filename === filename);
       const deletePath = task?.projectPath || projectPath;
       const success = await deleteCompletedTask(filename, deletePath);
@@ -238,10 +290,58 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
     [tasks, projectPath, removeFromStore]
   );
 
+  const handleCleanupProject = useCallback(
+    async (cleanupProjectPath: string, tasksToDelete: string[]) => {
+      if (tasksToDelete.length === 0) return;
+      const deletedCount = await bulkDeleteCompletedTasks(tasksToDelete, cleanupProjectPath);
+      if (deletedCount > 0) {
+        // Remove from store
+        for (const filename of tasksToDelete) {
+          removeFromStore(filename);
+        }
+      }
+    },
+    [removeFromStore]
+  );
+
   const handleClearFilters = useCallback(() => {
     setFilter({});
-    setProjectFilter(null);
   }, [setFilter]);
+
+  const toggleProjectExpanded = useCallback((path: string) => {
+    setExpandedProjects((prev) => ({ ...prev, [path]: !prev[path] }));
+  }, []);
+
+  const showMoreForProject = useCallback((path: string) => {
+    setProjectVisibleCounts((prev) => ({
+      ...prev,
+      [path]: (prev[path] || INITIAL_VISIBLE) + LOAD_MORE_COUNT,
+    }));
+  }, []);
+
+  // Count projects that can be cleaned up
+  const cleanableProjects = useMemo(() => {
+    // Use unfiltered tasks for cleanup (filters shouldn't affect cleanup counts)
+    const allGroups = groupTasksByProject(tasks);
+    return allGroups.filter((g) => g.totalCount > MAX_TASKS_KEEP);
+  }, [tasks]);
+
+  const totalCleanupCount = useMemo(
+    () => cleanableProjects.reduce((sum, g) => sum + (g.totalCount - MAX_TASKS_KEEP), 0),
+    [cleanableProjects]
+  );
+
+  const handleCleanupAll = useCallback(async () => {
+    for (const group of cleanableProjects) {
+      const tasksToDelete = group.tasks.slice(MAX_TASKS_KEEP).map((t) => t.filename);
+      if (tasksToDelete.length > 0) {
+        await bulkDeleteCompletedTasks(tasksToDelete, group.projectPath);
+        for (const filename of tasksToDelete) {
+          removeFromStore(filename);
+        }
+      }
+    }
+  }, [cleanableProjects, removeFromStore]);
 
   // Full-page loading
   if (loading && tasks.length === 0) {
@@ -265,42 +365,31 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
         <h3 className="text-xs font-semibold text-muted-foreground">
           Erledigte Aufgaben ({filteredTasks.length})
         </h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0"
-          onClick={() => void refetch()}
-          title="Aktualisieren"
-        >
-          <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} />
-        </Button>
-      </div>
-
-      {/* Project filter (only show if multiple projects have tasks) */}
-      {projectsInTasks.length > 1 && (
-        <div className="border-b border-muted px-3 py-1.5">
-          <div className="flex items-center gap-1.5">
-            <FolderOpen className="h-3 w-3 shrink-0 text-muted-foreground" />
-            <select
-              className="min-w-0 flex-1 truncate rounded-md border border-muted bg-transparent px-1.5 py-0.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              value={projectFilter || ALL_PROJECTS_VALUE}
-              onChange={(e) =>
-                setProjectFilter(e.target.value === ALL_PROJECTS_VALUE ? null : e.target.value)
-              }
+        <div className="flex items-center gap-1">
+          {/* Cleanup all button */}
+          {totalCleanupCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 gap-1 px-1.5 text-[10px] text-muted-foreground hover:text-destructive"
+              onClick={() => void handleCleanupAll()}
+              title={`${totalCleanupCount} alte Aufgaben aus ${cleanableProjects.length} Projekt(en) löschen`}
             >
-              <option value={ALL_PROJECTS_VALUE}>Alle Projekte ({tasks.length})</option>
-              {projectsInTasks.map(([path, name]) => {
-                const count = tasks.filter((t) => t.projectPath === path).length;
-                return (
-                  <option key={path} value={path}>
-                    {name} ({count})
-                  </option>
-                );
-              })}
-            </select>
-          </div>
+              <Trash2 className="h-3 w-3" />
+              {totalCleanupCount}
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0"
+            onClick={() => void refetch()}
+            title="Aktualisieren"
+          >
+            <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} />
+          </Button>
         </div>
-      )}
+      </div>
 
       {/* Search + Filter bar */}
       <div className="space-y-2 border-b border-muted px-3 py-2">
@@ -348,17 +437,24 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
         </div>
       )}
 
-      {/* Task cards or empty filter result */}
+      {/* Project groups or empty filter result */}
       {filteredTasks.length === 0 && hasActiveFilters ? (
         <NoResultsState onClearFilters={handleClearFilters} />
       ) : (
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 py-2">
-          {filteredTasks.map((task) => (
-            <CompletedTaskCard
-              key={`${task.projectPath || ''}:${task.filename}`}
-              task={task}
+        <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+          {projectGroups.map((group) => (
+            <CompletedTaskProjectGroup
+              key={group.projectPath}
+              projectName={group.projectName}
+              projectPath={group.projectPath}
+              tasks={group.tasks}
+              isExpanded={!!expandedProjects[group.projectPath]}
+              onToggleExpanded={() => toggleProjectExpanded(group.projectPath)}
+              visibleCount={projectVisibleCounts[group.projectPath] || INITIAL_VISIBLE}
+              onShowMore={() => showMoreForProject(group.projectPath)}
               fontSize={sessionFontSize}
-              onDelete={(fn) => void handleDelete(fn)}
+              onDeleteTask={(fn) => void handleDelete(fn)}
+              onCleanupProject={(path, toDelete) => void handleCleanupProject(path, toDelete)}
             />
           ))}
         </div>

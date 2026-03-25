@@ -170,25 +170,26 @@ export const Markdown = memo(function Markdown({ children, className }: Markdown
   return (
     <div
       className={cn(
-        'prose prose-sm prose-invert max-w-none',
+        'prose prose-sm prose-invert max-w-none prose-accents',
         // Headings — compact, closer to body text size (terminal-style)
-        '[&_h1]:text-base [&_h1]:text-foreground [&_h1]:font-bold [&_h1]:mt-3 [&_h1]:mb-1',
-        '[&_h2]:text-[0.94rem] [&_h2]:text-foreground [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-1',
-        '[&_h3]:text-[0.88rem] [&_h3]:text-foreground [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-0.5',
-        '[&_h4]:text-sm [&_h4]:text-foreground [&_h4]:font-semibold [&_h4]:mt-2 [&_h4]:mb-0.5',
-        // Paragraphs — breathable spacing between paragraphs
-        '[&_p]:text-foreground-secondary [&_p]:leading-relaxed [&_p]:my-2 [&_p]:whitespace-pre-wrap',
+        // Sizes scale with --heading-scale CSS variable (default 1.0, set by chat-display-styled)
+        '[&_h1]:font-bold [&_h1]:mt-3 [&_h1]:mb-1',
+        '[&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-1',
+        '[&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-0.5',
+        '[&_h4]:font-semibold [&_h4]:mt-2 [&_h4]:mb-0.5',
+        // Paragraphs — compact spacing between paragraphs
+        '[&_p]:text-foreground-secondary [&_p]:leading-relaxed [&_p]:my-1.5 [&_p]:whitespace-pre-wrap',
         // Lists — modern, clean look with comfortable spacing (markers via CSS below)
         '[&_ul]:my-2 [&_ul]:pl-0 [&_ul]:list-none [&_ol]:my-2 [&_ol]:pl-0 [&_ol]:list-none',
         '[&_ul_ul]:my-0.5 [&_ol_ol]:my-0.5',
-        '[&_li]:text-foreground-secondary [&_li]:my-1 [&_li]:whitespace-pre-wrap [&_li]:leading-relaxed',
-        '[&_li>p]:my-0',
-        // Code — subtle inline code, no distracting color
-        '[&_code]:text-foreground [&_code]:bg-muted/60 [&_code]:px-1 [&_code]:py-px [&_code]:rounded-sm [&_code]:text-[0.85em]',
+        '[&_li]:text-foreground-secondary [&_li]:my-0.5 [&_li]:whitespace-pre-wrap [&_li]:leading-relaxed',
+        '[&_li_p]:!my-0 [&_li_p]:!leading-snug',
+        // Code — subtle inline code, accent color set by .prose-accents
+        '[&_code]:bg-muted/60 [&_code]:px-1 [&_code]:py-px [&_code]:rounded-sm [&_code]:text-[0.85em]',
         '[&_pre]:bg-card [&_pre]:border [&_pre]:border-border [&_pre]:rounded-lg [&_pre]:my-1.5 [&_pre]:p-3 [&_pre]:overflow-x-auto',
         '[&_pre_code]:bg-transparent [&_pre_code]:p-0',
-        // Strong/Bold
-        '[&_strong]:text-foreground [&_strong]:font-semibold',
+        // Strong/Bold — accent color set by .prose-accents
+        '[&_strong]:font-semibold',
         // Links
         '[&_a]:text-brand-500 [&_a]:no-underline hover:[&_a]:underline',
         // Blockquotes
@@ -198,7 +199,7 @@ export const Markdown = memo(function Markdown({ children, className }: Markdown
         // Images
         '[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-1.5 [&_img]:border [&_img]:border-border',
         // Tables
-        '[&_th]:border [&_th]:border-border [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:text-sm [&_th]:font-semibold [&_th]:text-foreground [&_th]:bg-muted/50',
+        '[&_th]:border [&_th]:border-border [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:text-sm [&_th]:font-semibold [&_th]:bg-muted/50',
         '[&_td]:border [&_td]:border-border [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-sm [&_td]:text-foreground-secondary [&_td]:align-top',
         '[&_tr:nth-child(even)_td]:bg-muted/25',
         className
@@ -225,6 +226,24 @@ export const Markdown = memo(function Markdown({ children, className }: Markdown
  * Uses CSS variables so they adapt to all app themes.
  */
 const syntaxStyles = `
+  /* Heading sizes — scale with --heading-scale (default 1.0) */
+  .prose h1 { font-size: calc(1rem * var(--heading-scale, 1)); }
+  .prose h2 { font-size: calc(0.94rem * var(--heading-scale, 1)); }
+  .prose h3 { font-size: calc(0.88rem * var(--heading-scale, 1)); }
+  .prose h4 { font-size: calc(0.875rem * var(--heading-scale, 1)); }
+
+  /* Remove excessive spacing from <p> inside list items (markdown parser wraps content in <p>) */
+  .prose li > p,
+  .prose li > p:first-child,
+  .prose li > p:last-child {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+  }
+  /* Adjacent <p> siblings in list items: tiny gap instead of full paragraph spacing */
+  .prose li > p + p {
+    margin-top: 0.15em !important;
+  }
+
   /* Modern list styling — custom markers */
   .prose ul, .prose ol {
     padding-left: 0;

@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { ChevronRight, FolderOpen, Folder } from 'lucide-react';
+import { useMemo } from 'react';
+import { ChevronRight, ChevronUp, FolderOpen, Folder, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { buildProjectDisplayEntries, type ProjectGroup } from '@/hooks/use-project-grouping';
 import type { SessionDisplayEntry } from '@/hooks/use-session-grouping';
@@ -14,8 +14,11 @@ interface ProjectGroupSectionProps {
   onToggleExpanded: () => void;
   visibleCount: number;
   onShowMore: () => void;
+  onShowLess: () => void;
   /** Render function for display entries (sessions / orchestrator groups) */
   renderDisplayEntry: (entry: SessionDisplayEntry) => React.ReactNode;
+  /** Creates a new chat in this project */
+  onNewSession?: (projectPath: string) => void;
 }
 
 export { INITIAL_VISIBLE, LOAD_MORE_COUNT };
@@ -27,7 +30,9 @@ export function ProjectGroupSection({
   onToggleExpanded,
   visibleCount,
   onShowMore,
+  onShowLess,
   renderDisplayEntry,
+  onNewSession,
 }: ProjectGroupSectionProps) {
   const visibleSessions = useMemo(
     () => group.allSessions.slice(0, visibleCount),
@@ -41,6 +46,7 @@ export function ProjectGroupSection({
 
   const hasMore = visibleCount < group.totalCount;
   const remainingCount = group.totalCount - visibleCount;
+  const isExpansionActive = visibleCount > INITIAL_VISIBLE;
 
   return (
     <div className="mb-1">
@@ -70,6 +76,25 @@ export function ProjectGroupSection({
         <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[9px] tabular-nums text-muted-foreground">
           {group.totalCount}
         </span>
+        {onNewSession && (
+          <span
+            role="button"
+            tabIndex={-1}
+            onClick={(e) => {
+              e.stopPropagation();
+              onNewSession(group.projectPath);
+            }}
+            className={cn(
+              'shrink-0 rounded-md p-0.5',
+              'text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/15',
+              'opacity-0 group-hover/project-header:opacity-100',
+              'transition-all duration-150 cursor-pointer'
+            )}
+            title={`Neuer Chat in ${group.projectName}`}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </span>
+        )}
       </button>
 
       {/* Collapsible session list */}
@@ -85,24 +110,45 @@ export function ProjectGroupSection({
           <div className="ml-3 space-y-1 border-l border-dashed border-muted-foreground/20 pl-2 pt-1">
             {displayEntries.map((entry) => renderDisplayEntry(entry))}
 
-            {/* Show more button */}
-            {hasMore && (
-              <button
-                className={cn(
-                  'flex w-full items-center justify-center gap-1 rounded-md py-1',
-                  'text-[10px] text-muted-foreground hover:bg-accent/40 hover:text-foreground',
-                  'transition-colors duration-150 cursor-pointer'
+            {/* Show more / show less controls */}
+            {(hasMore || isExpansionActive) && (
+              <div className="flex items-center gap-1 pt-0.5">
+                {hasMore && (
+                  <button
+                    className={cn(
+                      'flex flex-1 items-center justify-center gap-1 rounded-md py-1',
+                      'text-[10px] text-muted-foreground hover:bg-accent/40 hover:text-foreground',
+                      'transition-colors duration-150 cursor-pointer'
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onShowMore();
+                    }}
+                  >
+                    +{Math.min(LOAD_MORE_COUNT, remainingCount)} weitere anzeigen
+                    <span className="text-[9px] text-muted-foreground/60">
+                      ({remainingCount} verbleibend)
+                    </span>
+                  </button>
                 )}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onShowMore();
-                }}
-              >
-                +{Math.min(LOAD_MORE_COUNT, remainingCount)} weitere anzeigen
-                <span className="text-[9px] text-muted-foreground/60">
-                  ({remainingCount} verbleibend)
-                </span>
-              </button>
+                {isExpansionActive && (
+                  <button
+                    className={cn(
+                      'flex items-center justify-center gap-0.5 rounded-md px-2 py-1',
+                      'text-[10px] text-muted-foreground hover:bg-accent/40 hover:text-foreground',
+                      'transition-colors duration-150 cursor-pointer',
+                      !hasMore && 'flex-1'
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onShowLess();
+                    }}
+                  >
+                    <ChevronUp className="h-3 w-3" />
+                    Weniger anzeigen
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>

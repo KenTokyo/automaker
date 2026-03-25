@@ -14,6 +14,7 @@ import {
   createListHandler,
   createCreateHandler,
   createDeleteHandler,
+  createBulkDeleteHandler,
   createStatsHandler,
 } from './handlers.js';
 import { createListHistoryFilesHandler, createReadHistoryFileHandler } from './history.js';
@@ -25,6 +26,8 @@ export function createCompletedTasksRoutes(events: EventEmitter): Router {
   router.get('/stats', createStatsHandler());
   router.get('/history-files', validatePathParams('projectPath'), createListHistoryFilesHandler());
   router.get('/history-file', validatePathParams('projectPath'), createReadHistoryFileHandler());
+
+  router.post('/bulk-delete', validatePathParams('projectPath'), createBulkDeleteHandler(events));
 
   router.get('/', validatePathParams('projectPath?', 'projectPaths?'), createListHandler());
   router.post('/', validatePathParams('projectPath'), createCreateHandler(events));

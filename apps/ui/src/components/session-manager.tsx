@@ -46,7 +46,9 @@ interface SessionManagerProps {
   onSelectSession: (sessionId: string | null, sessionProjectPath?: string) => void;
   projectPath: string;
   isCurrentSessionThinking?: boolean;
-  onQuickCreateRef?: MutableRefObject<(() => Promise<void>) | null>;
+  onQuickCreateRef?: MutableRefObject<
+    ((attachOrchestratorRunId?: boolean) => Promise<void>) | null
+  >;
 }
 
 export function SessionManager({
@@ -152,11 +154,37 @@ export function SessionManager({
     return orchestratorState.startNewRun() ?? undefined;
   };
 
+  /**
+   * Find an existing empty session (0 messages, not archived) for the current project.
+   * This prevents creating duplicate empty sessions when the user clicks "New" repeatedly.
+   */
+  const findReusableEmptySession = (): SessionListItem | undefined => {
+    return sessions.find(
+      (s) =>
+        s.projectPath === projectPath &&
+        s.messageCount === 0 &&
+        !s.isArchived &&
+        s.status !== 'running'
+    );
+  };
+
   const handleCreateSession = async () => {
+    // If user didn't type a custom name, try to reuse an existing empty session
+    if (!newSessionName.trim()) {
+      const existingEmpty = findReusableEmptySession();
+      if (existingEmpty) {
+        setNewSessionName('');
+        setIsCreating(false);
+        onSelectSession(existingEmpty.id);
+        return;
+      }
+    }
+
     const api = getElectronAPI();
     if (!api?.sessions) return;
 
-    const runIdForSession = resolveOrchestratorRunIdForSessionCreation();
+    // User-initiated creation: never attach orchestrator run ID
+    const runIdForSession = undefined;
     const sessionName = newSessionName.trim() || generateRandomSessionName();
     const result = await api.sessions.create(
       sessionName,
@@ -173,11 +201,21 @@ export function SessionManager({
     }
   };
 
-  const handleQuickCreateSession = async () => {
+  const handleQuickCreateSession = async (attachOrchestratorRunId?: boolean) => {
+    // Reuse an existing empty session instead of creating a new one
+    const existingEmpty = findReusableEmptySession();
+    if (existingEmpty) {
+      onSelectSession(existingEmpty.id);
+      return;
+    }
+
     const api = getElectronAPI();
     if (!api?.sessions) return;
 
-    const runIdForSession = resolveOrchestratorRunIdForSessionCreation();
+    // Only attach orchestrator run ID when explicitly requested (orchestrator auto-phase)
+    const runIdForSession = attachOrchestratorRunId
+      ? resolveOrchestratorRunIdForSessionCreation()
+      : undefined;
     const sessionName = generateRandomSessionName();
     const result = await api.sessions.create(
       sessionName,
@@ -419,6 +457,14 @@ export function SessionManager({
     }));
   }, []);
 
+  const showLessForProject = useCallback((projectPath: string) => {
+    setProjectVisibleCounts((prev) => {
+      const next = { ...prev };
+      delete next[projectPath];
+      return next;
+    });
+  }, []);
+
   const selectAllInCurrentTab = () => {
     const sessionsToSelect = activeTab === 'active' ? filteredActive : filteredArchived;
     setSelectedSessionIds(new Set(sessionsToSelect.map((session) => session.id)));
@@ -513,6 +559,48 @@ export function SessionManager({
     }
     void handleQuickCreateSession();
   };
+
+  /**
+   * Creates a new chat session for a specific project (not necessarily the current one).
+   * Called from the "+" button next to each project name in the sidebar.
+   */
+  const handleNewSessionForProject = useCallback(
+    async (targetProjectPath: string) => {
+      const api = getElectronAPI();
+      if (!api?.sessions) return;
+
+      // Try to reuse an existing empty session for that project
+      const existingEmpty = sessions.find(
+        (s) =>
+          s.projectPath === targetProjectPath &&
+          s.messageCount === 0 &&
+          !s.isArchived &&
+          s.status !== 'running'
+      );
+
+      if (existingEmpty) {
+        // Switch to the tab and select the empty session
+        if (activeTab === 'archived') setActiveTab('active');
+        onSelectSession(existingEmpty.id, targetProjectPath);
+        return;
+      }
+
+      const sessionName = generateRandomSessionName();
+      const result = await api.sessions.create(
+        sessionName,
+        targetProjectPath,
+        targetProjectPath,
+        undefined
+      );
+
+      if (result.success && result.session?.id) {
+        await invalidateSessions();
+        if (activeTab === 'archived') setActiveTab('active');
+        onSelectSession(result.session.id, targetProjectPath);
+      }
+    },
+    [sessions, activeTab, onSelectSession, invalidateSessions]
+  );
 
   return (
     <Card className="flex h-full flex-col gap-0 rounded-none py-2">
@@ -647,6 +735,8 @@ export function SessionManager({
                 onToggleExpanded={() => toggleProjectExpanded(group.projectPath)}
                 visibleCount={projectVisibleCounts[group.projectPath] || INITIAL_VISIBLE}
                 onShowMore={() => showMoreForProject(group.projectPath)}
+                onShowLess={() => showLessForProject(group.projectPath)}
+                onNewSession={(path) => void handleNewSessionForProject(path)}
                 renderDisplayEntry={(displayEntry) => {
                   if (displayEntry.type === 'single') {
                     const session = displayEntry.session;
