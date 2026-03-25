@@ -8,12 +8,38 @@
 import { Codex } from '@openai/codex-sdk';
 import { formatHistoryAsText, classifyError, getUserFriendlyErrorMessage } from '@automaker/utils';
 import { supportsReasoningEffort } from '@automaker/types';
-import type { ExecuteOptions, ProviderMessage } from './types.js';
+import type { ExecuteOptions, ProviderMessage, ProviderTokenUsage } from './types.js';
 
 const OPENAI_API_KEY_ENV = 'OPENAI_API_KEY';
 const SDK_HISTORY_HEADER = 'Current request:\n';
 const DEFAULT_RESPONSE_TEXT = '';
 const SDK_ERROR_DETAILS_LABEL = 'Details:';
+const INPUT_TOKEN_KEYS = ['input_tokens', 'inputTokens', 'prompt_tokens', 'promptTokens'] as const;
+const OUTPUT_TOKEN_KEYS = [
+  'output_tokens',
+  'outputTokens',
+  'completion_tokens',
+  'completionTokens',
+] as const;
+const TOTAL_TOKEN_KEYS = ['total_tokens', 'totalTokens', 'token_count', 'tokenCount'] as const;
+const CACHE_READ_TOKEN_KEYS = [
+  'cache_read_input_tokens',
+  'cacheReadInputTokens',
+  'cached_input_tokens',
+  'cachedInputTokens',
+] as const;
+const CACHE_CREATE_TOKEN_KEYS = [
+  'cache_creation_input_tokens',
+  'cacheCreationInputTokens',
+  'cache_write_input_tokens',
+  'cacheWriteInputTokens',
+] as const;
+const REASONING_TOKEN_KEYS = [
+  'reasoning_tokens',
+  'reasoningTokens',
+  'reasoning_output_tokens',
+  'reasoningOutputTokens',
+] as const;
 
 type PromptBlock = {
   type: string;
@@ -82,6 +108,74 @@ function buildSdkErrorMessage(rawMessage: string, userMessage: string): string {
   return `${userMessage}\n\n${SDK_ERROR_DETAILS_LABEL} ${rawMessage}`;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function toTokenCount(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  const normalized = Math.max(0, Math.round(value));
+  return normalized > 0 ? normalized : undefined;
+}
+
+function readTokenField(
+  record: Record<string, unknown>,
+  keys: readonly string[]
+): number | undefined {
+  for (const key of keys) {
+    const tokenCount = toTokenCount(record[key]);
+    if (typeof tokenCount === 'number') {
+      return tokenCount;
+    }
+  }
+  return undefined;
+}
+
+function normalizeTokenUsage(record: Record<string, unknown>): ProviderTokenUsage | undefined {
+  const inputTokens = readTokenField(record, INPUT_TOKEN_KEYS);
+  const outputTokens = readTokenField(record, OUTPUT_TOKEN_KEYS);
+  const totalTokens = readTokenField(record, TOTAL_TOKEN_KEYS);
+  const cacheReadInputTokens = readTokenField(record, CACHE_READ_TOKEN_KEYS);
+  const cacheCreationInputTokens = readTokenField(record, CACHE_CREATE_TOKEN_KEYS);
+  const reasoningTokens = readTokenField(record, REASONING_TOKEN_KEYS);
+
+  if (
+    !inputTokens &&
+    !outputTokens &&
+    !totalTokens &&
+    !cacheReadInputTokens &&
+    !cacheCreationInputTokens &&
+    !reasoningTokens
+  ) {
+    return undefined;
+  }
+
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    cacheReadInputTokens,
+    cacheCreationInputTokens,
+    reasoningTokens,
+  };
+}
+
+function extractSdkTokenUsage(result: unknown): ProviderTokenUsage | undefined {
+  const resultRecord = asRecord(result);
+  if (!resultRecord) return undefined;
+
+  const usageCandidate = asRecord(resultRecord.usage);
+  if (usageCandidate) {
+    const normalized = normalizeTokenUsage(usageCandidate);
+    if (normalized) return normalized;
+  }
+
+  return normalizeTokenUsage(resultRecord);
+}
+
 /**
  * Execute a query using the official Codex SDK
  *
@@ -133,6 +227,7 @@ export async function* executeCodexSdkQuery(
 
     // Run the query
     const result = await thread.run(promptText, runOptions);
+    const usage = extractSdkTokenUsage(result);
 
     // Extract response text (from finalResponse property)
     const outputText = result.finalResponse ?? DEFAULT_RESPONSE_TEXT;
@@ -148,6 +243,7 @@ export async function* executeCodexSdkQuery(
         role: 'assistant',
         content: [{ type: 'text', text: outputText }],
       },
+      usage,
     };
 
     // Yield result
@@ -156,6 +252,7 @@ export async function* executeCodexSdkQuery(
       subtype: 'success',
       session_id: threadId,
       result: outputText,
+      usage,
     };
   } catch (error) {
     const errorInfo = classifyError(error);

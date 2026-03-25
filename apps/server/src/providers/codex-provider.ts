@@ -28,6 +28,7 @@ import type {
   ProviderMessage,
   InstallationStatus,
   ModelDefinition,
+  ProviderTokenUsage,
 } from './types.js';
 import {
   CODEX_MODEL_MAP,
@@ -128,6 +129,32 @@ const ITEM_ID_KEYS = ['id', 'item_id', 'call_id', 'tool_use_id', 'command_id'] a
 const EVENT_ID_KEYS = ['id', 'event_id', 'request_id'] as const;
 const COMMAND_OUTPUT_FIELDS = ['output', 'stdout', 'stderr', 'result'] as const;
 const COMMAND_OUTPUT_SEPARATOR = '\n';
+const INPUT_TOKEN_KEYS = ['input_tokens', 'inputTokens', 'prompt_tokens', 'promptTokens'] as const;
+const OUTPUT_TOKEN_KEYS = [
+  'output_tokens',
+  'outputTokens',
+  'completion_tokens',
+  'completionTokens',
+] as const;
+const TOTAL_TOKEN_KEYS = ['total_tokens', 'totalTokens', 'token_count', 'tokenCount'] as const;
+const CACHE_READ_TOKEN_KEYS = [
+  'cache_read_input_tokens',
+  'cacheReadInputTokens',
+  'cached_input_tokens',
+  'cachedInputTokens',
+] as const;
+const CACHE_CREATE_TOKEN_KEYS = [
+  'cache_creation_input_tokens',
+  'cacheCreationInputTokens',
+  'cache_write_input_tokens',
+  'cacheWriteInputTokens',
+] as const;
+const REASONING_TOKEN_KEYS = [
+  'reasoning_tokens',
+  'reasoningTokens',
+  'reasoning_output_tokens',
+  'reasoningOutputTokens',
+] as const;
 const IN_PROCESS_STREAM_LAG_PATTERN =
   /\bin-process app-server event stream lagged; dropped \d+ events\b/i;
 const PARSE_OUTPUT_PREFIX = 'Failed to parse output:';
@@ -260,6 +287,119 @@ function getEventType(event: Record<string, unknown>): string | null {
     return event.event;
   }
   return null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function toTokenCount(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  const normalized = Math.max(0, Math.round(value));
+  return normalized > 0 ? normalized : undefined;
+}
+
+function readTokenField(
+  record: Record<string, unknown>,
+  keys: readonly string[]
+): number | undefined {
+  for (const key of keys) {
+    const tokenCount = toTokenCount(record[key]);
+    if (typeof tokenCount === 'number') {
+      return tokenCount;
+    }
+  }
+  return undefined;
+}
+
+function normalizeTokenUsageFromRecord(
+  record: Record<string, unknown>
+): ProviderTokenUsage | undefined {
+  const inputTokens = readTokenField(record, INPUT_TOKEN_KEYS);
+  const outputTokens = readTokenField(record, OUTPUT_TOKEN_KEYS);
+  const totalTokens = readTokenField(record, TOTAL_TOKEN_KEYS);
+  const cacheReadInputTokens = readTokenField(record, CACHE_READ_TOKEN_KEYS);
+  const cacheCreationInputTokens = readTokenField(record, CACHE_CREATE_TOKEN_KEYS);
+  const reasoningTokens = readTokenField(record, REASONING_TOKEN_KEYS);
+
+  if (
+    !inputTokens &&
+    !outputTokens &&
+    !totalTokens &&
+    !cacheReadInputTokens &&
+    !cacheCreationInputTokens &&
+    !reasoningTokens
+  ) {
+    return undefined;
+  }
+
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    cacheReadInputTokens,
+    cacheCreationInputTokens,
+    reasoningTokens,
+  };
+}
+
+function collectTokenUsageCandidates(event: Record<string, unknown>): Record<string, unknown>[] {
+  const candidates: Record<string, unknown>[] = [];
+  const pushCandidate = (value: unknown) => {
+    const candidate = asRecord(value);
+    if (candidate) {
+      candidates.push(candidate);
+    }
+  };
+
+  pushCandidate(event.usage);
+  pushCandidate(event.token_usage);
+  pushCandidate(event.tokenUsage);
+  pushCandidate(event.stats);
+  pushCandidate(event.metrics);
+
+  const result = asRecord(event.result);
+  if (result) {
+    pushCandidate(result.usage);
+    pushCandidate(result.token_usage);
+    pushCandidate(result.tokenUsage);
+    pushCandidate(result.stats);
+    pushCandidate(result.metrics);
+  }
+
+  const turn = asRecord(event.turn);
+  if (turn) {
+    pushCandidate(turn.usage);
+    pushCandidate(turn.token_usage);
+    pushCandidate(turn.tokenUsage);
+    pushCandidate(turn.stats);
+  }
+
+  const item = asRecord(event.item);
+  if (item) {
+    pushCandidate(item.usage);
+    pushCandidate(item.token_usage);
+    pushCandidate(item.tokenUsage);
+    pushCandidate(item.stats);
+  }
+
+  return candidates;
+}
+
+function extractCodexTokenUsage(event: Record<string, unknown>): ProviderTokenUsage | undefined {
+  const candidates = collectTokenUsageCandidates(event);
+  for (const candidate of candidates) {
+    const usage = normalizeTokenUsageFromRecord(candidate);
+    if (usage) {
+      return usage;
+    }
+  }
+
+  // Fallback: some event payloads expose token fields directly on the root event.
+  return normalizeTokenUsageFromRecord(event);
 }
 
 function extractText(value: unknown): string | null {
@@ -929,7 +1069,8 @@ export class CodexProvider extends BaseProvider {
 
         if (eventType === CODEX_EVENT_TYPES.turnCompleted) {
           const resultText = extractText(event.result) || undefined;
-          yield { type: 'result', subtype: 'success', result: resultText };
+          const usage = extractCodexTokenUsage(event);
+          yield { type: 'result', subtype: 'success', result: resultText, usage };
           continue;
         }
 

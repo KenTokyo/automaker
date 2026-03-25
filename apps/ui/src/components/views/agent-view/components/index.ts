@@ -9,3 +9,4 @@ export { ChatArea } from './chat-area';
 export { RightPanelShell } from './right-panel-shell';
 export { ToolCallGroup } from './tool-call-group';
 export { ChatSettingsPopover } from './chat-settings-popover';
+export { TaskContextBadge } from './task-context-badge';

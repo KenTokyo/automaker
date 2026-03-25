@@ -24,6 +24,7 @@ import type {
   ModelDefinition,
   InstallationStatus,
   ContentBlock,
+  ProviderTokenUsage,
 } from '@automaker/types';
 import { type SubprocessOptions, getOpenCodeAuthIndicators } from '@automaker/platform';
 import { createLogger } from '@automaker/utils';
@@ -217,6 +218,33 @@ let toolUseIdCounter = 0;
 function generateToolUseId(): string {
   toolUseIdCounter += 1;
   return `opencode-tool-${toolUseIdCounter}`;
+}
+
+function toTokenCount(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  const normalized = Math.max(0, Math.round(value));
+  return normalized > 0 ? normalized : undefined;
+}
+
+function normalizeOpenCodeUsage(tokens: OpenCodePart['tokens']): ProviderTokenUsage | undefined {
+  if (!tokens) return undefined;
+
+  const inputTokens = toTokenCount(tokens.input);
+  const outputTokens = toTokenCount(tokens.output);
+  const reasoningTokens = toTokenCount(tokens.reasoning);
+  const totalTokens =
+    inputTokens || outputTokens ? (inputTokens ?? 0) + (outputTokens ?? 0) : undefined;
+
+  if (!inputTokens && !outputTokens && !reasoningTokens && !totalTokens) {
+    return undefined;
+  }
+
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    reasoningTokens,
+  };
 }
 
 /**
@@ -453,6 +481,7 @@ export class OpencodeProvider extends CliProvider {
 
       case 'step_finish': {
         const finishEvent = openCodeEvent as OpenCodeStepFinishEvent;
+        const usage = normalizeOpenCodeUsage(finishEvent.part?.tokens);
 
         // Check if the step failed - either by error property or reason='error'
         if (finishEvent.part?.error) {
@@ -478,6 +507,7 @@ export class OpencodeProvider extends CliProvider {
           subtype: 'success',
           session_id: finishEvent.sessionID,
           result: (finishEvent.part as OpenCodePart & { result?: string })?.result,
+          usage,
         };
       }
 

@@ -9,6 +9,7 @@ export type {
   ConversationMessage,
   ExecuteOptions,
   ContentBlock,
+  ProviderTokenUsage,
   ProviderMessage,
   InstallationStatus,
   ValidationResult,

@@ -249,6 +249,19 @@ export interface ContentBlock {
 }
 
 /**
+ * Optional token usage information from provider stream/result events.
+ * Values are normalized to token counts for one assistant turn.
+ */
+export interface ProviderTokenUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
+  reasoningTokens?: number;
+}
+
+/**
  * Message returned by a provider (matches Claude SDK streaming format)
  */
 export interface ProviderMessage {
@@ -262,6 +275,7 @@ export interface ProviderMessage {
   result?: string;
   error?: string;
   parent_tool_use_id?: string | null;
+  usage?: ProviderTokenUsage;
   /** Structured output from SDK when using outputFormat */
   structured_output?: Record<string, unknown>;
 }

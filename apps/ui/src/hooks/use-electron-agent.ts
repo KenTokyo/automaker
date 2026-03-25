@@ -450,11 +450,30 @@ export function useElectronAgent({
               }
 
               const existingMessage = prev[existingIndex];
+              const tokenUsage = event.usage ?? existingMessage.tokenUsage;
               const nextMessages = [...prev];
               nextMessages[existingIndex] = {
                 ...existingMessage,
                 content: event.content,
                 toolCalls: completedToolCalls,
+                tokenUsage,
+              };
+              return nextMessages;
+            });
+          } else if (event.usage) {
+            setMessages((prev) => {
+              const lastAssistantIndex = [...prev]
+                .map((msg, index) => ({ msg, index }))
+                .reverse()
+                .find(({ msg }) => msg.role === 'assistant')?.index;
+              if (lastAssistantIndex === undefined) return prev;
+
+              const existingMessage = prev[lastAssistantIndex];
+              if (existingMessage.tokenUsage === event.usage) return prev;
+              const nextMessages = [...prev];
+              nextMessages[lastAssistantIndex] = {
+                ...existingMessage,
+                tokenUsage: event.usage,
               };
               return nextMessages;
             });

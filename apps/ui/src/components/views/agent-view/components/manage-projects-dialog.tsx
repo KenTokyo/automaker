@@ -1,5 +1,16 @@
-import { useState, useMemo } from 'react';
-import { Eye, EyeOff, Folder, Search, Trash2, Undo2, AlertTriangle } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import {
+  Eye,
+  EyeOff,
+  Folder,
+  Search,
+  Trash2,
+  Undo2,
+  AlertTriangle,
+  Users,
+  Database,
+  Loader2,
+} from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -11,10 +22,14 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { getAuthenticatedImageUrl } from '@/lib/api-fetch';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/app-store';
+import { useSupabaseProjects } from '@/hooks/use-supabase-projects';
 import type { Project, TrashedProject } from '@/lib/electron';
+import { ProjectMembersDialog } from './project-members-dialog';
 
 function getProjectIcon(project: Project | TrashedProject): LucideIcon {
   if (project.icon && project.icon in LucideIcons) {
@@ -31,6 +46,9 @@ interface ManageProjectsDialogProps {
 export function ManageProjectsDialog({ open, onOpenChange }: ManageProjectsDialogProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'hidden' | 'trash'>('all');
+  const [membersProjectId, setMembersProjectId] = useState<string | null>(null);
+  const [membersProjectName, setMembersProjectName] = useState('');
+  const [togglingTeamDb, setTogglingTeamDb] = useState<string | null>(null);
 
   const projects = useAppStore((s) => s.projects);
   const trashedProjects = useAppStore((s) => s.trashedProjects);
@@ -39,6 +57,80 @@ export function ManageProjectsDialog({ open, onOpenChange }: ManageProjectsDialo
   const restoreTrashedProject = useAppStore((s) => s.restoreTrashedProject);
   const deleteTrashedProject = useAppStore((s) => s.deleteTrashedProject);
   const emptyTrash = useAppStore((s) => s.emptyTrash);
+
+  const supabaseEnabled = isSupabaseConfigured();
+  const {
+    projects: supabaseProjects,
+    createProject,
+    deleteProject: deleteSupabaseProject,
+    getMembers,
+    addMember,
+    updateMemberRole,
+    removeMember,
+  } = useSupabaseProjects();
+
+  // Map: local project path -> supabase project (using slug = project path)
+  const supabaseProjectBySlug = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    for (const sp of supabaseProjects) {
+      map.set(sp.slug, { id: sp.id, name: sp.name });
+    }
+    return map;
+  }, [supabaseProjects]);
+
+  const isTeamDbEnabled = useCallback(
+    (project: Project | TrashedProject) => {
+      return supabaseProjectBySlug.has(project.path);
+    },
+    [supabaseProjectBySlug]
+  );
+
+  const getSupabaseProjectId = useCallback(
+    (project: Project | TrashedProject): string | null => {
+      return supabaseProjectBySlug.get(project.path)?.id ?? null;
+    },
+    [supabaseProjectBySlug]
+  );
+
+  const handleToggleTeamDb = useCallback(
+    async (project: Project | TrashedProject) => {
+      setTogglingTeamDb(project.id);
+      try {
+        const existingSpId = getSupabaseProjectId(project);
+        if (existingSpId) {
+          // Disable: remove from Supabase
+          const ok = await deleteSupabaseProject(existingSpId);
+          if (ok) {
+            toast.success(`Team-DB fuer "${project.name}" deaktiviert`);
+          } else {
+            toast.error('Fehler beim Deaktivieren der Team-DB');
+          }
+        } else {
+          // Enable: create in Supabase (slug = project path for unique mapping)
+          const created = await createProject(project.name, project.path);
+          if (created) {
+            toast.success(`Team-DB fuer "${project.name}" aktiviert`);
+          } else {
+            toast.error('Fehler beim Aktivieren der Team-DB');
+          }
+        }
+      } finally {
+        setTogglingTeamDb(null);
+      }
+    },
+    [getSupabaseProjectId, deleteSupabaseProject, createProject]
+  );
+
+  const handleOpenMembers = useCallback(
+    (project: Project | TrashedProject) => {
+      const spId = getSupabaseProjectId(project);
+      if (spId) {
+        setMembersProjectId(spId);
+        setMembersProjectName(project.name);
+      }
+    },
+    [getSupabaseProjectId]
+  );
 
   const query = searchQuery.toLowerCase().trim();
 
@@ -69,7 +161,7 @@ export function ManageProjectsDialog({ open, onOpenChange }: ManageProjectsDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col">
+      <DialogContent className="sm:max-w-xl max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Projekte verwalten</DialogTitle>
           <DialogDescription>
@@ -220,6 +312,52 @@ export function ManageProjectsDialog({ open, onOpenChange }: ManageProjectsDialo
                     </span>
                   )}
 
+                  {/* Team-DB controls (only when Supabase is configured and not trashed) */}
+                  {supabaseEnabled &&
+                    !isTrashed &&
+                    (() => {
+                      const teamDbActive = isTeamDbEnabled(project);
+                      const isToggling = togglingTeamDb === project.id;
+                      return (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Members button (only when team-db active) */}
+                          {teamDbActive && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs text-violet-400 hover:text-violet-300 hover:bg-violet-500/10 gap-1"
+                              onClick={() => handleOpenMembers(project)}
+                              title="Mitglieder verwalten"
+                            >
+                              <Users className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                          {/* Team-DB toggle */}
+                          <div
+                            className="flex items-center gap-1.5"
+                            title={teamDbActive ? 'Team-DB deaktivieren' : 'Team-DB aktivieren'}
+                          >
+                            {isToggling ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-600" />
+                            ) : (
+                              <Database
+                                className={cn(
+                                  'w-3 h-3',
+                                  teamDbActive ? 'text-cyan-400' : 'text-zinc-600'
+                                )}
+                              />
+                            )}
+                            <Switch
+                              checked={teamDbActive}
+                              disabled={isToggling}
+                              onCheckedChange={() => void handleToggleTeamDb(project)}
+                              className="h-4 w-8 data-[state=checked]:bg-cyan-500 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-4"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                   {/* Actions */}
                   <div className="flex items-center gap-1 shrink-0">
                     {isTrashed ? (
@@ -326,6 +464,25 @@ export function ManageProjectsDialog({ open, onOpenChange }: ManageProjectsDialo
           </div>
         )}
       </DialogContent>
+
+      {/* Members sub-dialog */}
+      {supabaseEnabled && membersProjectId && (
+        <ProjectMembersDialog
+          open={!!membersProjectId}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) {
+              setMembersProjectId(null);
+              setMembersProjectName('');
+            }
+          }}
+          projectName={membersProjectName}
+          supabaseProjectId={membersProjectId}
+          getMembers={getMembers}
+          addMember={addMember}
+          updateMemberRole={updateMemberRole}
+          removeMember={removeMember}
+        />
+      )}
     </Dialog>
   );
 }

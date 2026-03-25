@@ -36,6 +36,8 @@ interface AgentInputAreaProps {
   modelContextWindowTokens?: number | null;
   /** Whether model context lookup already finished */
   isModelContextLookupReady?: boolean;
+  /** True when context tokens come from provider usage events */
+  isContextUsageMeasured?: boolean;
   /** Current context usage in percent */
   contextUsagePercent?: number | null;
   // File attachments
@@ -84,6 +86,7 @@ export function AgentInputArea({
   contextWindowTokens = null,
   modelContextWindowTokens = null,
   isModelContextLookupReady = false,
+  isContextUsageMeasured = false,
   contextUsagePercent = null,
   selectedImages,
   selectedTextFiles,
@@ -170,6 +173,7 @@ export function AgentInputArea({
         contextWindowTokens={contextWindowTokens}
         modelContextWindowTokens={modelContextWindowTokens}
         isModelContextLookupReady={isModelContextLookupReady}
+        isContextUsageMeasured={isContextUsageMeasured}
         contextUsagePercent={contextUsagePercent}
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}

@@ -32,6 +32,7 @@ import {
   getTaskPriorityShortLabel,
   formatRelativeTime,
 } from './task-utils';
+import { TaskSendToAgent } from './task-send-to-agent';
 
 // ---------------------------------------------------------------------------
 // Status cycle helper
@@ -182,6 +183,9 @@ export function TaskCard({ task, onUpdate, onDelete, onEdit, fontSize = 14 }: Ta
 
         {/* Action buttons (visible on hover) */}
         <div className="flex shrink-0 items-center gap-0.5">
+          {/* Send to Agent button */}
+          <TaskSendToAgent task={task} onStatusChange={onUpdate} />
+
           {/* Status cycle button */}
           <Button
             variant="ghost"

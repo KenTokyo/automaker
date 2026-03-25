@@ -5,6 +5,7 @@ import type { ChatDisplaySettings } from '@/store/types/ui-types';
 import type { ActiveSubAgent } from '@/hooks/use-electron-agent';
 import { MessageList } from './message-list';
 import { NoSessionState } from './empty-states';
+import { TaskContextBadge } from './task-context-badge';
 
 interface Message {
   id: string;
@@ -57,17 +58,20 @@ export const ChatArea = memo(function ChatArea({
   }
 
   return (
-    <MessageList
-      messages={messages}
-      isProcessing={isProcessing}
-      activeSubAgents={activeSubAgents}
-      onOpenSubAgentSession={onOpenSubAgentSession}
-      messagesContainerRef={messagesContainerRef}
-      onScroll={onScroll}
-      chatBackgroundColor={chatBackgroundColor}
-      chatBubbleColor={chatBubbleColor}
-      userBubbleColor={userBubbleColor}
-      chatDisplaySettings={chatDisplaySettings}
-    />
+    <>
+      <TaskContextBadge />
+      <MessageList
+        messages={messages}
+        isProcessing={isProcessing}
+        activeSubAgents={activeSubAgents}
+        onOpenSubAgentSession={onOpenSubAgentSession}
+        messagesContainerRef={messagesContainerRef}
+        onScroll={onScroll}
+        chatBackgroundColor={chatBackgroundColor}
+        chatBubbleColor={chatBubbleColor}
+        userBubbleColor={userBubbleColor}
+        chatDisplaySettings={chatDisplaySettings}
+      />
+    </>
   );
 });

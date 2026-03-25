@@ -15,6 +15,7 @@ export type {
   McpSSEServerConfig,
   McpHttpServerConfig,
   ContentBlock,
+  ProviderTokenUsage,
   ProviderMessage,
   InstallationStatus,
   ValidationResult,

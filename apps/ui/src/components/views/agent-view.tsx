@@ -3,6 +3,7 @@ import { useAppStore } from '@/store/app-store';
 import { useAgentPromptsStore } from '@/store/agent-prompts-store';
 import { useTimeLimiterStore } from '@/store/time-limiter-store';
 import { useOrchestratorStore } from '@/store/orchestrator-store';
+import { useTaskChatBridgeStore } from '@/store/task-chat-bridge-store';
 import { useShallow } from 'zustand/react/shallow';
 import { useElectronAgent } from '@/hooks/use-electron-agent';
 import { SessionManager, type QuickCreateSessionArgs } from '@/components/session-manager';
@@ -328,6 +329,34 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     if (contextMessageCount <= 0) return 0;
     return estimatedConversationTokens + CONTEXT_BASELINE_TOKENS;
   }, [contextMessageCount, estimatedConversationTokens]);
+  const measuredContextTokens = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message.role !== 'assistant' || !message.tokenUsage) continue;
+
+      const usage = message.tokenUsage;
+      const totalTokens = usage.totalTokens ?? 0;
+      const fromParts =
+        (usage.inputTokens ?? 0) +
+        (usage.cacheReadInputTokens ?? 0) +
+        (usage.cacheCreationInputTokens ?? 0) +
+        (usage.outputTokens ?? 0) +
+        (usage.reasoningTokens ?? 0);
+      const measuredTotal = totalTokens > 0 ? totalTokens : fromParts;
+
+      if (Number.isFinite(measuredTotal) && measuredTotal > 0) {
+        return Math.max(0, Math.round(measuredTotal));
+      }
+    }
+    return null;
+  }, [messages]);
+  const contextTokens = useMemo(() => {
+    if (measuredContextTokens !== null) {
+      return measuredContextTokens;
+    }
+    return estimatedContextTokens;
+  }, [measuredContextTokens, estimatedContextTokens]);
+  const isContextUsageMeasured = measuredContextTokens !== null;
   const hasConversationMessages = useMemo(() => {
     return messages.some((message) => message.role === 'user' || message.role === 'assistant');
   }, [messages]);
@@ -398,8 +427,10 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
   const contextUsagePercent = useMemo(() => {
     if (!contextWindowTokens || contextWindowTokens <= 0) return null;
-    return (estimatedContextTokens / contextWindowTokens) * 100;
-  }, [estimatedContextTokens, contextWindowTokens]);
+    const effectiveWindow = Math.max(1, contextWindowTokens - CONTEXT_BASELINE_TOKENS);
+    const usedTokens = Math.max(0, contextTokens - CONTEXT_BASELINE_TOKENS);
+    return (usedTokens / effectiveWindow) * 100;
+  }, [contextTokens, contextWindowTokens]);
 
   // Sync the current model to the time limiter store so it uses model-specific time limits
   useEffect(() => {
@@ -485,6 +516,23 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     clearPendingContent,
     hasConversationMessages,
   ]);
+
+  // Handle pending task message from task-chat bridge
+  const pendingTaskMessage = useTaskChatBridgeStore((s) => s.pendingTaskMessage);
+  const shouldNavigateToAgent = useTaskChatBridgeStore((s) => s.shouldNavigateToAgent);
+
+  useEffect(() => {
+    if (!shouldNavigateToAgent) return;
+    // We are already in the agent view - clear the flag
+    useTaskChatBridgeStore.getState().clearNavigationFlag();
+  }, [shouldNavigateToAgent]);
+
+  useEffect(() => {
+    // Consume pending task message when we have a session and are connected
+    if (!pendingTaskMessage || !currentSessionId || !isConnected) return;
+    setInput(pendingTaskMessage);
+    useTaskChatBridgeStore.getState().consumePendingMessage();
+  }, [pendingTaskMessage, currentSessionId, isConnected]);
 
   const createFollowUpSessionWithSummary = useCallback(
     async (reason: 'time-limit' | 'context-threshold'): Promise<boolean> => {
@@ -1165,10 +1213,11 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
                   isConnected={isConnected}
                   projectPath={currentProject?.path || null}
                   elapsedSeconds={elapsedSeconds}
-                  estimatedContextTokens={estimatedContextTokens}
+                  estimatedContextTokens={contextTokens}
                   contextWindowTokens={contextWindowTokens}
                   modelContextWindowTokens={modelContextWindowTokens}
                   isModelContextLookupReady={availableModelsFetched}
+                  isContextUsageMeasured={isContextUsageMeasured}
                   contextUsagePercent={contextUsagePercent}
                   selectedImages={fileAttachments.selectedImages}
                   selectedTextFiles={fileAttachments.selectedTextFiles}
@@ -1266,10 +1315,11 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
               isConnected={isConnected}
               projectPath={currentProject?.path || null}
               elapsedSeconds={elapsedSeconds}
-              estimatedContextTokens={estimatedContextTokens}
+              estimatedContextTokens={contextTokens}
               contextWindowTokens={contextWindowTokens}
               modelContextWindowTokens={modelContextWindowTokens}
               isModelContextLookupReady={availableModelsFetched}
+              isContextUsageMeasured={isContextUsageMeasured}
               contextUsagePercent={contextUsagePercent}
               selectedImages={fileAttachments.selectedImages}
               selectedTextFiles={fileAttachments.selectedTextFiles}

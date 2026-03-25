@@ -21,6 +21,7 @@ import type {
   InstallationStatus,
   ModelDefinition,
   ContentBlock,
+  ProviderTokenUsage,
 } from './types.js';
 import { validateBareModelId } from '@automaker/types';
 import { GEMINI_MODEL_MAP, type GeminiAuthStatus } from '@automaker/types';
@@ -96,6 +97,34 @@ interface GeminiResultEvent extends GeminiStreamEvent {
   };
   error?: string;
   session_id?: string;
+}
+
+function toTokenCount(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  const normalized = Math.max(0, Math.round(value));
+  return normalized > 0 ? normalized : undefined;
+}
+
+function normalizeGeminiUsage(
+  stats: GeminiResultEvent['stats'] | undefined
+): ProviderTokenUsage | undefined {
+  if (!stats) return undefined;
+
+  const inputTokens = toTokenCount(stats.input_tokens ?? stats.input);
+  const outputTokens = toTokenCount(stats.output_tokens);
+  const totalTokens = toTokenCount(stats.total_tokens);
+  const cacheReadInputTokens = toTokenCount(stats.cached);
+
+  if (!inputTokens && !outputTokens && !totalTokens && !cacheReadInputTokens) {
+    return undefined;
+  }
+
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    cacheReadInputTokens,
+  };
 }
 
 // =============================================================================
@@ -370,6 +399,7 @@ export class GeminiProvider extends CliProvider {
 
       case 'result': {
         const resultEvent = geminiEvent as GeminiResultEvent;
+        const usage = normalizeGeminiUsage(resultEvent.stats);
 
         if (resultEvent.status === 'error') {
           return {
@@ -387,6 +417,7 @@ export class GeminiProvider extends CliProvider {
           type: 'result',
           subtype: 'success',
           session_id: resultEvent.session_id,
+          usage,
         };
       }
 

@@ -4,9 +4,10 @@
  * Full card layout with search, tag/status/priority filters,
  * and sorting by date, title, priority, or status.
  *
- * Default: "Alle Projekte" mode - loads tasks from ALL
- * registered projects simultaneously so tasks are always visible
- * regardless of which project is currently active.
+ * Uses the unified `useTasksSource` hook that auto-selects between
+ * Supabase (DB) and file-based task storage. When Supabase is active
+ * and a matching project exists, tasks come from the database. Otherwise,
+ * the classic file-based multi-project mode is used as fallback.
  */
 
 import { useCallback, useMemo, useState } from 'react';
@@ -14,8 +15,12 @@ import {
   AArrowDown,
   AArrowUp,
   AlertCircle,
+  ArrowUpFromLine,
   CheckSquare,
+  Database,
   FolderOpen,
+  HardDrive,
+  LayoutGrid,
   Loader2,
   Plus,
   RefreshCw,
@@ -28,18 +33,23 @@ import type {
   TaskSortOrder,
   TaskStatus,
   TaskPriority,
-  TaskFilter,
 } from '@automaker/types';
 import { useAppStore } from '@/store/app-store';
-import { useTasks, createTask, updateTask, deleteTask } from '@/hooks/use-tasks';
+import { useTasksSource, type TaskCreateInput } from '@/hooks/use-tasks-source';
+import { useTaskAttachments } from '@/hooks/use-task-attachments';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { TaskCard } from './task-card';
 import { CompletedTasksSearch } from './completed-tasks-search';
 import { TasksFilterBar } from './tasks-filter-bar';
 import { TaskCreateDialog, type CreateTaskData } from './task-create-dialog';
+import { KanbanFullscreenDialog } from './kanban-fullscreen-dialog';
+import { TaskMigrationDialog } from './task-migration-dialog';
+import { TaskNotificationsPopover } from './task-notifications-popover';
 import { getTaskPriorityOrder, getTaskStatusOrder } from './task-utils';
+import { useSupabaseAuthStore } from '@/store/supabase-auth-store';
 
 // ---------------------------------------------------------------------------
 // Client-side sort helper
@@ -127,11 +137,8 @@ interface TasksPanelProps {
 }
 
 export function TasksPanel({ projectPath }: TasksPanelProps) {
-  const { tasks, loading, error, filter, sortField, sortOrder } = useAppStore(
+  const { filter, sortField, sortOrder } = useAppStore(
     useShallow((s) => ({
-      tasks: s.tasks,
-      loading: s.tasksLoading,
-      error: s.tasksError,
       filter: s.tasksFilter,
       sortField: s.tasksSortField,
       sortOrder: s.tasksSortOrder,
@@ -142,28 +149,38 @@ export function TasksPanel({ projectPath }: TasksPanelProps) {
   const setFilter = useAppStore((s) => s.setTasksFilter);
   const setSortField = useAppStore((s) => s.setTasksSortField);
   const setSortOrder = useAppStore((s) => s.setTasksSortOrder);
-  const removeFromStore = useAppStore((s) => s.removeTask);
-  const updateInStore = useAppStore((s) => s.updateTaskInStore);
-  const addToStore = useAppStore((s) => s.addTask);
   const sessionFontSize = useAppStore((s) => s.sessionFontSize);
   const setSessionFontSize = useAppStore((s) => s.setSessionFontSize);
 
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [kanbanOpen, setKanbanOpen] = useState(false);
+  const [migrationOpen, setMigrationOpen] = useState(false);
 
-  // Build allProjects list for the hook (always fetch from all)
-  const allProjects = useMemo(
-    () => projects.map((p) => ({ path: p.path, name: p.name })),
-    [projects]
-  );
+  // Supabase auth for migration
+  const supabaseUser = useSupabaseAuthStore((s) => s.user);
 
-  // Always use multi-project mode - pass null as projectPath when we have projects
-  const { refetch } = useTasks(
-    allProjects.length > 0 ? null : projectPath,
-    undefined,
-    allProjects.length > 0 ? allProjects : undefined
-  );
+  // Unified data source (auto-selects Supabase or file-based)
+  const {
+    source,
+    tasks,
+    loading,
+    error,
+    refetch,
+    handleCreate: sourceCreate,
+    handleUpdate: sourceUpdate,
+    handleDelete: sourceDelete,
+    supabaseProjectId,
+  } = useTasksSource(projectPath);
+
+  // Attachment upload support (only active when Supabase source)
+  const { uploadPendingAttachments } = useTaskAttachments(null);
+
+  const currentProjectName = useMemo(() => {
+    const proj = projects.find((p) => p.path === projectPath);
+    return proj?.name ?? 'Projekt';
+  }, [projects, projectPath]);
 
   // Extract unique project names from loaded tasks for the filter dropdown
   const projectsInTasks = useMemo(() => {
@@ -239,52 +256,37 @@ export function TasksPanel({ projectPath }: TasksPanelProps) {
   );
 
   const handleDelete = useCallback(
-    async (filename: string) => {
-      // In multi-project mode, find the task to get its projectPath
-      const task = tasks.find((t) => t.filename === filename);
-      const deletePath = task?.projectPath || projectPath;
-      const success = await deleteTask(filename, deletePath);
-      if (success) {
-        removeFromStore(filename);
-      }
+    async (taskId: string) => {
+      await sourceDelete(taskId);
     },
-    [tasks, projectPath, removeFromStore]
+    [sourceDelete]
   );
 
   const handleUpdate = useCallback(
-    async (filename: string, updates: Partial<Task>) => {
-      // In multi-project mode, find the task to get its projectPath
-      const task = tasks.find((t) => t.filename === filename);
-      const updatePath = task?.projectPath || projectPath;
-      const updated = await updateTask(filename, updatePath, updates);
-      if (updated) {
-        updateInStore(filename, updated);
-      }
+    async (taskId: string, updates: Partial<Task>) => {
+      await sourceUpdate(taskId, updates);
     },
-    [tasks, projectPath, updateInStore]
+    [sourceUpdate]
   );
 
   const handleCreate = useCallback(
     async (data: CreateTaskData) => {
-      // Determine which project to create the task in
-      const targetPath = projectFilter || projectPath;
-      const today = new Date().toISOString().split('T')[0];
-
-      const newTask = await createTask({
+      const input: TaskCreateInput = {
         title: data.title,
         description: data.description,
         priority: data.priority,
         status: data.status,
         tags: data.tags,
         summary: data.summary,
-        date: today,
-        projectPath: targetPath,
-      });
-      if (newTask) {
-        addToStore(newTask);
+      };
+      const taskId = await sourceCreate(input);
+
+      // Upload pending attachments after task creation (Supabase only)
+      if (taskId && data.pendingAttachments && data.pendingAttachments.length > 0) {
+        void uploadPendingAttachments(taskId, data.pendingAttachments);
       }
     },
-    [projectFilter, projectPath, addToStore]
+    [sourceCreate, uploadPendingAttachments]
   );
 
   const handleEdit = useCallback((task: Task) => {
@@ -334,6 +336,7 @@ export function TasksPanel({ projectPath }: TasksPanelProps) {
   if (tasks.length === 0) {
     return (
       <EmptyState
+        source={source}
         onCreate={() => {
           setEditingTask(null);
           setCreateDialogOpen(true);
@@ -349,10 +352,36 @@ export function TasksPanel({ projectPath }: TasksPanelProps) {
     <div className="flex h-full min-h-0 flex-col">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-muted px-3 py-2">
-        <h3 className="text-xs font-semibold text-muted-foreground">
-          Tasks ({filteredTasks.length})
-        </h3>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-xs font-semibold text-muted-foreground">
+            Tasks ({filteredTasks.length})
+          </h3>
+          <DataSourceBadge source={source} />
+        </div>
         <div className="flex items-center gap-1">
+          {isSupabaseConfigured() && supabaseProjectId && (
+            <>
+              <TaskNotificationsPopover projectId={supabaseProjectId} />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={() => setKanbanOpen(true)}
+                title="Kanban Board oeffnen"
+              >
+                <LayoutGrid className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 text-violet-400 hover:bg-violet-500/10 hover:text-violet-300"
+                onClick={() => setMigrationOpen(true)}
+                title="Lokale Tasks nach Supabase migrieren"
+              >
+                <ArrowUpFromLine className="h-3 w-3" />
+              </Button>
+            </>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -368,7 +397,10 @@ export function TasksPanel({ projectPath }: TasksPanelProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 w-6 p-0"
+            className={cn(
+              'h-6 w-6 p-0',
+              supabaseProjectId && 'text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300'
+            )}
             onClick={() => void refetch()}
             title="Aktualisieren"
           >
@@ -377,8 +409,8 @@ export function TasksPanel({ projectPath }: TasksPanelProps) {
         </div>
       </div>
 
-      {/* Project filter (only show if multiple projects have tasks) */}
-      {projectsInTasks.length > 1 && (
+      {/* Project filter (only show if file source with multiple projects) */}
+      {source === 'file' && projectsInTasks.length > 1 && (
         <div className="border-b border-muted px-3 py-1.5">
           <div className="flex items-center gap-1.5">
             <FolderOpen className="h-3 w-3 shrink-0 text-muted-foreground" />
@@ -426,7 +458,7 @@ export function TasksPanel({ projectPath }: TasksPanelProps) {
             max={18}
             step={1}
             className="flex-1"
-            aria-label="Schriftgröße für Tasks"
+            aria-label="Schriftgroesse fuer Tasks"
           />
           <AArrowUp className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="w-7 text-right text-xs tabular-nums text-muted-foreground">
@@ -482,7 +514,56 @@ export function TasksPanel({ projectPath }: TasksPanelProps) {
         onSave={editingTask ? handleSaveEdit : handleCreate}
         editTask={editingTask ?? undefined}
       />
+
+      {/* Kanban Fullscreen Dialog */}
+      {isSupabaseConfigured() && supabaseProjectId && (
+        <KanbanFullscreenDialog
+          open={kanbanOpen}
+          onOpenChange={setKanbanOpen}
+          projectId={supabaseProjectId}
+          projectName={currentProjectName}
+        />
+      )}
+
+      {/* Migration Dialog */}
+      {isSupabaseConfigured() && supabaseProjectId && supabaseUser && (
+        <TaskMigrationDialog
+          open={migrationOpen}
+          onOpenChange={setMigrationOpen}
+          projectPath={projectPath}
+          supabaseProjectId={supabaseProjectId}
+          userId={supabaseUser.id}
+          onComplete={() => void refetch()}
+        />
+      )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Data source badge
+// ---------------------------------------------------------------------------
+
+function DataSourceBadge({ source }: { source: 'supabase' | 'file' }) {
+  if (source === 'supabase') {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full bg-cyan-500/10 px-1.5 py-0.5 text-[9px] font-medium text-cyan-400"
+        title="Datenquelle: Supabase Datenbank"
+      >
+        <Database className="h-2.5 w-2.5" />
+        DB
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-zinc-500/10 px-1.5 py-0.5 text-[9px] font-medium text-zinc-500"
+      title="Datenquelle: Lokale Dateien"
+    >
+      <HardDrive className="h-2.5 w-2.5" />
+      Lokal
+    </span>
   );
 }
 
@@ -518,13 +599,14 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 }
 
 interface EmptyStateProps {
+  source: 'supabase' | 'file';
   onCreate: () => void;
   dialogOpen: boolean;
   onDialogClose: (open: boolean) => void;
   onSave: (data: CreateTaskData) => void;
 }
 
-function EmptyState({ onCreate, dialogOpen, onDialogClose, onSave }: EmptyStateProps) {
+function EmptyState({ source, onCreate, dialogOpen, onDialogClose, onSave }: EmptyStateProps) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 px-4 py-12 text-center">
       <CheckSquare className="h-10 w-10 text-muted-foreground/40" />
@@ -534,6 +616,7 @@ function EmptyState({ onCreate, dialogOpen, onDialogClose, onSave }: EmptyStateP
           Erstelle deinen ersten Task, um loszulegen.
         </p>
       </div>
+      <DataSourceBadge source={source} />
       <Button variant="outline" size="sm" onClick={onCreate} className="gap-1.5 border-muted">
         <Plus className="h-3 w-3" />
         Neuer Task

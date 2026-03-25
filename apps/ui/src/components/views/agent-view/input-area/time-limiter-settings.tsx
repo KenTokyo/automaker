@@ -51,6 +51,8 @@ interface TimeLimiterSettingsProps {
   modelContextWindowTokens?: number | null;
   /** Whether model context lookup already finished */
   isModelContextLookupReady?: boolean;
+  /** True when context tokens come from provider usage events */
+  isContextUsageMeasured?: boolean;
   contextUsagePercent?: number | null;
 }
 
@@ -61,6 +63,7 @@ export const TimeLimiterSettings = memo(function TimeLimiterSettings({
   contextWindowTokens = null,
   modelContextWindowTokens = null,
   isModelContextLookupReady = false,
+  isContextUsageMeasured = false,
   contextUsagePercent = null,
 }: TimeLimiterSettingsProps) {
   const {
@@ -203,6 +206,7 @@ export const TimeLimiterSettings = memo(function TimeLimiterSettings({
   const contextThresholdReached =
     displayContextPercent !== null && displayContextPercent >= autoCondenseThresholdPercent;
   const TriggerStatusIcon = isEnabled ? Timer : Gauge;
+  const contextTokenPrefix = isContextUsageMeasured ? '' : '~';
 
   const manualContextStoreValue = contextWindowOverrideTokens
     ? contextWindowOverrideTokens.toString()
@@ -241,7 +245,7 @@ export const TimeLimiterSettings = memo(function TimeLimiterSettings({
               ? `Zeitlimit: ${formatTime(remainingSeconds)} verbleibend`
               : 'Zeitlimit deaktiviert',
             hasContextWindow
-              ? `Kontext: ${roundedContextPercent ?? 0}% (${formatTokens(estimatedContextTokens)} / ${formatTokens(contextWindowTokens ?? 0)} Tokens)`
+              ? `Kontext ${isContextUsageMeasured ? '(gemessen)' : '(geschätzt)'}: ${roundedContextPercent ?? 0}% (${formatTokens(estimatedContextTokens)} / ${formatTokens(contextWindowTokens ?? 0)} Tokens)`
               : displayContextPercent === 0
                 ? 'Kontext: 0% (noch keine Nachricht)'
                 : 'Kontext: keine Größe verfügbar',
@@ -515,7 +519,8 @@ export const TimeLimiterSettings = memo(function TimeLimiterSettings({
                   {hasContextWindow ? (
                     <>
                       <p className="text-xs text-muted-foreground">
-                        ~{formatTokens(estimatedContextTokens)} /{' '}
+                        {contextTokenPrefix}
+                        {formatTokens(estimatedContextTokens)} /{' '}
                         {formatTokens(contextWindowTokens ?? 0)} Tokens
                         {roundedContextPercent !== null ? ` (${roundedContextPercent}%)` : ''}
                       </p>

@@ -22,11 +22,21 @@ export interface Message {
   isError?: boolean;
   images?: ImageAttachment[];
   toolCalls?: ToolUse[];
+  tokenUsage?: TokenUsage;
 }
 
 export interface ToolUse {
   name: string;
   input: unknown;
+}
+
+export interface TokenUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
+  reasoningTokens?: number;
 }
 
 export type StreamEvent =
@@ -57,6 +67,7 @@ export type StreamEvent =
       messageId?: string;
       content: string;
       toolUses: ToolUse[];
+      usage?: TokenUsage;
     }
   | {
       type: 'error';

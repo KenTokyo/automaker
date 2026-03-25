@@ -6,7 +6,13 @@
 import path from 'path';
 import * as secureFs from '../lib/secure-fs.js';
 import type { EventEmitter } from '../lib/events.js';
-import type { ExecuteOptions, ThinkingLevel, ReasoningEffort } from '@automaker/types';
+import type {
+  ExecuteOptions,
+  ThinkingLevel,
+  ReasoningEffort,
+  ProviderMessage,
+  ProviderTokenUsage,
+} from '@automaker/types';
 import { stripProviderPrefix } from '@automaker/types';
 import {
   readImageAsBase64,
@@ -46,6 +52,7 @@ interface Message {
   }>;
   timestamp: string;
   isError?: boolean;
+  tokenUsage?: ProviderTokenUsage;
 }
 
 interface QueuedPrompt {
@@ -92,6 +99,123 @@ interface SessionMetadata {
   sdkSessionId?: string; // Claude SDK session ID for conversation continuity
   totalElapsedMs?: number; // Accumulated running time in milliseconds
   lastStartedAt?: string; // ISO timestamp of when the session last started running
+}
+
+const INPUT_TOKEN_KEYS = ['inputTokens', 'input_tokens', 'promptTokens', 'prompt_tokens'] as const;
+const OUTPUT_TOKEN_KEYS = [
+  'outputTokens',
+  'output_tokens',
+  'completionTokens',
+  'completion_tokens',
+] as const;
+const TOTAL_TOKEN_KEYS = ['totalTokens', 'total_tokens', 'tokenCount', 'token_count'] as const;
+const CACHE_READ_TOKEN_KEYS = [
+  'cacheReadInputTokens',
+  'cache_read_input_tokens',
+  'cachedInputTokens',
+  'cached_input_tokens',
+] as const;
+const CACHE_CREATE_TOKEN_KEYS = [
+  'cacheCreationInputTokens',
+  'cache_creation_input_tokens',
+  'cacheWriteInputTokens',
+  'cache_write_input_tokens',
+] as const;
+const REASONING_TOKEN_KEYS = [
+  'reasoningTokens',
+  'reasoning_tokens',
+  'reasoningOutputTokens',
+  'reasoning_output_tokens',
+] as const;
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function toTokenCount(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  const normalized = Math.max(0, Math.round(value));
+  return normalized > 0 ? normalized : undefined;
+}
+
+function readTokenCount(
+  record: Record<string, unknown>,
+  keys: readonly string[]
+): number | undefined {
+  for (const key of keys) {
+    const count = toTokenCount(record[key]);
+    if (typeof count === 'number') {
+      return count;
+    }
+  }
+  return undefined;
+}
+
+function normalizeProviderTokenUsage(rawUsage: unknown): ProviderTokenUsage | null {
+  const record = asRecord(rawUsage);
+  if (!record) return null;
+
+  const inputTokens = readTokenCount(record, INPUT_TOKEN_KEYS);
+  const outputTokens = readTokenCount(record, OUTPUT_TOKEN_KEYS);
+  const explicitTotalTokens = readTokenCount(record, TOTAL_TOKEN_KEYS);
+  const cacheReadInputTokens = readTokenCount(record, CACHE_READ_TOKEN_KEYS);
+  const cacheCreationInputTokens = readTokenCount(record, CACHE_CREATE_TOKEN_KEYS);
+  const reasoningTokens = readTokenCount(record, REASONING_TOKEN_KEYS);
+
+  const fallbackTotal =
+    (inputTokens ?? 0) +
+    (outputTokens ?? 0) +
+    (cacheReadInputTokens ?? 0) +
+    (cacheCreationInputTokens ?? 0);
+  const totalTokens = explicitTotalTokens ?? (fallbackTotal > 0 ? fallbackTotal : undefined);
+
+  if (
+    !inputTokens &&
+    !outputTokens &&
+    !totalTokens &&
+    !cacheReadInputTokens &&
+    !cacheCreationInputTokens &&
+    !reasoningTokens
+  ) {
+    return null;
+  }
+
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    cacheReadInputTokens,
+    cacheCreationInputTokens,
+    reasoningTokens,
+  };
+}
+
+function extractTokenUsageFromProviderMessage(message: ProviderMessage): ProviderTokenUsage | null {
+  const direct = normalizeProviderTokenUsage(message.usage);
+  if (direct) return direct;
+
+  const messageRecord = asRecord(message);
+  if (!messageRecord) return null;
+
+  const nestedMessage = asRecord(messageRecord.message);
+  if (nestedMessage) {
+    const nestedUsage = normalizeProviderTokenUsage(nestedMessage.usage);
+    if (nestedUsage) return nestedUsage;
+  }
+
+  const nestedUsage = normalizeProviderTokenUsage(messageRecord.usage);
+  if (nestedUsage) return nestedUsage;
+
+  const tokenUsage = normalizeProviderTokenUsage(messageRecord.token_usage);
+  if (tokenUsage) return tokenUsage;
+
+  const camelTokenUsage = normalizeProviderTokenUsage(messageRecord.tokenUsage);
+  if (camelTokenUsage) return camelTokenUsage;
+
+  return normalizeProviderTokenUsage(messageRecord);
 }
 
 export class AgentService {
@@ -495,6 +619,7 @@ export class AgentService {
       let responseText = '';
       let sessionInfoParsed = false; // Track if we've already extracted session info
       const toolUses: Array<{ name: string; input: unknown }> = [];
+      let latestTokenUsage: ProviderTokenUsage | null = null;
 
       for await (const msg of stream) {
         // Capture SDK session ID from any message and persist it
@@ -502,6 +627,11 @@ export class AgentService {
           session.sdkSessionId = msg.session_id;
           // Persist the SDK session ID to ensure conversation continuity across server restarts
           await this.updateSession(sessionId, { sdkSessionId: msg.session_id });
+        }
+
+        const usage = extractTokenUsageFromProviderMessage(msg);
+        if (usage) {
+          latestTokenUsage = usage;
         }
 
         if (msg.type === 'assistant') {
@@ -562,10 +692,14 @@ export class AgentService {
                     role: 'assistant',
                     content: displayText,
                     timestamp: new Date().toISOString(),
+                    tokenUsage: latestTokenUsage ?? undefined,
                   };
                   session.messages.push(currentAssistantMessage);
                 } else {
                   currentAssistantMessage.content = displayText;
+                  if (latestTokenUsage) {
+                    currentAssistantMessage.tokenUsage = latestTokenUsage;
+                  }
                 }
 
                 this.emitAgentEvent(sessionId, {
@@ -651,6 +785,7 @@ export class AgentService {
                 role: 'assistant',
                 content: resultContent,
                 timestamp: new Date().toISOString(),
+                tokenUsage: latestTokenUsage ?? undefined,
               };
               session.messages.push(currentAssistantMessage);
               responseText = resultContent;
@@ -664,6 +799,9 @@ export class AgentService {
             }
             // When currentAssistantMessage exists, keep the accumulated streaming
             // content from all turns — msg.result only contains the last turn's text
+            if (currentAssistantMessage && latestTokenUsage) {
+              currentAssistantMessage.tokenUsage = latestTokenUsage;
+            }
           }
         } else if (msg.type === 'error') {
           // Some providers (like Codex CLI/SaaS or Cursor CLI) surface failures as
@@ -753,6 +891,10 @@ export class AgentService {
         }
       }
 
+      if (currentAssistantMessage && latestTokenUsage) {
+        currentAssistantMessage.tokenUsage = latestTokenUsage;
+      }
+
       await this.saveSession(sessionId, session.messages);
 
       session.isRunning = false;
@@ -767,6 +909,7 @@ export class AgentService {
         messageId: currentAssistantMessage?.id,
         content: currentAssistantMessage?.content ?? responseText,
         toolUses,
+        usage: latestTokenUsage ?? undefined,
       });
 
       // Mark session as dirty (needs review) after successful completion

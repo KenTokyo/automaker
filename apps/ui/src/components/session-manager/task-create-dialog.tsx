@@ -3,10 +3,11 @@
  *
  * Provides form fields for title, description, priority, tags, and markdown body.
  * When editTask is provided, pre-fills fields and shows "Speichern" instead of "Erstellen".
+ * Supports CTRL+V paste for image attachments (queued as pending until task is created).
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Paperclip } from 'lucide-react';
 import type { Task, TaskPriority, TaskStatus } from '@automaker/types';
 import { TASK_PRIORITIES, TASK_STATUSES } from '@automaker/types';
 import {
@@ -27,6 +28,9 @@ import {
   getTaskStatusLabel,
   getTaskStatusDotColor,
 } from './task-utils';
+import { usePendingAttachments } from '@/hooks/use-task-attachments';
+import type { PendingAttachment } from '@/hooks/use-task-attachments';
+import { PendingAttachmentPreview } from './task-attachment-preview';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,6 +43,8 @@ export interface CreateTaskData {
   status: TaskStatus;
   tags: string[];
   summary: string;
+  /** Files queued for upload after task creation. */
+  pendingAttachments?: PendingAttachment[];
 }
 
 interface TaskCreateDialogProps {
@@ -59,6 +65,7 @@ export function TaskCreateDialog({ open, onOpenChange, onSave, editTask }: TaskC
   const [status, setStatus] = useState<TaskStatus>('open');
   const [tagsInput, setTagsInput] = useState('');
   const [summary, setSummary] = useState('');
+  const { pending, addFiles, removeFile, clear: clearPending } = usePendingAttachments();
 
   const isEditMode = !!editTask;
 
@@ -80,8 +87,46 @@ export function TaskCreateDialog({ open, onOpenChange, onSave, editTask }: TaskC
         setTagsInput('');
         setSummary('');
       }
+      clearPending();
     }
-  }, [open, editTask]);
+  }, [open, editTask, clearPending]);
+
+  // CTRL+V paste handler for images
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      const files: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === 'file') {
+          const file = item.getAsFile();
+          if (file) files.push(file);
+        }
+      }
+
+      if (files.length > 0) {
+        // Only prevent default if we found files to avoid blocking text paste
+        e.preventDefault();
+        addFiles(files);
+      }
+    },
+    [addFiles]
+  );
+
+  // File input handler for manual file selection
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (files && files.length > 0) {
+        addFiles(Array.from(files));
+      }
+      // Reset the input so the same file can be selected again
+      e.target.value = '';
+    },
+    [addFiles]
+  );
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -100,10 +145,11 @@ export function TaskCreateDialog({ open, onOpenChange, onSave, editTask }: TaskC
         status,
         tags,
         summary: summary.trim(),
+        pendingAttachments: pending.length > 0 ? pending : undefined,
       });
       onOpenChange(false);
     },
-    [title, description, priority, status, tagsInput, summary, onSave, onOpenChange]
+    [title, description, priority, status, tagsInput, summary, pending, onSave, onOpenChange]
   );
 
   const handleRemoveTag = useCallback(
@@ -132,7 +178,7 @@ export function TaskCreateDialog({ open, onOpenChange, onSave, editTask }: TaskC
           <DialogTitle>{isEditMode ? 'Task bearbeiten' : 'Neuer Task'}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" onPaste={handlePaste}>
           {/* Title */}
           <div className="space-y-1.5">
             <label htmlFor="task-title" className="text-xs font-medium text-muted-foreground">
@@ -265,6 +311,37 @@ export function TaskCreateDialog({ open, onOpenChange, onSave, editTask }: TaskC
               className="resize-y"
             />
           </div>
+
+          {/* Pending Attachments Preview */}
+          {!isEditMode && pending.length > 0 && (
+            <div className="space-y-1.5">
+              <PendingAttachmentPreview pending={pending} onRemove={removeFile} />
+            </div>
+          )}
+
+          {/* Attach file button + paste hint */}
+          {!isEditMode && (
+            <div className="flex items-center gap-2">
+              <label
+                className={cn(
+                  'inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1.5',
+                  'border border-white/5 bg-zinc-900/60 text-xs text-zinc-400',
+                  'transition-colors hover:bg-zinc-800/80 hover:text-cyan-400'
+                )}
+              >
+                <Paperclip className="h-3 w-3" />
+                Datei anhaengen
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileSelect}
+                  accept="image/*,.pdf,.doc,.docx,.txt,.md,.json,.csv,.zip"
+                />
+              </label>
+              <span className="text-[10px] text-zinc-600">oder STRG+V zum Einfuegen</span>
+            </div>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

@@ -54,6 +54,8 @@ interface InputControlsProps {
   modelContextWindowTokens?: number | null;
   /** Whether model context lookup already finished */
   isModelContextLookupReady?: boolean;
+  /** True when context tokens come from provider usage events */
+  isContextUsageMeasured?: boolean;
   /** Current context usage in percent */
   contextUsagePercent?: number | null;
   // Drag handlers
@@ -99,6 +101,7 @@ export function InputControls({
   contextWindowTokens = null,
   modelContextWindowTokens = null,
   isModelContextLookupReady = false,
+  isContextUsageMeasured = false,
   contextUsagePercent = null,
   onDragEnter,
   onDragLeave,
@@ -655,6 +658,7 @@ export function InputControls({
             contextWindowTokens={contextWindowTokens}
             modelContextWindowTokens={modelContextWindowTokens}
             isModelContextLookupReady={isModelContextLookupReady}
+            isContextUsageMeasured={isContextUsageMeasured}
             contextUsagePercent={contextUsagePercent}
           />
 
