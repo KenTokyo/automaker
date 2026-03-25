@@ -19,6 +19,32 @@ interface ProjectInfo {
   name: string;
 }
 
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+}
+
+function normalizeCompletedTask(task: CompletedTask): CompletedTask {
+  return {
+    ...task,
+    tags: normalizeStringArray(task.tags),
+    files: normalizeStringArray(task.files),
+  };
+}
+
+function extractCompletedTaskFromEventPayload(payload: unknown): CompletedTask | null {
+  const raw = payload as { task?: unknown } | null;
+  const candidate = raw && typeof raw === 'object' && 'task' in raw ? raw.task : payload;
+  if (!candidate || typeof candidate !== 'object') return null;
+
+  const maybeTask = candidate as CompletedTask;
+  if (typeof maybeTask.filename !== 'string' || maybeTask.filename.length === 0) {
+    return null;
+  }
+
+  return normalizeCompletedTask(maybeTask);
+}
+
 /**
  * Build query string from filter options
  */
@@ -104,7 +130,7 @@ export function useCompletedTasks(
 
       const data = (await response.json()) as { tasks: CompletedTask[] };
       if (!controller.signal.aborted) {
-        setCompletedTasks(data.tasks ?? []);
+        setCompletedTasks((data.tasks ?? []).map(normalizeCompletedTask));
         setLoading(false);
       }
     } catch (err: unknown) {
@@ -130,9 +156,18 @@ export function useCompletedTasks(
   useEffect(() => {
     const client = getHttpApiClient();
     const unsubCreated = client.onCompletedTaskCreated((payload) => {
-      const task = payload as CompletedTask;
+      const task = extractCompletedTaskFromEventPayload(payload);
       if (task) {
-        addCompletedTask(task);
+        const exists = useAppStore
+          .getState()
+          .completedTasks.some(
+            (t) =>
+              t.filename === task.filename && (t.projectPath ?? '') === (task.projectPath ?? '')
+          );
+
+        if (!exists) {
+          addCompletedTask(task);
+        }
       }
     });
     const unsubDeleted = client.onCompletedTaskDeleted((payload) => {

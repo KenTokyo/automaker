@@ -53,6 +53,10 @@ function normalizeRunId(orchestratorRunId: string | undefined): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
+function hasVisibleParent(session: SessionListItem, sessionIdsInGroup: Set<string>): boolean {
+  return Boolean(session.parentSessionId && sessionIdsInGroup.has(session.parentSessionId));
+}
+
 export function buildDisplayEntries(
   sessions: SessionListItem[],
   expandedRunIds: Record<string, boolean>
@@ -95,7 +99,13 @@ export function buildDisplayEntries(
       return a.id.localeCompare(b.id);
     });
 
-    const leadSession = groupedSessions[groupedSessions.length - 1];
+    const groupedSessionIds = new Set(groupedSessions.map((session) => session.id));
+    const rootSessions = groupedSessions.filter(
+      (session) => !hasVisibleParent(session, groupedSessionIds)
+    );
+    const leadSessionPool = rootSessions.length > 0 ? rootSessions : groupedSessions;
+    const leadSession = leadSessionPool[leadSessionPool.length - 1];
+
     displayEntries.push({
       entry: {
         type: 'orchestrator',
@@ -103,7 +113,7 @@ export function buildDisplayEntries(
           runId: group.runId,
           sessions: groupedSessions,
           leadSession,
-          phaseCount: groupedSessions.length,
+          phaseCount: rootSessions.length > 0 ? rootSessions.length : groupedSessions.length,
           isExpanded: !!expandedRunIds[group.runId],
         },
       },

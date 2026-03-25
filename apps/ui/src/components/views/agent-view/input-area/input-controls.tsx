@@ -33,7 +33,6 @@ interface InputControlsProps {
   onInputChange: (value: string) => void;
   onSend: (messageOverride?: string) => void;
   onStop: () => void;
-  onToggleImageDropZone: () => void;
   onPaste: (e: React.ClipboardEvent) => Promise<void>;
   /** Current model selection (model + optional thinking level) */
   modelSelection: PhaseModelEntry;
@@ -43,11 +42,20 @@ interface InputControlsProps {
   isConnected: boolean;
   hasFiles: boolean;
   isDragOver: boolean;
-  showImageDropZone: boolean;
   /** Current project path for agent prompts */
   projectPath: string | null;
   /** Elapsed seconds for time limiter display */
   elapsedSeconds?: number;
+  /** Estimated context tokens for the current chat */
+  estimatedContextTokens?: number;
+  /** Context window size for the selected model */
+  contextWindowTokens?: number | null;
+  /** Native model context window size from provider metadata */
+  modelContextWindowTokens?: number | null;
+  /** Whether model context lookup already finished */
+  isModelContextLookupReady?: boolean;
+  /** Current context usage in percent */
+  contextUsagePercent?: number | null;
   // Drag handlers
   onDragEnter: (e: React.DragEvent) => void;
   onDragLeave: (e: React.DragEvent) => void;
@@ -78,7 +86,6 @@ export function InputControls({
   onInputChange,
   onSend,
   onStop,
-  onToggleImageDropZone,
   onPaste,
   modelSelection,
   onModelSelect,
@@ -86,9 +93,13 @@ export function InputControls({
   isConnected,
   hasFiles,
   isDragOver,
-  showImageDropZone,
   projectPath,
   elapsedSeconds = 0,
+  estimatedContextTokens = 0,
+  contextWindowTokens = null,
+  modelContextWindowTokens = null,
+  isModelContextLookupReady = false,
+  contextUsagePercent = null,
   onDragEnter,
   onDragLeave,
   onDragOver,
@@ -578,22 +589,6 @@ export function InputControls({
             </Button>
           )}
 
-          {/* File Attachment Button */}
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={onToggleImageDropZone}
-            disabled={!isConnected}
-            className={cn(
-              'h-7 w-7 rounded-md border-border shrink-0',
-              showImageDropZone && 'bg-primary/10 text-primary border-primary/30',
-              hasFiles && 'border-primary/30 text-primary'
-            )}
-            title="Attach files (images, .txt, .md)"
-          >
-            <Paperclip className="w-3.5 h-3.5" />
-          </Button>
-
           {/* Docs Quick Access */}
           <Popover open={docsPopoverOpen} onOpenChange={setDocsPopoverOpen}>
             <PopoverTrigger asChild>
@@ -644,9 +639,6 @@ export function InputControls({
             </PopoverContent>
           </Popover>
 
-          {/* Time Limiter Settings */}
-          <TimeLimiterSettings disabled={!isConnected} elapsedSeconds={elapsedSeconds} />
-
           {/* Orchestrator Settings */}
           <OrchestratorSettings disabled={!isConnected} />
 
@@ -654,6 +646,17 @@ export function InputControls({
           <CompletedTasksToggle disabled={!isConnected} />
 
           <div className="mx-0.5 h-4 w-px bg-border shrink-0" />
+
+          {/* Context Condense Settings (right side, near Send) */}
+          <TimeLimiterSettings
+            disabled={false}
+            elapsedSeconds={elapsedSeconds}
+            estimatedContextTokens={estimatedContextTokens}
+            contextWindowTokens={contextWindowTokens}
+            modelContextWindowTokens={modelContextWindowTokens}
+            isModelContextLookupReady={isModelContextLookupReady}
+            contextUsagePercent={contextUsagePercent}
+          />
 
           {/* Stop Button (only when processing) */}
           {isProcessing && (

@@ -100,6 +100,7 @@ export type StreamEvent =
       description: string;
       model?: string;
       runInBackground?: boolean;
+      childSessionId?: string;
     }
   | {
       type: 'subagent_progress';
@@ -113,6 +114,7 @@ export type StreamEvent =
       type: 'subagent_stopped';
       sessionId: string;
       agentId: string;
+      childSessionId?: string;
     };
 
 export interface SessionListItem {

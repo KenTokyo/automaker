@@ -123,7 +123,9 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
           disabled={disabled}
           className={cn(
             'h-7 rounded-md border-border shrink-0',
-            isEnabled ? 'w-auto min-w-7 px-1.5 gap-1 bg-muted/50 text-foreground' : 'w-7',
+            isEnabled
+              ? 'w-auto min-w-7 px-1.5 gap-1 bg-emerald-500/10 text-emerald-600 border-emerald-500/40 hover:bg-emerald-500/15'
+              : 'w-7',
             autoSendStatus !== 'idle' && 'animate-pulse'
           )}
           title={

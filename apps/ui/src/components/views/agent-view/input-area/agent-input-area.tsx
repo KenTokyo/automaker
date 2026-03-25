@@ -1,5 +1,6 @@
 import { ImageDropZone } from '@/components/ui/image-drop-zone';
 import type { ImageAttachment, TextFileAttachment } from '@/store/app-store';
+import { cn } from '@/lib/utils';
 import type { PhaseModelEntry } from '@automaker/types';
 import { FilePreview } from './file-preview';
 import { QueueDisplay } from './queue-display';
@@ -27,6 +28,16 @@ interface AgentInputAreaProps {
   projectPath: string | null;
   /** Elapsed seconds for time limiter display */
   elapsedSeconds?: number;
+  /** Estimated context tokens for the current chat */
+  estimatedContextTokens?: number;
+  /** Context window size for the selected model */
+  contextWindowTokens?: number | null;
+  /** Native model context window size from provider metadata */
+  modelContextWindowTokens?: number | null;
+  /** Whether model context lookup already finished */
+  isModelContextLookupReady?: boolean;
+  /** Current context usage in percent */
+  contextUsagePercent?: number | null;
   // File attachments
   selectedImages: ImageAttachment[];
   selectedTextFiles: TextFileAttachment[];
@@ -54,6 +65,8 @@ interface AgentInputAreaProps {
   onInputHeightChange?: () => void;
   /** Callback to create a new session */
   onNewSession?: () => void;
+  /** Activity state of the currently opened chat session */
+  chatActivityState?: 'idle' | 'running' | 'stopped';
 }
 
 export function AgentInputArea({
@@ -67,6 +80,11 @@ export function AgentInputArea({
   isConnected,
   projectPath,
   elapsedSeconds = 0,
+  estimatedContextTokens = 0,
+  contextWindowTokens = null,
+  modelContextWindowTokens = null,
+  isModelContextLookupReady = false,
+  contextUsagePercent = null,
   selectedImages,
   selectedTextFiles,
   showImageDropZone,
@@ -88,11 +106,18 @@ export function AgentInputArea({
   accentColor,
   onInputHeightChange,
   onNewSession,
+  chatActivityState = 'idle',
 }: AgentInputAreaProps) {
   const hasFiles = selectedImages.length > 0 || selectedTextFiles.length > 0;
 
   return (
-    <div className="border-t border-border p-2.5 bg-card/50 backdrop-blur-sm flex-shrink-0">
+    <div
+      className={cn(
+        'border-t border-border p-2.5 bg-card/50 backdrop-blur-sm flex-shrink-0 transition-colors duration-200',
+        chatActivityState === 'running' && 'border-t-2 border-amber-500 bg-amber-500/5',
+        chatActivityState === 'stopped' && 'border-t-2 border-red-500 bg-red-500/5'
+      )}
+    >
       {/* Image Drop Zone (when visible) */}
       {showImageDropZone && (
         <ImageDropZone
@@ -132,7 +157,6 @@ export function AgentInputArea({
         onInputChange={onInputChange}
         onSend={onSend}
         onStop={onStop}
-        onToggleImageDropZone={onToggleImageDropZone}
         onPaste={onPaste}
         modelSelection={modelSelection}
         onModelSelect={onModelSelect}
@@ -140,9 +164,13 @@ export function AgentInputArea({
         isConnected={isConnected}
         hasFiles={hasFiles}
         isDragOver={isDragOver}
-        showImageDropZone={showImageDropZone}
         projectPath={projectPath}
         elapsedSeconds={elapsedSeconds}
+        estimatedContextTokens={estimatedContextTokens}
+        contextWindowTokens={contextWindowTokens}
+        modelContextWindowTokens={modelContextWindowTokens}
+        isModelContextLookupReady={isModelContextLookupReady}
+        contextUsagePercent={contextUsagePercent}
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}
         onDragOver={onDragOver}

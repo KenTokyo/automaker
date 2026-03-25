@@ -128,6 +128,9 @@ const ITEM_ID_KEYS = ['id', 'item_id', 'call_id', 'tool_use_id', 'command_id'] a
 const EVENT_ID_KEYS = ['id', 'event_id', 'request_id'] as const;
 const COMMAND_OUTPUT_FIELDS = ['output', 'stdout', 'stderr', 'result'] as const;
 const COMMAND_OUTPUT_SEPARATOR = '\n';
+const IN_PROCESS_STREAM_LAG_PATTERN =
+  /\bin-process app-server event stream lagged; dropped \d+ events\b/i;
+const PARSE_OUTPUT_PREFIX = 'Failed to parse output:';
 const OUTPUT_SCHEMA_FILENAME = 'output-schema.json';
 const OUTPUT_SCHEMA_INDENT_SPACES = 2;
 const IMAGE_TEMP_DIR = '.codex-images';
@@ -318,6 +321,24 @@ function extractItemType(item: Record<string, unknown>): string | null {
     return item.kind;
   }
   return null;
+}
+
+function isInProcessStreamLagMessage(text: string): boolean {
+  return IN_PROCESS_STREAM_LAG_PATTERN.test(text.trim());
+}
+
+function isIgnorableCodexLagOutput(text: string): boolean {
+  const trimmed = text.trim();
+  if (isInProcessStreamLagMessage(trimmed)) {
+    return true;
+  }
+
+  if (!trimmed.startsWith(PARSE_OUTPUT_PREFIX)) {
+    return false;
+  }
+
+  const parsedPayload = trimmed.slice(PARSE_OUTPUT_PREFIX.length).trim();
+  return isInProcessStreamLagMessage(parsedPayload);
 }
 
 function resolveSystemPrompt(systemPrompt?: unknown): string | null {
@@ -866,6 +887,15 @@ export class CodexProvider extends BaseProvider {
 
         if (eventType === CODEX_EVENT_TYPES.error) {
           const errorText = extractText(event.error ?? event.message) || 'Codex CLI error';
+          if (isIgnorableCodexLagOutput(errorText)) {
+            logger.warn(
+              '[CodexProvider] Suppressed in-process stream lag warning from chat output',
+              {
+                errorText,
+              }
+            );
+            continue;
+          }
           const exitCodeMatch = errorText.match(/^Process exited with code (\d+)$/i);
 
           // Enhance error message with helpful context
@@ -906,6 +936,12 @@ export class CodexProvider extends BaseProvider {
         if (!eventType) {
           const fallbackText = extractText(event);
           if (fallbackText) {
+            if (isIgnorableCodexLagOutput(fallbackText)) {
+              logger.warn(
+                '[CodexProvider] Suppressed in-process stream lag warning from fallback event'
+              );
+              continue;
+            }
             yield {
               type: 'assistant',
               message: {
@@ -1013,6 +1049,12 @@ export class CodexProvider extends BaseProvider {
 
           const text = extractText(item) || extractText(event);
           if (text) {
+            if (isIgnorableCodexLagOutput(text)) {
+              logger.warn(
+                '[CodexProvider] Suppressed in-process stream lag warning from item-completed event'
+              );
+              continue;
+            }
             yield {
               type: 'assistant',
               message: {

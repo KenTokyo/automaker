@@ -7,9 +7,6 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import {
-  ArrowDownAZ,
-  ChevronDown,
-  ChevronRight,
   ChevronsDownUp,
   Clock,
   Highlighter,
@@ -17,10 +14,12 @@ import {
   Search,
   SlidersHorizontal,
   Star,
+  ArrowDownAZ,
   TreePine,
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { Input } from '@/components/ui/input';
+import { MiniSelect } from '@/components/ui/mini-select';
 import { cn } from '@/lib/utils';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { createLogger } from '@automaker/utils/logger';
@@ -268,48 +267,28 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
       {!showPreview && (
         <div className="border-b border-border px-2 py-1.5 space-y-1">
           {/* Row 1: Sort + Time filter + Highlight window */}
-          <div className="flex items-center gap-1">
-            <ArrowDownAZ className="h-3 w-3 shrink-0 text-muted-foreground" />
-            <select
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <MiniSelect
               value={sortBy}
-              onChange={(e) => handleSortChange(e.target.value)}
-              className="h-6 min-w-0 flex-1 rounded border border-border bg-transparent px-1 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              aria-label="Sortierung"
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-
-            <Clock className="h-3 w-3 shrink-0 text-muted-foreground ml-1" />
-            <select
+              options={SORT_OPTIONS}
+              onChange={handleSortChange}
+              icon={<ArrowDownAZ className="h-3 w-3" />}
+              ariaLabel="Sortierung"
+            />
+            <MiniSelect
               value={timeFilter}
-              onChange={(e) => handleTimeFilterChange(Number(e.target.value))}
-              className="h-6 min-w-0 flex-1 rounded border border-border bg-transparent px-1 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              aria-label="Zeitfilter"
-            >
-              {TIME_FILTER_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-
-            <Highlighter className="h-3 w-3 shrink-0 text-muted-foreground ml-1" />
-            <select
+              options={TIME_FILTER_OPTIONS}
+              onChange={(v) => handleTimeFilterChange(Number(v))}
+              icon={<Clock className="h-3 w-3" />}
+              ariaLabel="Zeitfilter"
+            />
+            <MiniSelect
               value={highlightWindow}
-              onChange={(e) => handleHighlightWindowChange(Number(e.target.value))}
-              className="h-6 min-w-0 flex-1 rounded border border-border bg-transparent px-1 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              aria-label="Highlight-Fenster"
-            >
-              {HIGHLIGHT_WINDOW_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              options={HIGHLIGHT_WINDOW_OPTIONS}
+              onChange={(v) => handleHighlightWindowChange(Number(v))}
+              icon={<Highlighter className="h-3 w-3" />}
+              ariaLabel="Hervorhebung"
+            />
           </div>
 
           {/* Row 2: Collapse + Refresh + File count */}
@@ -562,21 +541,14 @@ function FilesFooter({
   filteredFileCount,
   totalFileCount,
 }: FilesFooterProps) {
+  // In preview mode, the back button is in the FilePreview header – no footer needed
+  if (showPreview) return null;
+
   return (
     <p className="text-[10px] text-muted-foreground">
-      {showPreview ? (
-        <button
-          type="button"
-          className="hover:text-foreground transition-colors underline"
-          onClick={() => useExplorerStore.getState().selectFile(null)}
-        >
-          &#8592; Zurück zur Liste
-        </button>
-      ) : isFiltered ? (
-        `${filteredFileCount} von ${totalFileCount} Dateien`
-      ) : (
-        `${totalFileCount} Dateien`
-      )}
+      {isFiltered
+        ? `${filteredFileCount} von ${totalFileCount} Dateien`
+        : `${totalFileCount} Dateien`}
     </p>
   );
 }

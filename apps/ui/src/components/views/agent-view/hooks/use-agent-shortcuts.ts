@@ -7,10 +7,13 @@ import {
 import { useAppStore } from '@/store/app-store';
 import { useExplorerStore } from '@/store/explorer-store';
 import type { RightPanelMode } from '@/store/types/ui-types';
+import type { QuickCreateSessionArgs } from '@/components/session-manager';
 
 interface UseAgentShortcutsOptions {
   currentProject: { path: string; name: string } | null;
-  quickCreateSessionRef: React.MutableRefObject<(() => Promise<void>) | null>;
+  quickCreateSessionRef: React.MutableRefObject<
+    ((options?: QuickCreateSessionArgs) => Promise<boolean>) | null
+  >;
 }
 
 export function useAgentShortcuts({

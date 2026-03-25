@@ -13,6 +13,7 @@ export interface ActiveSubAgent {
   agentId: string;
   agentType: string;
   description: string;
+  childSessionId?: string;
   model?: string;
   startedAt: Date;
   elapsedSeconds: number;
@@ -518,6 +519,7 @@ export function useElectronAgent({
               agentId: event.agentId,
               agentType: event.agentType,
               description: event.description,
+              childSessionId: event.childSessionId,
               model: event.model,
               startedAt: new Date(),
               elapsedSeconds: 0,

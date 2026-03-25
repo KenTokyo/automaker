@@ -96,6 +96,10 @@ interface SessionMetadata {
 
 export class AgentService {
   private sessions = new Map<string, Session>();
+  private activeSubagentSessions = new Map<
+    string,
+    { childSessionId: string; parentSessionId: string; runInBackground: boolean }
+  >();
   private stateDir: string;
   private metadataFile: string;
   private events: EventEmitter;
@@ -587,13 +591,28 @@ export class AgentService {
                   const taskInput = block.input as Record<string, unknown>;
                   // SDK tool_use blocks include an 'id' field not in our ContentBlock type
                   const blockWithId = block as typeof block & { id?: string };
+                  const childSession = await this.ensureSubagentSession(
+                    sessionId,
+                    taskInput,
+                    blockWithId.id
+                  );
+                  const runInBackground = Boolean(taskInput.run_in_background);
+                  if (blockWithId.id && childSession?.id) {
+                    this.activeSubagentSessions.set(blockWithId.id, {
+                      childSessionId: childSession.id,
+                      parentSessionId: sessionId,
+                      runInBackground,
+                    });
+                  }
+
                   this.emitAgentEvent(sessionId, {
                     type: 'subagent_started',
                     agentId: blockWithId.id,
                     agentType: (taskInput.subagent_type as string) || 'unknown',
                     description: (taskInput.description as string) || '',
                     model: taskInput.model as string | undefined,
-                    runInBackground: taskInput.run_in_background as boolean | undefined,
+                    runInBackground,
+                    childSessionId: childSession?.id,
                   });
                 }
               }
@@ -712,9 +731,24 @@ export class AgentService {
           });
         } else if (msg.type === 'user' && msg.parent_tool_use_id) {
           // Sub-agent returned its result
+          const activeSubagent = this.activeSubagentSessions.get(msg.parent_tool_use_id);
+          let childSessionId = activeSubagent?.childSessionId;
+          if (!childSessionId) {
+            const existingSubagentSession = await this.findSubagentSession(
+              sessionId,
+              msg.parent_tool_use_id
+            );
+            childSessionId = existingSubagentSession?.id;
+          }
+          if (childSessionId) {
+            await this.accumulateElapsedTime(childSessionId);
+          }
+          this.activeSubagentSessions.delete(msg.parent_tool_use_id);
+
           this.emitAgentEvent(sessionId, {
             type: 'subagent_stopped',
             agentId: msg.parent_tool_use_id,
+            childSessionId,
           });
         }
       }
@@ -724,6 +758,7 @@ export class AgentService {
       session.isRunning = false;
       session.abortController = null;
       await this.accumulateElapsedTime(sessionId);
+      await this.finalizeForegroundSubagents(sessionId);
 
       // Emit a single terminal completion event after the provider stream ends.
       // Some providers can emit multiple "result" events during one execution.
@@ -763,6 +798,8 @@ export class AgentService {
       session.isRunning = false;
       session.abortController = null;
       await this.accumulateElapsedTime(sessionId);
+      await this.finalizeForegroundSubagents(sessionId);
+      await this.finalizeBackgroundSubagentsAfterParentStop(sessionId);
 
       const errorMessage: Message = {
         id: this.generateId(),
@@ -805,6 +842,15 @@ export class AgentService {
     return this.sessions.get(sessionId)?.isRunning ?? false;
   }
 
+  isSubagentSessionRunning(sessionId: string): boolean {
+    for (const active of this.activeSubagentSessions.values()) {
+      if (active.childSessionId === sessionId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   isSessionStopped(sessionId: string): boolean {
     return this.sessions.get(sessionId)?.wasStopped ?? false;
   }
@@ -829,6 +875,8 @@ export class AgentService {
       session.wasStopped = true;
       session.abortController = null;
       await this.accumulateElapsedTime(sessionId);
+      await this.finalizeForegroundSubagents(sessionId);
+      await this.finalizeBackgroundSubagentsAfterParentStop(sessionId);
 
       this.emitAgentEvent(sessionId, {
         type: 'stopped',
@@ -1226,6 +1274,113 @@ export class AgentService {
         type: 'queue_error',
         error: (error as Error).message,
         promptId: nextPrompt.id,
+      });
+    }
+  }
+
+  private async findSubagentSession(
+    parentSessionId: string,
+    parentToolUseId: string
+  ): Promise<SessionMetadata | undefined> {
+    if (!parentToolUseId) return undefined;
+    const metadata = await this.loadMetadata();
+    return Object.values(metadata).find(
+      (session) =>
+        session.parentSessionId === parentSessionId && session.parentToolUseId === parentToolUseId
+    );
+  }
+
+  private buildSubagentSessionName(agentType: string, description: string): string {
+    const normalizedAgentType = agentType.trim() || 'Sub-Agent';
+    const normalizedDescription = description.trim();
+    if (!normalizedDescription) {
+      return `${normalizedAgentType} Aufgabe`;
+    }
+
+    const maxDescriptionLength = 64;
+    const compactDescription =
+      normalizedDescription.length > maxDescriptionLength
+        ? `${normalizedDescription.slice(0, maxDescriptionLength - 3)}...`
+        : normalizedDescription;
+
+    return `${normalizedAgentType}: ${compactDescription}`;
+  }
+
+  private async ensureSubagentSession(
+    parentSessionId: string,
+    taskInput: Record<string, unknown>,
+    parentToolUseId?: string
+  ): Promise<SessionMetadata | null> {
+    if (!parentToolUseId) {
+      return null;
+    }
+
+    const existingSession = await this.findSubagentSession(parentSessionId, parentToolUseId);
+    if (existingSession) {
+      await this.updateSession(existingSession.id, { lastStartedAt: new Date().toISOString() });
+      return existingSession;
+    }
+
+    const metadata = await this.loadMetadata();
+    const parentSession = metadata[parentSessionId];
+    if (!parentSession) {
+      return null;
+    }
+
+    const description =
+      typeof taskInput.description === 'string' ? taskInput.description.trim() : '';
+    const agentType =
+      typeof taskInput.subagent_type === 'string' ? taskInput.subagent_type.trim() : 'Sub-Agent';
+    const model = typeof taskInput.model === 'string' ? taskInput.model : undefined;
+    const sessionName = this.buildSubagentSessionName(agentType, description);
+    const startedAt = new Date().toISOString();
+
+    const subagentSession = await this.createSession(
+      sessionName,
+      parentSession.projectPath,
+      parentSession.workingDirectory,
+      model,
+      parentSession.orchestratorRunId,
+      'subagent',
+      parentSessionId,
+      parentToolUseId
+    );
+
+    await this.updateSession(subagentSession.id, {
+      description: description || undefined,
+      lastStartedAt: startedAt,
+    });
+
+    return {
+      ...subagentSession,
+      description: description || undefined,
+      lastStartedAt: startedAt,
+    };
+  }
+
+  private async finalizeForegroundSubagents(parentSessionId: string): Promise<void> {
+    const entries = Array.from(this.activeSubagentSessions.entries()).filter(
+      ([, active]) => active.parentSessionId === parentSessionId && !active.runInBackground
+    );
+
+    for (const [toolUseId, active] of entries) {
+      this.activeSubagentSessions.delete(toolUseId);
+      await this.accumulateElapsedTime(active.childSessionId);
+    }
+  }
+
+  private async finalizeBackgroundSubagentsAfterParentStop(parentSessionId: string): Promise<void> {
+    const entries = Array.from(this.activeSubagentSessions.entries()).filter(
+      ([, active]) => active.parentSessionId === parentSessionId && active.runInBackground
+    );
+
+    for (const [toolUseId, active] of entries) {
+      this.activeSubagentSessions.delete(toolUseId);
+      await this.accumulateElapsedTime(active.childSessionId);
+      this.emitAgentEvent(parentSessionId, {
+        type: 'subagent_stopped',
+        agentId: toolUseId,
+        childSessionId: active.childSessionId,
       });
     }
   }

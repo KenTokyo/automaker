@@ -84,7 +84,7 @@ export interface SortOption {
 }
 
 export const SORT_OPTIONS: SortOption[] = [
-  { value: 'modified', label: 'Zuletzt geaendert' },
+  { value: 'modified', label: 'Zuletzt geändert' },
   { value: 'created', label: 'Zuletzt erstellt' },
   { value: 'name', label: 'Name A-Z' },
 ];

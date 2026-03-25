@@ -77,13 +77,13 @@ export const CompletedTasksToggle = memo(function CompletedTasksToggle({
           size="icon"
           disabled={disabled}
           className={cn(
-            'h-7 rounded-md border-border shrink-0',
-            isEnabled ? 'border-emerald-500/50 text-emerald-600 w-auto min-w-7 px-1.5 gap-1' : 'w-7'
+            'h-7 w-7 rounded-md border-border shrink-0',
+            isEnabled &&
+              'bg-emerald-500/10 text-emerald-600 border-emerald-500/40 hover:bg-emerald-500/15'
           )}
           title={isEnabled ? 'Aufgaben-Erfassung: Aktiv' : 'Aufgaben-Erfassung: Aus'}
         >
           <CheckCircle className="w-3.5 h-3.5" />
-          {isEnabled && <span className="text-[11px] font-medium">AN</span>}
         </Button>
       </DropdownMenuTrigger>
 

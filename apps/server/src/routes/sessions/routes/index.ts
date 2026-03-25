@@ -26,7 +26,8 @@ export function createIndexHandler(agentService: AgentService) {
           const lastError = lastMessage?.isError
             ? getLastErrorPreview(lastMessage.content)
             : undefined;
-          const isRunning = agentService.isSessionRunning(s.id);
+          const isRunning =
+            agentService.isSessionRunning(s.id) || agentService.isSubagentSessionRunning(s.id);
           const preview = lastMessage?.content?.slice(0, 100) || '';
 
           return {

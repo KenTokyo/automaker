@@ -4,9 +4,10 @@ import type { ActiveSubAgent } from '@/hooks/use-electron-agent';
 
 interface SubAgentIndicatorProps {
   activeSubAgents: ActiveSubAgent[];
+  onOpenSession?: (sessionId: string) => void;
 }
 
-export function SubAgentIndicator({ activeSubAgents }: SubAgentIndicatorProps) {
+export function SubAgentIndicator({ activeSubAgents, onOpenSession }: SubAgentIndicatorProps) {
   if (activeSubAgents.length === 0) return null;
 
   return (
@@ -17,27 +18,48 @@ export function SubAgentIndicator({ activeSubAgents }: SubAgentIndicatorProps) {
           {activeSubAgents.length} Sub-Agent{activeSubAgents.length !== 1 ? 's' : ''} aktiv
         </span>
       </div>
-      {activeSubAgents.map((agent) => (
-        <div
-          key={agent.agentId}
-          className="flex items-center gap-2 text-xs text-muted-foreground pl-1"
-        >
-          <Loader2 className="h-3 w-3 animate-spin text-amber-400/60 shrink-0" />
-          <span className="font-medium text-foreground/80 truncate">{agent.agentType}</span>
-          {agent.description && (
-            <span className="truncate text-muted-foreground/70">{agent.description}</span>
-          )}
-          <div className="flex items-center gap-1 ml-auto shrink-0 text-muted-foreground/50">
-            <Clock className="h-2.5 w-2.5" />
-            <span>{formatElapsed(agent.elapsedSeconds)}</span>
-          </div>
-          {agent.runInBackground && (
-            <span className="text-[10px] px-1 py-0.5 rounded bg-blue-500/10 text-blue-400/70 shrink-0">
-              BG
-            </span>
-          )}
-        </div>
-      ))}
+      {activeSubAgents.map((agent) => {
+        const canOpenSession = Boolean(agent.childSessionId && onOpenSession);
+
+        return (
+          <button
+            key={agent.agentId}
+            type="button"
+            onClick={() => {
+              if (agent.childSessionId && onOpenSession) {
+                onOpenSession(agent.childSessionId);
+              }
+            }}
+            disabled={!canOpenSession}
+            className={`flex w-full items-center gap-2 pl-1 text-left text-xs text-muted-foreground transition-colors ${
+              canOpenSession
+                ? 'rounded-md hover:bg-amber-500/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500/40'
+                : ''
+            }`}
+            title={canOpenSession ? 'Sub-Agent-Session öffnen' : undefined}
+          >
+            <Loader2 className="h-3 w-3 animate-spin text-amber-400/60 shrink-0" />
+            <span className="font-medium text-foreground/80 truncate">{agent.agentType}</span>
+            {agent.description && (
+              <span className="truncate text-muted-foreground/70">{agent.description}</span>
+            )}
+            <div className="flex items-center gap-1 ml-auto shrink-0 text-muted-foreground/50">
+              <Clock className="h-2.5 w-2.5" />
+              <span>{formatElapsed(agent.elapsedSeconds)}</span>
+            </div>
+            {agent.runInBackground && (
+              <span className="text-[10px] px-1 py-0.5 rounded bg-blue-500/10 text-blue-400/70 shrink-0">
+                BG
+              </span>
+            )}
+            {canOpenSession && (
+              <span className="text-[10px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-400/80 shrink-0">
+                Öffnen
+              </span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 # Master-Plan: Automatic Context Condense (wie Codex, für Automaker)
 
-> Status: 🟡 Planung fertig, Umsetzung startet als Nächstes
+> Status: 🟢 Kern-Umsetzung abgeschlossen (UI + Auto-Trigger + Session-Verknüpfung)
 > Datum: 2026-03-25
 > Ziel: Kontext automatisch zusammenfassen, neuen Chat öffnen, sauber weiterarbeiten
 
@@ -192,13 +192,13 @@ Orchestrator = unser Ablauf-Steuerer für mehrere KI-Schritte hintereinander.
 
 ## Abnahme (Done-Kriterien)
 
-- [ ] Token-Auslastung unten sichtbar
-- [ ] Auto-Condense pro Modell einstellbar
-- [ ] Automatischer Wechsel bei Schwelle funktioniert
-- [ ] Kein Endlos-Trigger
-- [ ] Session-Historie bleibt stabil
-- [ ] `npm run type-check` läuft sauber
-- [ ] UTF-8 Check läuft sauber
+- [x] Token-Auslastung unten sichtbar
+- [x] Auto-Condense pro Modell einstellbar
+- [x] Automatischer Wechsel bei Schwelle funktioniert
+- [x] Kein Endlos-Trigger
+- [x] Session-Historie bleibt stabil (Parent-Link bei Auto-Condense)
+- [x] `npm run typecheck` läuft sauber
+- [x] UTF-8 Check läuft sauber (für geänderte Dateien)
 
 ---
 

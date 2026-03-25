@@ -1,11 +1,11 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { useAgentPromptsStore } from '@/store/agent-prompts-store';
 import { useTimeLimiterStore } from '@/store/time-limiter-store';
 import { useOrchestratorStore } from '@/store/orchestrator-store';
 import { useShallow } from 'zustand/react/shallow';
 import { useElectronAgent } from '@/hooks/use-electron-agent';
-import { SessionManager } from '@/components/session-manager';
+import { SessionManager, type QuickCreateSessionArgs } from '@/components/session-manager';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { copyToClipboard, generateChatSummary, generateContextSummary } from '@/lib/copy-all-chat';
 import { embedSystemPrompts } from '@/lib/system-prompt-payload';
@@ -13,8 +13,10 @@ import type { ChatDisplaySettings } from '@/store/types/ui-types';
 import { DEFAULT_CHAT_DISPLAY_SETTINGS } from '@/store/types/ui-types';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { useSessions } from '@/hooks/queries/use-sessions';
+import { useAvailableModels } from '@/hooks/queries/use-models';
 import { useSessionQueryInvalidation } from '@/hooks/use-query-invalidation';
 import { createLogger } from '@automaker/utils/logger';
+import { CLAUDE_CANONICAL_MAP } from '@automaker/types';
 import { toast } from 'sonner';
 
 // Extracted hooks
@@ -45,6 +47,11 @@ import { Label } from '@/components/ui/label';
 const LG_BREAKPOINT = 1024;
 /** Breakpoint above which all three panels can coexist */
 const XL_BREAKPOINT = 1440;
+const MIN_MESSAGES_FOR_AUTO_CONDENSE = 4;
+const CONTEXT_TEXT_CHARS_PER_TOKEN = 4;
+const CONTEXT_TOOL_CHARS_PER_TOKEN = 3;
+const CONTEXT_IMAGE_TOKEN_ESTIMATE = 850;
+const CONTEXT_BASELINE_TOKENS = 12000;
 const logger = createLogger('AgentView');
 
 interface AgentViewProps {
@@ -121,6 +128,8 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     setChatDisplaySettings(settings);
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('automaker:chatDisplaySettings', JSON.stringify(settings));
+      // Notify same-tab listeners (e.g. FilePreview) about the change
+      window.dispatchEvent(new CustomEvent('chatDisplaySettingsChanged'));
     }
   }, []);
 
@@ -175,7 +184,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
   // Ref for quick create session function from SessionManager
   const quickCreateSessionRef = useRef<
-    ((attachOrchestratorRunId?: boolean) => Promise<void>) | null
+    ((options?: QuickCreateSessionArgs) => Promise<boolean>) | null
   >(null);
 
   // Session management hook
@@ -188,7 +197,12 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
   // Session name for Save-to-Docs feature
   const { data: allSessions = [] } = useSessions(true);
-  const currentSessionName = allSessions.find((s) => s.id === currentSessionId)?.name ?? null;
+  const currentSession = useMemo(
+    () => allSessions.find((session) => session.id === currentSessionId) ?? null,
+    [allSessions, currentSessionId]
+  );
+  const { data: availableModels = [], isFetched: availableModelsFetched } = useAvailableModels();
+  const currentSessionName = currentSession?.name ?? null;
   const [copySuccess, setCopySuccess] = useState(false);
   const [isSavingToDoc, setIsSavingToDoc] = useState(false);
 
@@ -213,6 +227,20 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     reasoningEffort: modelSelection.reasoningEffort,
     onToolUse: handleToolUse,
   });
+
+  const chatActivityState: 'idle' | 'running' | 'stopped' =
+    isProcessing || currentSession?.status === 'running'
+      ? 'running'
+      : currentSession?.status === 'stopped'
+        ? 'stopped'
+        : 'idle';
+
+  const chatActivityHandleClass =
+    chatActivityState === 'running'
+      ? 'bg-amber-500/70 data-[resize-handle-state=hover]:bg-amber-500 data-[resize-handle-state=drag]:bg-amber-500 focus-visible:ring-amber-500'
+      : chatActivityState === 'stopped'
+        ? 'bg-red-500/70 data-[resize-handle-state=hover]:bg-red-500 data-[resize-handle-state=drag]:bg-red-500 focus-visible:ring-red-500'
+        : undefined;
 
   // File attachments hook
   const fileAttachments = useFileAttachments({
@@ -264,10 +292,114 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     setCurrentModel: timeLimiterSetCurrentModel,
     getElapsedSeconds,
     isTimeExceeded,
+    isContextThresholdExceeded,
+    autoCondenseEnabled,
+    contextWindowOverrideTokens,
     pendingCopiedContent,
     setPendingCopiedContent,
     clearPendingContent,
   } = useTimeLimiterStore();
+
+  const contextMessageCount = useMemo(() => {
+    return messages.filter((message) => message.id !== 'welcome').length;
+  }, [messages]);
+
+  const estimatedConversationTokens = useMemo(() => {
+    return messages
+      .filter((message) => message.id !== 'welcome')
+      .reduce((sum, message) => {
+        const textTokens = Math.max(
+          1,
+          Math.ceil(message.content.length / CONTEXT_TEXT_CHARS_PER_TOKEN)
+        );
+        const toolTokens = (message.toolCalls ?? []).reduce((toolSum, toolCall) => {
+          const inputPayload = JSON.stringify(toolCall.input);
+          if (!inputPayload) return toolSum;
+          return (
+            toolSum + Math.max(1, Math.ceil(inputPayload.length / CONTEXT_TOOL_CHARS_PER_TOKEN))
+          );
+        }, 0);
+        const imageTokens = (message.images?.length ?? 0) * CONTEXT_IMAGE_TOKEN_ESTIMATE;
+        return sum + textTokens + toolTokens + imageTokens;
+      }, 0);
+  }, [messages]);
+
+  const estimatedContextTokens = useMemo(() => {
+    if (contextMessageCount <= 0) return 0;
+    return estimatedConversationTokens + CONTEXT_BASELINE_TOKENS;
+  }, [contextMessageCount, estimatedConversationTokens]);
+  const hasConversationMessages = useMemo(() => {
+    return messages.some((message) => message.role === 'user' || message.role === 'assistant');
+  }, [messages]);
+
+  const modelContextWindowTokens = useMemo(() => {
+    if (!modelSelection.model || availableModels.length === 0) return null;
+
+    const selectedModel = modelSelection.model.toLowerCase();
+    const hasClaudeCanonical = Object.prototype.hasOwnProperty.call(
+      CLAUDE_CANONICAL_MAP,
+      selectedModel
+    );
+    const canonicalClaudeModel = hasClaudeCanonical
+      ? CLAUDE_CANONICAL_MAP[selectedModel as keyof typeof CLAUDE_CANONICAL_MAP].toLowerCase()
+      : null;
+    const selectedCandidates = Array.from(
+      new Set(
+        [selectedModel, canonicalClaudeModel]
+          .filter((value): value is string => Boolean(value))
+          .flatMap((value) => [value, value.replace(/^(claude|cursor|codex|gemini|copilot)-/, '')])
+      )
+    );
+    const selectedProvider = modelSelection.providerId?.toLowerCase();
+
+    const matchesModel = (candidate: string | undefined): boolean => {
+      if (!candidate) return false;
+      const normalized = candidate.toLowerCase();
+      if (selectedCandidates.includes(normalized)) return true;
+      return selectedCandidates.some((value) => normalized.endsWith(`-${value}`));
+    };
+
+    const findMatch = (respectProvider: boolean) => {
+      return availableModels.find((model) => {
+        if (
+          respectProvider &&
+          selectedProvider &&
+          model.provider &&
+          model.provider.toLowerCase() !== selectedProvider
+        ) {
+          return false;
+        }
+
+        return matchesModel(model.id) || matchesModel(model.modelString);
+      });
+    };
+
+    const matchedModel = findMatch(true) ?? findMatch(false);
+    const windowSize = matchedModel?.contextWindow;
+
+    if (typeof windowSize !== 'number' || windowSize <= 0) {
+      return null;
+    }
+
+    return windowSize;
+  }, [availableModels, modelSelection.model, modelSelection.providerId]);
+
+  const contextWindowTokens = useMemo(() => {
+    if (typeof modelContextWindowTokens === 'number' && modelContextWindowTokens > 0) {
+      return modelContextWindowTokens;
+    }
+
+    if (typeof contextWindowOverrideTokens === 'number' && contextWindowOverrideTokens > 0) {
+      return contextWindowOverrideTokens;
+    }
+
+    return null;
+  }, [modelContextWindowTokens, contextWindowOverrideTokens]);
+
+  const contextUsagePercent = useMemo(() => {
+    if (!contextWindowTokens || contextWindowTokens <= 0) return null;
+    return (estimatedContextTokens / contextWindowTokens) * 100;
+  }, [estimatedContextTokens, contextWindowTokens]);
 
   // Sync the current model to the time limiter store so it uses model-specific time limits
   useEffect(() => {
@@ -278,6 +410,8 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
   // Track elapsed seconds for display
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const autoSessionSwitchTriggeredSessionsRef = useRef(new Set<string>());
+  const pendingCopiedContentSourceSessionIdRef = useRef<string | null>(null);
 
   // Reset timer when session changes
   useEffect(() => {
@@ -329,41 +463,129 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
   // Handle pending content from previous session (paste into new session)
   useEffect(() => {
     if (pendingCopiedContent && currentSessionId && isConnected && !isProcessing) {
+      const sourceSessionId = pendingCopiedContentSourceSessionIdRef.current;
+      if (sourceSessionId && sourceSessionId === currentSessionId) {
+        return;
+      }
+      // Never inject into an already-used chat. Wait for the fresh follow-up session.
+      if (hasConversationMessages) {
+        return;
+      }
+
       // Set the pending content as input
       setInput(pendingCopiedContent);
       clearPendingContent();
+      pendingCopiedContentSourceSessionIdRef.current = null;
     }
-  }, [pendingCopiedContent, currentSessionId, isConnected, isProcessing, clearPendingContent]);
+  }, [
+    pendingCopiedContent,
+    currentSessionId,
+    isConnected,
+    isProcessing,
+    clearPendingContent,
+    hasConversationMessages,
+  ]);
+
+  const createFollowUpSessionWithSummary = useCallback(
+    async (reason: 'time-limit' | 'context-threshold'): Promise<boolean> => {
+      const quickCreate = quickCreateSessionRef.current;
+      if (!quickCreate || !currentSessionId) return false;
+
+      const autoHintText =
+        reason === 'context-threshold'
+          ? 'Hinweis: Dieser Chat wurde automatisch zusammengefasst, weil der Kontext fast voll war.\n\n'
+          : 'Hinweis: Dieser Chat wurde automatisch zusammengefasst, weil das Zeitlimit erreicht war.\n\n';
+
+      const contextSummary = `${autoHintText}${generateContextSummary(messages)}`;
+      pendingCopiedContentSourceSessionIdRef.current = currentSessionId;
+      setPendingCopiedContent(contextSummary);
+      const created = await quickCreate({
+        attachOrchestratorRunId: false,
+        forceCreate: true,
+        sourceType: 'manual',
+        parentSessionId: currentSessionId,
+      });
+
+      if (!created) {
+        pendingCopiedContentSourceSessionIdRef.current = null;
+        clearPendingContent();
+        toast.error('Automatischer Wechsel fehlgeschlagen. Bitte kurz erneut versuchen.');
+        return false;
+      }
+
+      if (reason === 'context-threshold') {
+        toast.success('Kontext war fast voll. Neuer Chat mit Zusammenfassung gestartet.');
+      } else {
+        toast.success('Zeitlimit erreicht. Neuer Chat mit Zusammenfassung gestartet.');
+      }
+
+      return true;
+    },
+    [messages, currentSessionId, setPendingCopiedContent, clearPendingContent]
+  );
 
   // Auto-session-switch when time limit is exceeded
   useEffect(() => {
     if (!timeLimiterEnabled || !currentSessionId || !isConnected) return;
     if (!isTimeExceeded()) return;
     if (isProcessing) return; // Don't switch while processing
+    if (autoSessionSwitchTriggeredSessionsRef.current.has(currentSessionId)) return;
 
-    // Only trigger once per session
-    const handleTimeExceeded = async () => {
-      // Generate context summary
-      const contextSummary = generateContextSummary(messages);
+    const sourceSessionId = currentSessionId;
+    autoSessionSwitchTriggeredSessionsRef.current.add(sourceSessionId);
 
-      // Store the content to paste into new session
-      setPendingCopiedContent(contextSummary);
-
-      // Create new session (time-limiter: attach orchestrator run ID)
-      if (quickCreateSessionRef.current) {
-        await quickCreateSessionRef.current(true);
-      }
-    };
-
-    handleTimeExceeded();
+    void createFollowUpSessionWithSummary('time-limit')
+      .then((didCreate) => {
+        if (!didCreate) {
+          autoSessionSwitchTriggeredSessionsRef.current.delete(sourceSessionId);
+        }
+      })
+      .catch((error) => {
+        logger.error('[TimeLimiter] Automatic session switch failed', error);
+        autoSessionSwitchTriggeredSessionsRef.current.delete(sourceSessionId);
+      });
   }, [
     timeLimiterEnabled,
     currentSessionId,
     isConnected,
     isProcessing,
-    messages,
     isTimeExceeded,
-    setPendingCopiedContent,
+    createFollowUpSessionWithSummary,
+  ]);
+
+  // Auto-session-switch when context threshold is exceeded
+  useEffect(() => {
+    if (!autoCondenseEnabled || !currentSessionId || !isConnected) return;
+    if (isProcessing) return;
+    if (contextUsagePercent === null) return;
+    if (contextWindowTokens === null) return;
+    if (!isContextThresholdExceeded(contextUsagePercent)) return;
+    if (contextMessageCount < MIN_MESSAGES_FOR_AUTO_CONDENSE) return;
+    if (autoSessionSwitchTriggeredSessionsRef.current.has(currentSessionId)) return;
+
+    const sourceSessionId = currentSessionId;
+    autoSessionSwitchTriggeredSessionsRef.current.add(sourceSessionId);
+
+    void createFollowUpSessionWithSummary('context-threshold')
+      .then((didCreate) => {
+        if (!didCreate) {
+          autoSessionSwitchTriggeredSessionsRef.current.delete(sourceSessionId);
+        }
+      })
+      .catch((error) => {
+        logger.error('[ContextCondense] Automatic session switch failed', error);
+        autoSessionSwitchTriggeredSessionsRef.current.delete(sourceSessionId);
+      });
+  }, [
+    autoCondenseEnabled,
+    currentSessionId,
+    isConnected,
+    isProcessing,
+    contextUsagePercent,
+    contextWindowTokens,
+    contextMessageCount,
+    isContextThresholdExceeded,
+    createFollowUpSessionWithSummary,
   ]);
 
   // Orchestrator store
@@ -734,6 +956,14 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     setShowSessionManager(true);
   }, []);
 
+  const handleOpenSubAgentSession = useCallback(
+    (sessionId: string) => {
+      const targetSession = allSessions.find((session) => session.id === sessionId);
+      handleSelectSession(sessionId, targetSession?.projectPath);
+    },
+    [allSessions, handleSelectSession]
+  );
+
   const handleHideSessionManager = useCallback(() => {
     setShowSessionManager(false);
   }, []);
@@ -868,7 +1098,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
                   onQuickCreateRef={quickCreateSessionRef}
                 />
               </ResizablePanel>
-              <ResizableHandle withHandle />
+              <ResizableHandle withHandle className={chatActivityHandleClass} />
             </>
           )}
 
@@ -911,6 +1141,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
                 messages={displayMessages}
                 isProcessing={isProcessing}
                 activeSubAgents={activeSubAgents}
+                onOpenSubAgentSession={handleOpenSubAgentSession}
                 showSessionManager={showSessionManager}
                 messagesContainerRef={messagesContainerRef}
                 onScroll={handleScroll}
@@ -934,6 +1165,11 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
                   isConnected={isConnected}
                   projectPath={currentProject?.path || null}
                   elapsedSeconds={elapsedSeconds}
+                  estimatedContextTokens={estimatedContextTokens}
+                  contextWindowTokens={contextWindowTokens}
+                  modelContextWindowTokens={modelContextWindowTokens}
+                  isModelContextLookupReady={availableModelsFetched}
+                  contextUsagePercent={contextUsagePercent}
                   selectedImages={fileAttachments.selectedImages}
                   selectedTextFiles={fileAttachments.selectedTextFiles}
                   showImageDropZone={fileAttachments.showImageDropZone}
@@ -955,6 +1191,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
                   accentColor={currentProject?.badgeColor || currentProject?.backgroundColor}
                   onInputHeightChange={handleInputHeightChange}
                   onNewSession={handleNewSession}
+                  chatActivityState={chatActivityState}
                 />
               )}
             </div>
@@ -963,7 +1200,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
           {/* Right Panel - Desktop (resizable): Browser, Files, Terminal, Dashboard */}
           {browserPanelOpen && currentProject && (
             <>
-              <ResizableHandle withHandle />
+              <ResizableHandle withHandle className={chatActivityHandleClass} />
               <ResizablePanel id="right-panel" defaultSize={20} minSize={15} maxSize={50}>
                 <RightPanelShell projectPath={currentProject.path} />
               </ResizablePanel>
@@ -1005,6 +1242,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
             messages={displayMessages}
             isProcessing={isProcessing}
             activeSubAgents={activeSubAgents}
+            onOpenSubAgentSession={handleOpenSubAgentSession}
             showSessionManager={showSessionManager}
             messagesContainerRef={messagesContainerRef}
             onScroll={handleScroll}
@@ -1028,6 +1266,11 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
               isConnected={isConnected}
               projectPath={currentProject?.path || null}
               elapsedSeconds={elapsedSeconds}
+              estimatedContextTokens={estimatedContextTokens}
+              contextWindowTokens={contextWindowTokens}
+              modelContextWindowTokens={modelContextWindowTokens}
+              isModelContextLookupReady={availableModelsFetched}
+              contextUsagePercent={contextUsagePercent}
               selectedImages={fileAttachments.selectedImages}
               selectedTextFiles={fileAttachments.selectedTextFiles}
               showImageDropZone={fileAttachments.showImageDropZone}
@@ -1048,6 +1291,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
               inputRef={inputRef}
               onInputHeightChange={handleInputHeightChange}
               onNewSession={handleNewSession}
+              chatActivityState={chatActivityState}
             />
           )}
         </div>

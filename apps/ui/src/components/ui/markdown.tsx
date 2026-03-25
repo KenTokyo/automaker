@@ -5,10 +5,91 @@ import rehypeSanitize from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 import { common, createLowlight } from 'lowlight';
 import { toHtml } from 'hast-util-to-html';
+import type { Root, Element, ElementContent } from 'hast';
 import { cn } from '@/lib/utils';
 import { Square, CheckSquare } from 'lucide-react';
 
 const lowlight = createLowlight(common);
+
+/**
+ * Rehype plugin that fixes invalid `<p>` nested inside `<p>`.
+ * This can happen when rehype-sanitize strips block-level elements (e.g. <div>)
+ * and their inline children merge into a surrounding <p>, producing nested <p> tags.
+ * We walk the tree and lift nested <p> into siblings of the parent <p>.
+ */
+function rehypeFixNestedP() {
+  return (tree: Root) => {
+    visit(tree);
+  };
+}
+
+function visit(node: Root | Element) {
+  if (!('children' in node)) return;
+
+  // Process children bottom-up so indices stay valid
+  for (let i = 0; i < node.children.length; i++) {
+    const child = node.children[i];
+    if (child.type === 'element') {
+      visit(child);
+    }
+  }
+
+  // Only fix <p> elements that contain nested <p>
+  if (node.type === 'element' && node.tagName === 'p') {
+    const hasNestedP = node.children.some((c) => c.type === 'element' && c.tagName === 'p');
+    if (!hasNestedP) return;
+
+    // Split children into groups separated by nested <p> elements.
+    // Each nested <p> becomes a sibling; surrounding inline content stays in wrapper <p>.
+    const fragments: ElementContent[][] = [[]];
+    for (const child of node.children) {
+      if (child.type === 'element' && child.tagName === 'p') {
+        // Push the nested <p> as its own group
+        fragments.push([child]);
+        fragments.push([]);
+      } else {
+        fragments[fragments.length - 1].push(child);
+      }
+    }
+
+    // Build replacement nodes
+    const replacement: ElementContent[] = [];
+    for (const frag of fragments) {
+      if (frag.length === 0) continue;
+      if (frag.length === 1 && frag[0].type === 'element' && frag[0].tagName === 'p') {
+        // Already a <p>, keep it directly
+        replacement.push(frag[0]);
+      } else {
+        // Wrap remaining inline content in a <p>
+        const onlyWhitespace = frag.every((c) => c.type === 'text' && c.value.trim() === '');
+        if (!onlyWhitespace) {
+          replacement.push({
+            type: 'element',
+            tagName: 'p',
+            properties: { ...node.properties },
+            children: frag,
+          });
+        }
+      }
+    }
+
+    // Replace this node's children with the flattened result
+    // We need to splice into the parent, so we mark this for replacement
+    (node as Element & { _replaceWith?: ElementContent[] })._replaceWith = replacement;
+  }
+
+  // Now apply replacements for children that were marked
+  const newChildren: ElementContent[] = [];
+  for (const child of node.children as (ElementContent & { _replaceWith?: ElementContent[] })[]) {
+    if (child._replaceWith) {
+      newChildren.push(...child._replaceWith);
+      delete child._replaceWith;
+    } else {
+      newChildren.push(child);
+    }
+  }
+  node.children = newChildren as typeof node.children;
+}
 
 interface MarkdownProps {
   children: string;
@@ -182,7 +263,7 @@ export const Markdown = memo(function Markdown({ children, className }: Markdown
         // Lists — modern, clean look with comfortable spacing (markers via CSS below)
         '[&_ul]:my-2 [&_ul]:pl-0 [&_ul]:list-none [&_ol]:my-2 [&_ol]:pl-0 [&_ol]:list-none',
         '[&_ul_ul]:my-0.5 [&_ol_ol]:my-0.5',
-        '[&_li]:text-foreground-secondary [&_li]:my-0.5 [&_li]:whitespace-pre-wrap [&_li]:leading-relaxed',
+        '[&_li]:text-foreground-secondary [&_li]:my-0 [&_li]:whitespace-normal [&_li]:leading-relaxed',
         '[&_li_p]:!my-0 [&_li_p]:!leading-snug',
         // Code — subtle inline code, accent color set by .prose-accents
         '[&_code]:bg-muted/60 [&_code]:px-1 [&_code]:py-px [&_code]:rounded-sm [&_code]:text-[0.85em]',
@@ -207,7 +288,7 @@ export const Markdown = memo(function Markdown({ children, className }: Markdown
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw, rehypeSanitize]}
+        rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeFixNestedP]}
         components={{
           code: CodeBlock as React.ComponentType<React.ComponentProps<'code'>>,
           table: TableBlock as React.ComponentType<React.ComponentProps<'table'>>,
@@ -253,24 +334,39 @@ const syntaxStyles = `
     position: relative;
     padding-left: 1.25em;
   }
-  /* Unordered list bullets */
+  .prose ul > li + li,
+  .prose ol > li + li {
+    margin-top: 0.15em;
+  }
+  /* Unordered list bullets — round, cleaner and optically centered */
   .prose ul > li::before {
-    content: "•";
+    content: "";
     position: absolute;
-    left: 0;
-    color: var(--muted-foreground);
-    font-weight: 700;
-    font-size: 1.1em;
-    line-height: inherit;
+    left: 0.1em;
+    top: 0.7em;
+    transform: translateY(-50%);
+    width: 0.34em;
+    height: 0.34em;
+    border-radius: 9999px;
+    background: hsl(var(--muted-foreground));
+    opacity: 0.9;
   }
   .prose ul ul > li::before {
-    content: "◦";
-    font-weight: 400;
+    width: 0.28em;
+    height: 0.28em;
+    left: 0.13em;
+    background: transparent;
+    border: 1.5px solid hsl(var(--muted-foreground));
+    opacity: 0.85;
   }
   .prose ul ul ul > li::before {
-    content: "▪";
-    font-size: 0.7em;
-    top: 0.3em;
+    width: 0.24em;
+    height: 0.24em;
+    left: 0.15em;
+    border-radius: 2px;
+    background: hsl(var(--muted-foreground));
+    border: none;
+    opacity: 0.82;
   }
   /* Ordered list numbers */
   .prose ol {

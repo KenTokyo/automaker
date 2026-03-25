@@ -47,9 +47,19 @@ interface SessionManagerProps {
   projectPath: string;
   isCurrentSessionThinking?: boolean;
   onQuickCreateRef?: MutableRefObject<
-    ((attachOrchestratorRunId?: boolean) => Promise<void>) | null
+    ((options?: QuickCreateSessionArgs) => Promise<boolean>) | null
   >;
 }
+
+export interface QuickCreateSessionOptions {
+  attachOrchestratorRunId?: boolean;
+  forceCreate?: boolean;
+  sourceType?: 'manual' | 'orchestrator' | 'subagent';
+  parentSessionId?: string;
+  parentToolUseId?: string;
+}
+
+export type QuickCreateSessionArgs = boolean | QuickCreateSessionOptions;
 
 export function SessionManager({
   currentSessionId,
@@ -129,7 +139,9 @@ export function SessionManager({
         event.type === 'started' ||
         event.type === 'complete' ||
         event.type === 'error' ||
-        event.type === 'session_metadata_updated'
+        event.type === 'session_metadata_updated' ||
+        event.type === 'subagent_started' ||
+        event.type === 'subagent_stopped'
       ) {
         void invalidateSessions();
       }
@@ -158,7 +170,7 @@ export function SessionManager({
    * Find an existing empty session (0 messages, not archived) for the current project.
    * This prevents creating duplicate empty sessions when the user clicks "New" repeatedly.
    */
-  const findReusableEmptySession = (): SessionListItem | undefined => {
+  const findReusableEmptySession = useCallback((): SessionListItem | undefined => {
     return sessions.find(
       (s) =>
         s.projectPath === projectPath &&
@@ -166,7 +178,7 @@ export function SessionManager({
         !s.isArchived &&
         s.status !== 'running'
     );
-  };
+  }, [sessions, projectPath]);
 
   const handleCreateSession = async () => {
     // If user didn't type a custom name, try to reuse an existing empty session
@@ -201,34 +213,55 @@ export function SessionManager({
     }
   };
 
-  const handleQuickCreateSession = async (attachOrchestratorRunId?: boolean) => {
-    // Reuse an existing empty session instead of creating a new one
-    const existingEmpty = findReusableEmptySession();
-    if (existingEmpty) {
-      onSelectSession(existingEmpty.id);
-      return;
-    }
+  const handleQuickCreateSession = useCallback(
+    async (options?: QuickCreateSessionArgs): Promise<boolean> => {
+      const normalizedOptions: QuickCreateSessionOptions =
+        typeof options === 'boolean' ? { attachOrchestratorRunId: options } : options || {};
+      const {
+        attachOrchestratorRunId = false,
+        forceCreate = false,
+        sourceType,
+        parentSessionId,
+        parentToolUseId,
+      } = normalizedOptions;
 
-    const api = getElectronAPI();
-    if (!api?.sessions) return;
+      // Reuse an existing empty session unless this flow explicitly forces a new one.
+      if (!forceCreate) {
+        const existingEmpty = findReusableEmptySession();
+        if (existingEmpty) {
+          onSelectSession(existingEmpty.id);
+          return true;
+        }
+      }
 
-    // Only attach orchestrator run ID when explicitly requested (orchestrator auto-phase)
-    const runIdForSession = attachOrchestratorRunId
-      ? resolveOrchestratorRunIdForSessionCreation()
-      : undefined;
-    const sessionName = generateRandomSessionName();
-    const result = await api.sessions.create(
-      sessionName,
-      projectPath,
-      projectPath,
-      runIdForSession
-    );
+      const api = getElectronAPI();
+      if (!api?.sessions) return false;
 
-    if (result.success && result.session?.id) {
-      await invalidateSessions();
-      onSelectSession(result.session.id);
-    }
-  };
+      // Only attach orchestrator run ID when explicitly requested (orchestrator auto-phase)
+      const runIdForSession = attachOrchestratorRunId
+        ? resolveOrchestratorRunIdForSessionCreation()
+        : undefined;
+      const sessionName = generateRandomSessionName();
+      const result = await api.sessions.create(
+        sessionName,
+        projectPath,
+        projectPath,
+        runIdForSession,
+        sourceType,
+        parentSessionId,
+        parentToolUseId
+      );
+
+      if (result.success && result.session?.id) {
+        await invalidateSessions();
+        onSelectSession(result.session.id);
+        return true;
+      }
+
+      return false;
+    },
+    [findReusableEmptySession, projectPath, invalidateSessions, onSelectSession]
+  );
 
   useEffect(() => {
     if (onQuickCreateRef) {
@@ -240,7 +273,7 @@ export function SessionManager({
         onQuickCreateRef.current = null;
       }
     };
-  }, [onQuickCreateRef, projectPath]);
+  }, [onQuickCreateRef, handleQuickCreateSession]);
 
   const handleRenameSession = async (sessionId: string) => {
     const api = getElectronAPI();
@@ -427,6 +460,36 @@ export function SessionManager({
   const filteredArchived = filteredByTime.filter((session) => session.isArchived);
   const displayedSessions = activeTab === 'active' ? filteredActive : filteredArchived;
   const isFiltering = !!debouncedSearchTerm || !!filterProjectPath || timeFilterHours !== null;
+  const displayedSessionById = useMemo(
+    () => new Map(displayedSessions.map((session) => [session.id, session])),
+    [displayedSessions]
+  );
+  const childSessionsByParentId = useMemo(() => {
+    const grouped = new Map<string, SessionListItem[]>();
+
+    for (const session of displayedSessions) {
+      if (!session.parentSessionId || !displayedSessionById.has(session.parentSessionId)) {
+        continue;
+      }
+
+      const existing = grouped.get(session.parentSessionId);
+      if (existing) {
+        existing.push(session);
+      } else {
+        grouped.set(session.parentSessionId, [session]);
+      }
+    }
+
+    for (const children of grouped.values()) {
+      children.sort((a, b) => {
+        const byCreated = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        if (byCreated !== 0) return byCreated;
+        return a.id.localeCompare(b.id);
+      });
+    }
+
+    return grouped;
+  }, [displayedSessions, displayedSessionById]);
 
   // Group sessions by project for tree view
   const projectGroups = useProjectGrouping({
@@ -602,6 +665,91 @@ export function SessionManager({
     [sessions, activeTab, onSelectSession, invalidateSessions]
   );
 
+  const isChildSessionHiddenAtTopLevel = (session: SessionListItem): boolean =>
+    Boolean(session.parentSessionId && displayedSessionById.has(session.parentSessionId));
+
+  const renderSessionNode = (
+    session: SessionListItem,
+    {
+      rowFontSize,
+      phaseIndex,
+      depth = 0,
+      keyPrefix,
+      visited = new Set<string>(),
+    }: {
+      rowFontSize: number;
+      phaseIndex?: number;
+      depth?: number;
+      keyPrefix: string;
+      visited?: Set<string>;
+    }
+  ) => {
+    if (visited.has(session.id)) {
+      return null;
+    }
+
+    const nextVisited = new Set(visited);
+    nextVisited.add(session.id);
+    const childSessions = (childSessionsByParentId.get(session.id) || []).filter(
+      (child) => !nextVisited.has(child.id)
+    );
+
+    return (
+      <div key={`${keyPrefix}-${session.id}`} className="space-y-1">
+        <SessionItemErrorBoundary
+          key={`boundary-${session.id}`}
+          sessionId={session.id}
+          sessionName={session.name}
+        >
+          <SessionListItemRow
+            session={session}
+            currentSessionId={currentSessionId}
+            isCurrentSessionThinking={isCurrentSessionThinking}
+            runningSessions={runningSessions}
+            sessionFontSize={rowFontSize}
+            isMultiselectMode={isMultiselectMode}
+            isSelected={selectedSessionIds.has(session.id)}
+            editingSessionId={editingSessionId}
+            editingName={editingName}
+            onEditingNameChange={setEditingName}
+            onStartEditing={(sessionId, currentName) => {
+              setEditingSessionId(sessionId);
+              setEditingName(currentName);
+            }}
+            onStopEditing={() => {
+              setEditingSessionId(null);
+              setEditingName('');
+            }}
+            onRenameSession={(sessionId) => void handleRenameSession(sessionId)}
+            onArchiveSession={(sessionId) => void handleArchiveSession(sessionId)}
+            onUnarchiveSession={(sessionId) => void handleUnarchiveSession(sessionId)}
+            onDeleteSession={handleDeleteSession}
+            onSelectSession={handleSelectSession}
+            onToggleSelection={toggleSessionSelection}
+            getProjectName={getProjectName}
+            getBadgeColor={getBadgeColor}
+            getProject={getProject}
+            phaseIndex={depth === 0 ? phaseIndex : undefined}
+            isSubagentChild={depth > 0 || session.sourceType === 'subagent'}
+          />
+        </SessionItemErrorBoundary>
+
+        {childSessions.length > 0 && (
+          <div className="ml-3 space-y-1 border-l border-dashed border-sky-500/30 pl-2">
+            {childSessions.map((childSession) =>
+              renderSessionNode(childSession, {
+                rowFontSize: Math.max(10, rowFontSize - 1),
+                depth: depth + 1,
+                keyPrefix: `${keyPrefix}-${session.id}`,
+                visited: nextVisited,
+              })
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <Card className="flex h-full flex-col gap-0 rounded-none py-2">
       <div className="px-2 pt-2">
@@ -740,43 +888,13 @@ export function SessionManager({
                 renderDisplayEntry={(displayEntry) => {
                   if (displayEntry.type === 'single') {
                     const session = displayEntry.session;
-                    return (
-                      <SessionItemErrorBoundary
-                        key={`boundary-${session.id}`}
-                        sessionId={session.id}
-                        sessionName={session.name}
-                      >
-                        <SessionListItemRow
-                          session={session}
-                          currentSessionId={currentSessionId}
-                          isCurrentSessionThinking={isCurrentSessionThinking}
-                          runningSessions={runningSessions}
-                          sessionFontSize={sessionFontSize}
-                          isMultiselectMode={isMultiselectMode}
-                          isSelected={selectedSessionIds.has(session.id)}
-                          editingSessionId={editingSessionId}
-                          editingName={editingName}
-                          onEditingNameChange={setEditingName}
-                          onStartEditing={(sessionId, currentName) => {
-                            setEditingSessionId(sessionId);
-                            setEditingName(currentName);
-                          }}
-                          onStopEditing={() => {
-                            setEditingSessionId(null);
-                            setEditingName('');
-                          }}
-                          onRenameSession={(sessionId) => void handleRenameSession(sessionId)}
-                          onArchiveSession={(sessionId) => void handleArchiveSession(sessionId)}
-                          onUnarchiveSession={(sessionId) => void handleUnarchiveSession(sessionId)}
-                          onDeleteSession={handleDeleteSession}
-                          onSelectSession={handleSelectSession}
-                          onToggleSelection={toggleSessionSelection}
-                          getProjectName={getProjectName}
-                          getBadgeColor={getBadgeColor}
-                          getProject={getProject}
-                        />
-                      </SessionItemErrorBoundary>
-                    );
+                    if (isChildSessionHiddenAtTopLevel(session)) {
+                      return null;
+                    }
+                    return renderSessionNode(session, {
+                      rowFontSize: sessionFontSize,
+                      keyPrefix: 'session-single',
+                    });
                   }
 
                   const sessionIds = displayEntry.group.sessions.map((session) => session.id);
@@ -817,50 +935,15 @@ export function SessionManager({
                       >
                         <div className="min-h-0 overflow-hidden">
                           <div className="space-y-1 border-l border-dashed border-muted-foreground/30 pl-2">
-                            {displayEntry.group.sessions.map((session, index) => (
-                              <SessionItemErrorBoundary
-                                key={`boundary-${session.id}`}
-                                sessionId={session.id}
-                                sessionName={session.name}
-                              >
-                                <SessionListItemRow
-                                  session={session}
-                                  currentSessionId={currentSessionId}
-                                  isCurrentSessionThinking={isCurrentSessionThinking}
-                                  runningSessions={runningSessions}
-                                  sessionFontSize={Math.max(10, sessionFontSize - 1)}
-                                  isMultiselectMode={isMultiselectMode}
-                                  isSelected={selectedSessionIds.has(session.id)}
-                                  editingSessionId={editingSessionId}
-                                  editingName={editingName}
-                                  onEditingNameChange={setEditingName}
-                                  onStartEditing={(sessionId, currentName) => {
-                                    setEditingSessionId(sessionId);
-                                    setEditingName(currentName);
-                                  }}
-                                  onStopEditing={() => {
-                                    setEditingSessionId(null);
-                                    setEditingName('');
-                                  }}
-                                  onRenameSession={(sessionId) =>
-                                    void handleRenameSession(sessionId)
-                                  }
-                                  onArchiveSession={(sessionId) =>
-                                    void handleArchiveSession(sessionId)
-                                  }
-                                  onUnarchiveSession={(sessionId) =>
-                                    void handleUnarchiveSession(sessionId)
-                                  }
-                                  onDeleteSession={handleDeleteSession}
-                                  onSelectSession={handleSelectSession}
-                                  onToggleSelection={toggleSessionSelection}
-                                  getProjectName={getProjectName}
-                                  getBadgeColor={getBadgeColor}
-                                  getProject={getProject}
-                                  phaseIndex={index + 1}
-                                />
-                              </SessionItemErrorBoundary>
-                            ))}
+                            {displayEntry.group.sessions
+                              .filter((session) => !isChildSessionHiddenAtTopLevel(session))
+                              .map((session, index) =>
+                                renderSessionNode(session, {
+                                  rowFontSize: Math.max(10, sessionFontSize - 1),
+                                  phaseIndex: index + 1,
+                                  keyPrefix: `session-orchestrator-${displayEntry.group.runId}`,
+                                })
+                              )}
                           </div>
                         </div>
                       </div>

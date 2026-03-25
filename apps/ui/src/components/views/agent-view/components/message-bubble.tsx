@@ -70,7 +70,7 @@ export const MessageBubble = memo(function MessageBubble({
   const hasCustomFontColor =
     chatDisplaySettings.fontColorGray != null && chatDisplaySettings.fontColorGray < 900;
   const markdownClassName = cn(
-    '[&_p]:whitespace-pre-wrap [&_li]:whitespace-pre-wrap [&_code]:break-words',
+    '[&_p]:whitespace-pre-wrap [&_li]:whitespace-normal [&_code]:break-words',
     isError
       ? 'text-red-600 dark:text-red-400 prose-code:text-red-600 dark:prose-code:text-red-400 prose-code:bg-red-500/10'
       : hasCustomFontColor

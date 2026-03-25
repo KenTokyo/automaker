@@ -95,15 +95,22 @@ export function FileTreeItem({
   const dateFontWeight = getDateRecencyFontWeight(recency);
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       className={cn(
-        'group flex w-full items-start gap-1.5 rounded-sm py-1 pr-1 text-left text-sm',
+        'group flex w-full items-start gap-1.5 rounded-sm py-1 pr-1 text-left text-sm cursor-pointer',
         'hover:bg-muted/60 transition-colors',
         isSelected && !node.isDirectory && 'bg-muted/80 text-foreground'
       )}
       style={{ paddingLeft, ...recencyStyle }}
       onClick={handleClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleClick();
+        }
+      }}
       title={node.path}
     >
       {/* Chevron / spacer */}
@@ -204,6 +211,6 @@ export function FileTreeItem({
           </button>
         </div>
       )}
-    </button>
+    </div>
   );
 }

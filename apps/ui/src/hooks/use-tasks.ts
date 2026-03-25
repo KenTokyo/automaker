@@ -19,6 +19,31 @@ interface ProjectInfo {
   name: string;
 }
 
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+}
+
+function normalizeTask(task: Task): Task {
+  return {
+    ...task,
+    tags: normalizeStringArray(task.tags),
+  };
+}
+
+function extractTaskFromEventPayload(payload: unknown): Task | null {
+  const raw = payload as { task?: unknown } | null;
+  const candidate = raw && typeof raw === 'object' && 'task' in raw ? raw.task : payload;
+  if (!candidate || typeof candidate !== 'object') return null;
+
+  const maybeTask = candidate as Task;
+  if (typeof maybeTask.filename !== 'string' || maybeTask.filename.length === 0) {
+    return null;
+  }
+
+  return normalizeTask(maybeTask);
+}
+
 /**
  * Build query string from filter options
  */
@@ -105,7 +130,7 @@ export function useTasks(
 
       const data = (await response.json()) as { tasks: Task[] };
       if (!controller.signal.aborted) {
-        setTasks(data.tasks ?? []);
+        setTasks((data.tasks ?? []).map(normalizeTask));
         setLoading(false);
       }
     } catch (err: unknown) {
@@ -131,13 +156,22 @@ export function useTasks(
   useEffect(() => {
     const client = getHttpApiClient();
     const unsubCreated = client.onTaskCreated((payload) => {
-      const task = payload as Task;
+      const task = extractTaskFromEventPayload(payload);
       if (task) {
-        addTask(task);
+        const exists = useAppStore
+          .getState()
+          .tasks.some(
+            (t) =>
+              t.filename === task.filename && (t.projectPath ?? '') === (task.projectPath ?? '')
+          );
+
+        if (!exists) {
+          addTask(task);
+        }
       }
     });
     const unsubUpdated = client.onTaskUpdated((payload) => {
-      const task = payload as Task;
+      const task = extractTaskFromEventPayload(payload);
       if (task && task.filename) {
         updateTaskInStore(task.filename, task);
       }

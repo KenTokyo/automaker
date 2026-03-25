@@ -21,6 +21,7 @@ interface ChatAreaProps {
   messages: Message[];
   isProcessing: boolean;
   activeSubAgents?: ActiveSubAgent[];
+  onOpenSubAgentSession?: (sessionId: string) => void;
   showSessionManager: boolean;
   messagesContainerRef: React.RefObject<HTMLDivElement | null>;
   onScroll: () => void;
@@ -36,6 +37,7 @@ export const ChatArea = memo(function ChatArea({
   messages,
   isProcessing,
   activeSubAgents,
+  onOpenSubAgentSession,
   showSessionManager,
   messagesContainerRef,
   onScroll,
@@ -59,6 +61,7 @@ export const ChatArea = memo(function ChatArea({
       messages={messages}
       isProcessing={isProcessing}
       activeSubAgents={activeSubAgents}
+      onOpenSubAgentSession={onOpenSubAgentSession}
       messagesContainerRef={messagesContainerRef}
       onScroll={onScroll}
       chatBackgroundColor={chatBackgroundColor}

@@ -3,6 +3,7 @@ import {
   AlertCircle,
   Archive,
   ArchiveRestore,
+  Bot,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -51,6 +52,7 @@ interface SessionListItemRowProps {
   getBadgeColor: (projectPath: string | undefined) => string | undefined;
   getProject: (projectPath: string | undefined) => Project | null;
   phaseIndex?: number;
+  isSubagentChild?: boolean;
 }
 
 export function SessionListItemRow({
@@ -76,6 +78,7 @@ export function SessionListItemRow({
   getBadgeColor,
   getProject,
   phaseIndex,
+  isSubagentChild = false,
 }: SessionListItemRowProps) {
   const formatTime = (timestamp: string | null | undefined): string => {
     if (!timestamp) return '--:--';
@@ -109,6 +112,7 @@ export function SessionListItemRow({
   const sessionBadgeColor = getBadgeColor(session.projectPath);
   const isEditing = editingSessionId === session.id;
   const isPhaseItem = typeof phaseIndex === 'number';
+  const isSubagent = isSubagentChild || session.sourceType === 'subagent';
 
   // File extraction for completed (dirty) sessions
   const [filesExpanded, setFilesExpanded] = useState(false);
@@ -177,7 +181,9 @@ export function SessionListItemRow({
         isMultiselectMode &&
           isSelected &&
           'border-primary bg-primary/20 shadow-[0_8px_18px_-16px_hsl(var(--primary))]',
-        isPhaseItem && 'bg-muted/20'
+        isPhaseItem && 'bg-muted/20',
+        isSubagent &&
+          'border-sky-500/50 bg-sky-500/5 shadow-[0_8px_20px_-16px_theme(colors.sky.500)]'
       )}
       style={{
         fontSize: `${sessionFontSize}px`,
@@ -284,6 +290,13 @@ export function SessionListItemRow({
                 {isPhaseItem && (
                   <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                     Phase {phaseIndex}
+                  </span>
+                )}
+
+                {isSubagent && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-500">
+                    <Bot className="h-2.5 w-2.5" />
+                    Sub-Agent
                   </span>
                 )}
 

@@ -21,6 +21,7 @@ interface MessageListProps {
   messages: Message[];
   isProcessing: boolean;
   activeSubAgents?: ActiveSubAgent[];
+  onOpenSubAgentSession?: (sessionId: string) => void;
   messagesContainerRef: React.RefObject<HTMLDivElement | null>;
   onScroll: () => void;
   chatBackgroundColor?: string;
@@ -33,6 +34,7 @@ export const MessageList = memo(function MessageList({
   messages,
   isProcessing,
   activeSubAgents,
+  onOpenSubAgentSession,
   messagesContainerRef,
   onScroll,
   chatBackgroundColor,
@@ -74,7 +76,10 @@ export const MessageList = memo(function MessageList({
 
       {/* Sub-Agent Activity Indicator */}
       {activeSubAgents && activeSubAgents.length > 0 && (
-        <SubAgentIndicator activeSubAgents={activeSubAgents} />
+        <SubAgentIndicator
+          activeSubAgents={activeSubAgents}
+          onOpenSession={onOpenSubAgentSession}
+        />
       )}
 
       {/* Thinking Indicator */}

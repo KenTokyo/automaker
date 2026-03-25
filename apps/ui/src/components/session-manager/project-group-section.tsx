@@ -34,10 +34,25 @@ export function ProjectGroupSection({
   renderDisplayEntry,
   onNewSession,
 }: ProjectGroupSectionProps) {
-  const visibleSessions = useMemo(
-    () => group.allSessions.slice(0, visibleCount),
-    [group.allSessions, visibleCount]
-  );
+  const visibleSessions = useMemo(() => {
+    const baseVisible = group.allSessions.slice(0, visibleCount);
+    const byId = new Map(group.allSessions.map((session) => [session.id, session]));
+    const visibleIds = new Set(baseVisible.map((session) => session.id));
+
+    // If a visible child session exists, ensure all its parents are also visible
+    // so we can render a stable parent -> child tree.
+    for (const session of baseVisible) {
+      let parentId = session.parentSessionId;
+      while (parentId) {
+        const parentSession = byId.get(parentId);
+        if (!parentSession) break;
+        visibleIds.add(parentSession.id);
+        parentId = parentSession.parentSessionId;
+      }
+    }
+
+    return group.allSessions.filter((session) => visibleIds.has(session.id));
+  }, [group.allSessions, visibleCount]);
 
   const displayEntries = useMemo(
     () => buildProjectDisplayEntries(visibleSessions, expandedRunIds),

@@ -343,7 +343,9 @@ export function useSessionQueryInvalidation(sessionId: string | undefined) {
       if (
         event.type === 'complete' ||
         event.type === 'session_metadata_updated' ||
-        event.type === 'stopped'
+        event.type === 'stopped' ||
+        event.type === 'subagent_started' ||
+        event.type === 'subagent_stopped'
       ) {
         queryClient.invalidateQueries({
           queryKey: ['sessions'],
