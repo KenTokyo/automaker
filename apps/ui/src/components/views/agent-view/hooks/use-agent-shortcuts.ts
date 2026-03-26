@@ -21,8 +21,6 @@ export function useAgentShortcuts({
   quickCreateSessionRef,
 }: UseAgentShortcutsOptions): void {
   const shortcuts = useKeyboardShortcutsConfig();
-  const leftPanelTab = useAppStore((s) => s.leftPanelTab);
-  const setLeftPanelTab = useAppStore((s) => s.setLeftPanelTab);
   const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
   const rightPanelMode = useAppStore((s) => s.rightPanelMode);
   const setRightPanelMode = useAppStore((s) => s.setRightPanelMode);
@@ -41,15 +39,6 @@ export function useAgentShortcuts({
           }
         },
         description: 'Create new session',
-      });
-
-      // Toggle docs panel (cycles sessions -> docs -> sessions)
-      shortcutsList.push({
-        key: 'ctrl+shift+d',
-        action: () => {
-          setLeftPanelTab(leftPanelTab === 'docs' ? 'sessions' : 'docs');
-        },
-        description: 'Toggle docs panel',
       });
 
       // Toggle browser panel
@@ -103,8 +92,6 @@ export function useAgentShortcuts({
     currentProject,
     shortcuts,
     quickCreateSessionRef,
-    leftPanelTab,
-    setLeftPanelTab,
     toggleBrowserPanel,
     rightPanelMode,
     setRightPanelMode,

@@ -1,23 +1,13 @@
 /**
  * KanbanTaskCard - Compact card for a single task inside a Kanban column.
  *
- * Shows title, priority badge, tags, creation date, and quick status-change buttons.
+ * Shows title, priority badge, tags, creation date, and edit/delete actions.
  * Clicking the card toggles an expanded detail view.
  */
 
 import { useCallback, useState } from 'react';
-import {
-  ArrowLeft,
-  ArrowRight,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  Trash2,
-  Loader2,
-  Pencil,
-} from 'lucide-react';
-import type { SupabaseTask, UpdateTaskInput } from '@ui/hooks/use-supabase-tasks';
-import type { TaskStatus } from '@ui/lib/supabase-types';
+import { ChevronDown, ChevronUp, Clock, Trash2, Loader2, Pencil } from 'lucide-react';
+import type { SupabaseTask } from '@ui/hooks/use-supabase-tasks';
 import { Badge } from '@ui/components/ui/badge';
 import { Button } from '@ui/components/ui/button';
 import { cn } from '@ui/lib/utils';
@@ -26,28 +16,6 @@ import {
   AttachmentCountBadge,
   TaskAttachmentPreview,
 } from '@ui/components/session-manager/task-attachment-preview';
-
-// ---------------------------------------------------------------------------
-// Status helpers
-// ---------------------------------------------------------------------------
-
-const STATUS_ORDER: TaskStatus[] = ['todo', 'in_progress', 'completed'];
-
-function getPrevStatus(current: TaskStatus): TaskStatus | null {
-  const idx = STATUS_ORDER.indexOf(current);
-  return idx > 0 ? STATUS_ORDER[idx - 1] : null;
-}
-
-function getNextStatus(current: TaskStatus): TaskStatus | null {
-  const idx = STATUS_ORDER.indexOf(current);
-  return idx < STATUS_ORDER.length - 1 ? STATUS_ORDER[idx + 1] : null;
-}
-
-const STATUS_LABELS: Record<TaskStatus, string> = {
-  todo: 'To Do',
-  in_progress: 'In Progress',
-  completed: 'Completed',
-};
 
 // ---------------------------------------------------------------------------
 // Priority helpers
@@ -94,7 +62,6 @@ function formatRelativeTime(dateString: string): string {
 
 interface KanbanTaskCardProps {
   task: SupabaseTask;
-  onUpdateTask: (id: string, updates: UpdateTaskInput) => Promise<SupabaseTask | null>;
   onDeleteTask: (id: string) => Promise<boolean>;
   onEditTask?: (task: SupabaseTask) => void;
   showSendToAgent?: boolean;
@@ -102,32 +69,14 @@ interface KanbanTaskCardProps {
 
 export function KanbanTaskCard({
   task,
-  onUpdateTask,
   onDeleteTask,
   onEditTask,
   showSendToAgent = false,
 }: KanbanTaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [updating, setUpdating] = useState(false);
   const { attachments } = useTaskAttachments(task.id);
   const attachmentCount = attachments.length;
-
-  const prevStatus = getPrevStatus(task.status);
-  const nextStatus = getNextStatus(task.status);
-
-  const handleStatusChange = useCallback(
-    async (newStatus: TaskStatus) => {
-      if (updating) return;
-      setUpdating(true);
-      try {
-        await onUpdateTask(task.id, { status: newStatus });
-      } finally {
-        setUpdating(false);
-      }
-    },
-    [task.id, onUpdateTask, updating]
-  );
 
   const handleDelete = useCallback(async () => {
     if (deleting) return;
@@ -245,82 +194,36 @@ export function KanbanTaskCard({
             </div>
           )}
 
-          {/* Status change + action buttons */}
-          <div className="flex items-center justify-between gap-1">
-            <div className="flex items-center gap-1">
-              {/* Move left (previous status) */}
-              {prevStatus && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={cn(
-                    'h-6 gap-1 px-2 text-[10px] border-white/5 bg-zinc-800/50',
-                    prevStatus === 'todo' &&
-                      'text-cyan-400 hover:bg-cyan-500/10 hover:border-cyan-500/20',
-                    prevStatus === 'in_progress' &&
-                      'text-orange-400 hover:bg-orange-500/10 hover:border-orange-500/20'
-                  )}
-                  onClick={() => void handleStatusChange(prevStatus)}
-                  disabled={updating}
-                  title={`Verschieben nach ${STATUS_LABELS[prevStatus]}`}
-                >
-                  <ArrowLeft className="h-3 w-3" />
-                  {STATUS_LABELS[prevStatus]}
-                </Button>
-              )}
-
-              {/* Move right (next status) */}
-              {nextStatus && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={cn(
-                    'h-6 gap-1 px-2 text-[10px] border-white/5 bg-zinc-800/50',
-                    nextStatus === 'in_progress' &&
-                      'text-orange-400 hover:bg-orange-500/10 hover:border-orange-500/20',
-                    nextStatus === 'completed' &&
-                      'text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/20'
-                  )}
-                  onClick={() => void handleStatusChange(nextStatus)}
-                  disabled={updating}
-                  title={`Verschieben nach ${STATUS_LABELS[nextStatus]}`}
-                >
-                  {STATUS_LABELS[nextStatus]}
-                  <ArrowRight className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-
-            <div className="flex items-center gap-0.5">
-              {/* Edit */}
-              {onEditTask && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 text-zinc-600 hover:text-violet-400 hover:bg-violet-500/10"
-                  onClick={() => onEditTask(task)}
-                  title="Task bearbeiten"
-                >
-                  <Pencil className="h-3 w-3" />
-                </Button>
-              )}
-
-              {/* Delete */}
+          {/* Action buttons */}
+          <div className="flex items-center justify-end gap-0.5">
+            {/* Edit */}
+            {onEditTask && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 w-6 p-0 text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10"
-                onClick={() => void handleDelete()}
-                disabled={deleting}
-                title="Task loeschen"
+                className="h-6 w-6 p-0 text-zinc-600 hover:text-violet-400 hover:bg-violet-500/10"
+                onClick={() => onEditTask(task)}
+                title="Task bearbeiten"
               >
-                {deleting ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Trash2 className="h-3 w-3" />
-                )}
+                <Pencil className="h-3 w-3" />
               </Button>
-            </div>
+            )}
+
+            {/* Delete */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10"
+              onClick={() => void handleDelete()}
+              disabled={deleting}
+              title="Task loeschen"
+            >
+              {deleting ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Trash2 className="h-3 w-3" />
+              )}
+            </Button>
           </div>
         </div>
       )}

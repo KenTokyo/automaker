@@ -368,9 +368,8 @@ export interface AppState {
   // Selected Agent Model (for quick model override in board view)
   selectedAgentModel: PhaseModelEntry;
 
-  // Docs Panel State
-  docsOpen: boolean; // Legacy: kept for backward compat, derived from leftPanelTab
-  leftPanelTab: LeftPanelTab; // Which tab is active on the left ('sessions' | 'docs' | 'overview')
+  // Left Panel State
+  leftPanelTab: LeftPanelTab; // Which tab is active on the left ('sessions' | 'overview' | 'completed' | 'tasks')
   currentDocPath: string | null;
   docsViewMode: 'rendered' | 'raw';
   recentDocs: RecentDoc[];
@@ -887,8 +886,7 @@ export interface AppActions {
   // Selected Agent Model actions
   setSelectedAgentModel: (entry: PhaseModelEntry) => void;
 
-  // Docs Panel actions
-  setDocsOpen: (open: boolean) => void; // Legacy: sets leftPanelTab to 'docs' or 'sessions'
+  // Left Panel actions
   setLeftPanelTab: (tab: LeftPanelTab) => void;
   setCurrentDocPath: (path: string | null) => void;
   setDocsViewMode: (mode: 'rendered' | 'raw') => void;

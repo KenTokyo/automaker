@@ -347,7 +347,6 @@ export function InputControls({
 
   // Recent docs from store
   const recentDocs = useAppStore((s) => s.recentDocs);
-  const setDocsOpen = useAppStore((s) => s.setDocsOpen);
   const [docsPopoverOpen, setDocsPopoverOpen] = useState(false);
 
   // Save-as-Markdown
@@ -628,17 +627,6 @@ export function InputControls({
                   ))}
                 </div>
               )}
-              <div className="p-2 border-t">
-                <button
-                  className="w-full text-xs text-center text-primary hover:underline"
-                  onClick={() => {
-                    setDocsOpen(true);
-                    setDocsPopoverOpen(false);
-                  }}
-                >
-                  Browse All Docs
-                </button>
-              </div>
             </PopoverContent>
           </Popover>
 

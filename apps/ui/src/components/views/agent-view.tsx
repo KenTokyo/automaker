@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+﻿import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { useAgentPromptsStore } from '@/store/agent-prompts-store';
 import { useTimeLimiterStore } from '@/store/time-limiter-store';
@@ -16,9 +16,12 @@ import { getHttpApiClient } from '@/lib/http-api-client';
 import { useSessions } from '@/hooks/queries/use-sessions';
 import { useAvailableModels } from '@/hooks/queries/use-models';
 import { useSessionQueryInvalidation } from '@/hooks/use-query-invalidation';
+import { updateTask as updateFileTask } from '@/hooks/use-tasks';
+import { updateSupabaseTaskById } from '@/hooks/use-supabase-tasks';
 import { createLogger } from '@automaker/utils/logger';
 import { CLAUDE_CANONICAL_MAP } from '@automaker/types';
 import { toast } from 'sonner';
+import { useSupabaseAuthStore } from '@/store/supabase-auth-store';
 
 // Extracted hooks
 import {
@@ -55,6 +58,25 @@ const CONTEXT_IMAGE_TOKEN_ESTIMATE = 850;
 const CONTEXT_BASELINE_TOKENS = 12000;
 const logger = createLogger('AgentView');
 
+function buildTaskCompletionNotes(
+  messages: Array<{ role: string; content: string; isError?: boolean }>
+): string {
+  const lastAssistant = [...messages]
+    .reverse()
+    .find((message) => message.role === 'assistant' && !message.isError && message.content.trim());
+
+  if (!lastAssistant) {
+    return 'Task abgeschlossen.';
+  }
+
+  const text = lastAssistant.content.trim();
+  if (text.length <= 1500) {
+    return text;
+  }
+
+  return `${text.slice(0, 1497)}...`;
+}
+
 interface AgentViewProps {
   /** When true, the built-in AgentHeader is not rendered (useful for custom headers). */
   hideHeader?: boolean;
@@ -71,7 +93,6 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     setBrowserPanelOpen,
     currentDocPath,
     setCurrentDocPath,
-    setDocsOpen,
   } = useAppStore(
     useShallow((s) => ({
       currentProject: s.currentProject,
@@ -83,9 +104,9 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       setBrowserPanelOpen: s.setBrowserPanelOpen,
       currentDocPath: s.currentDocPath,
       setCurrentDocPath: s.setCurrentDocPath,
-      setDocsOpen: s.setDocsOpen,
     }))
   );
+  const supabaseUser = useSupabaseAuthStore((s) => s.user);
   const [input, setInput] = useState('');
   const [currentTool, setCurrentTool] = useState<string | null>(null);
   const [isDesktop, setIsDesktop] = useState(true);
@@ -220,6 +241,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     removeFromServerQueue,
     clearServerQueue,
     activeSubAgents,
+    lastTerminalEvent,
   } = useElectronAgent({
     sessionId: currentSessionId || '',
     workingDirectory: currentProject?.path,
@@ -541,19 +563,17 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
   // Handle pending task message from task-chat bridge
   const pendingTaskMessage = useTaskChatBridgeStore((s) => s.pendingTaskMessage);
   const shouldNavigateToAgent = useTaskChatBridgeStore((s) => s.shouldNavigateToAgent);
+  const activeTaskContext = useTaskChatBridgeStore((s) => s.activeTaskContext);
+  const activeTaskSessionId = useTaskChatBridgeStore((s) => s.activeTaskSessionId);
+  const taskAutoStartInFlightRef = useRef(false);
+  const taskAutoStartSessionRequestForRef = useRef<number | null>(null);
+  const processedTaskTerminalEventKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!shouldNavigateToAgent) return;
     // We are already in the agent view - clear the flag
     useTaskChatBridgeStore.getState().clearNavigationFlag();
   }, [shouldNavigateToAgent]);
-
-  useEffect(() => {
-    // Consume pending task message when we have a session and are connected
-    if (!pendingTaskMessage || !currentSessionId || !isConnected) return;
-    setInput(pendingTaskMessage);
-    useTaskChatBridgeStore.getState().consumePendingMessage();
-  }, [pendingTaskMessage, currentSessionId, isConnected]);
 
   const createFollowUpSessionWithSummary = useCallback(
     async (reason: 'time-limit' | 'context-threshold'): Promise<boolean> => {
@@ -850,7 +870,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
   // Handle send message
   const handleSend = useCallback(
-    async (messageOverride?: string) => {
+    async (messageOverride?: string): Promise<boolean> => {
       const {
         selectedImages,
         selectedTextFiles,
@@ -861,7 +881,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
       const messageInput = messageOverride ?? input;
       if (!messageInput.trim() && selectedImages.length === 0 && selectedTextFiles.length === 0) {
-        return;
+        return false;
       }
 
       let messageContent = messageInput;
@@ -890,10 +910,24 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       setShowImageDropZone(false);
 
       // If already processing, add to server queue instead
-      if (isProcessing) {
-        await addToServerQueue(messageContent, messageImages, messageTextFiles);
-      } else {
-        await sendMessage(messageContent, messageImages, messageTextFiles);
+      try {
+        if (isProcessing) {
+          await addToServerQueue(messageContent, messageImages, messageTextFiles);
+        } else {
+          await sendMessage(messageContent, messageImages, messageTextFiles);
+        }
+        return true;
+      } catch (error) {
+        const fallbackText = messageInput.trim();
+        if (fallbackText) {
+          setInput(fallbackText);
+        }
+        const message =
+          error instanceof Error && error.message.trim().length > 0
+            ? error.message
+            : 'Senden hat nicht geklappt.';
+        toast.error(message);
+        return false;
       }
     },
     [
@@ -906,6 +940,277 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       getOrchestratorMessageWrapper,
     ]
   );
+
+  const syncTaskInProgressAfterSend = useCallback(
+    async (
+      context: { source: 'file' | 'supabase'; taskId: string; projectPath?: string },
+      sessionId: string
+    ): Promise<boolean> => {
+      try {
+        if (context.source === 'supabase') {
+          if (!supabaseUser?.id) return false;
+          const updated = await updateSupabaseTaskById(
+            context.taskId,
+            {
+              status: 'in_progress',
+              chatSessionId: sessionId,
+            },
+            supabaseUser.id
+          );
+          return updated !== null;
+        }
+
+        const localProjectPath = context.projectPath || currentProject?.path;
+        if (!localProjectPath) return false;
+
+        const updated = await updateFileTask(context.taskId, localProjectPath, {
+          status: 'in_progress',
+        });
+        return updated !== null;
+      } catch (error) {
+        logger.error('[TaskBridge] Failed to sync in_progress status after send', error);
+        return false;
+      }
+    },
+    [supabaseUser?.id, currentProject?.path]
+  );
+
+  const syncTaskCompletedAfterRun = useCallback(
+    async (
+      context: { source: 'file' | 'supabase'; taskId: string; projectPath?: string },
+      sessionId: string,
+      completedNotes: string
+    ): Promise<boolean> => {
+      try {
+        if (context.source === 'supabase') {
+          if (!supabaseUser?.id) return false;
+          const updated = await updateSupabaseTaskById(
+            context.taskId,
+            {
+              status: 'completed',
+              chatSessionId: sessionId,
+              completedNotes,
+            },
+            supabaseUser.id
+          );
+          return updated !== null;
+        }
+
+        const localProjectPath = context.projectPath || currentProject?.path;
+        if (!localProjectPath) return false;
+
+        const updated = await updateFileTask(context.taskId, localProjectPath, {
+          status: 'done',
+          summary: completedNotes,
+        });
+        return updated !== null;
+      } catch (error) {
+        logger.error('[TaskBridge] Failed to sync completed status after run', error);
+        return false;
+      }
+    },
+    [supabaseUser?.id, currentProject?.path]
+  );
+
+  useEffect(() => {
+    if (!pendingTaskMessage || !activeTaskContext) return;
+    if (taskAutoStartInFlightRef.current) return;
+
+    const bridgeState = useTaskChatBridgeStore.getState();
+    const taskToken = activeTaskContext.sentAt;
+
+    const failBeforeSend = (message: string) => {
+      bridgeState.consumePendingMessage();
+      bridgeState.setActiveTaskSession(null);
+      bridgeState.setTaskExecutionState(activeTaskContext, {
+        state: 'failed',
+        updatedAt: Date.now(),
+        errorMessage: message,
+      });
+      taskAutoStartSessionRequestForRef.current = null;
+      setInput(pendingTaskMessage);
+      toast.error(message);
+    };
+
+    const autoStartTask = async () => {
+      taskAutoStartInFlightRef.current = true;
+
+      try {
+        const quickCreate = quickCreateSessionRef.current;
+        if (!quickCreate) {
+          failBeforeSend('Session-Start ist gerade nicht bereit. Bitte kurz erneut versuchen.');
+          return;
+        }
+
+        if (!currentSessionId) {
+          if (taskAutoStartSessionRequestForRef.current === taskToken) {
+            return;
+          }
+
+          taskAutoStartSessionRequestForRef.current = taskToken;
+          const created = await quickCreate({
+            attachOrchestratorRunId: false,
+            forceCreate: false,
+            sourceType: 'manual',
+          });
+
+          if (!created) {
+            failBeforeSend('Neue Session konnte nicht erstellt werden.');
+          }
+          return;
+        }
+
+        if (hasConversationMessages) {
+          if (taskAutoStartSessionRequestForRef.current === taskToken) {
+            return;
+          }
+
+          taskAutoStartSessionRequestForRef.current = taskToken;
+          const created = await quickCreate({
+            attachOrchestratorRunId: false,
+            forceCreate: true,
+            sourceType: 'manual',
+            parentSessionId: currentSessionId,
+          });
+
+          if (!created) {
+            failBeforeSend('Neue leere Session konnte nicht erstellt werden.');
+          }
+          return;
+        }
+
+        if (!isConnected || isProcessing) return;
+
+        taskAutoStartSessionRequestForRef.current = null;
+
+        const didSend = await handleSend(pendingTaskMessage);
+        if (!didSend) {
+          bridgeState.consumePendingMessage();
+          bridgeState.setActiveTaskSession(null);
+          bridgeState.setTaskExecutionState(activeTaskContext, {
+            state: 'failed',
+            updatedAt: Date.now(),
+            errorMessage: 'Senden hat nicht geklappt.',
+          });
+          return;
+        }
+
+        const didSyncStatus = await syncTaskInProgressAfterSend(
+          activeTaskContext,
+          currentSessionId
+        );
+        if (!didSyncStatus) {
+          bridgeState.consumePendingMessage();
+          bridgeState.setActiveTaskSession(null);
+          bridgeState.setTaskExecutionState(activeTaskContext, {
+            state: 'failed',
+            updatedAt: Date.now(),
+            errorMessage: 'Task-Status konnte nicht gespeichert werden.',
+          });
+          toast.error('Task wurde gesendet, aber der Status konnte nicht gespeichert werden.');
+          return;
+        }
+
+        bridgeState.consumePendingMessage();
+        bridgeState.setActiveTaskSession(currentSessionId);
+        bridgeState.setTaskExecutionState(activeTaskContext, {
+          state: 'running',
+          updatedAt: Date.now(),
+          sessionId: currentSessionId,
+        });
+      } finally {
+        taskAutoStartInFlightRef.current = false;
+      }
+    };
+
+    void autoStartTask();
+  }, [
+    pendingTaskMessage,
+    activeTaskContext,
+    currentSessionId,
+    isConnected,
+    isProcessing,
+    hasConversationMessages,
+    handleSend,
+    syncTaskInProgressAfterSend,
+  ]);
+
+  useEffect(() => {
+    if (!lastTerminalEvent) return;
+    if (!activeTaskContext || !activeTaskSessionId || !currentSessionId) return;
+    if (lastTerminalEvent.sessionId !== currentSessionId) return;
+    if (activeTaskSessionId !== currentSessionId) return;
+
+    const eventKey = `${lastTerminalEvent.type}:${lastTerminalEvent.sessionId}:${lastTerminalEvent.at}`;
+    if (processedTaskTerminalEventKeyRef.current === eventKey) {
+      return;
+    }
+    processedTaskTerminalEventKeyRef.current = eventKey;
+
+    const bridgeState = useTaskChatBridgeStore.getState();
+
+    const handleTerminalEvent = async () => {
+      if (lastTerminalEvent.type === 'complete') {
+        const completedNotes = buildTaskCompletionNotes(messages);
+        const didSyncCompleted = await syncTaskCompletedAfterRun(
+          activeTaskContext,
+          currentSessionId,
+          completedNotes
+        );
+
+        if (!didSyncCompleted) {
+          bridgeState.setTaskExecutionState(activeTaskContext, {
+            state: 'failed',
+            updatedAt: Date.now(),
+            sessionId: currentSessionId,
+            errorMessage:
+              'Task ist fertig, aber der Abschluss-Status konnte nicht gespeichert werden.',
+          });
+          bridgeState.setActiveTaskSession(null);
+          toast.error(
+            'Task ist fertig, aber der Abschluss-Status konnte nicht gespeichert werden.'
+          );
+          return;
+        }
+
+        bridgeState.setTaskExecutionState(activeTaskContext, {
+          state: 'completed',
+          updatedAt: Date.now(),
+          sessionId: currentSessionId,
+        });
+        bridgeState.setActiveTaskSession(null);
+        return;
+      }
+
+      if (lastTerminalEvent.type === 'error') {
+        bridgeState.setTaskExecutionState(activeTaskContext, {
+          state: 'failed',
+          updatedAt: Date.now(),
+          sessionId: currentSessionId,
+          errorMessage: lastTerminalEvent.error || 'Agent-Fehler',
+        });
+        bridgeState.setActiveTaskSession(null);
+        return;
+      }
+
+      bridgeState.setTaskExecutionState(activeTaskContext, {
+        state: 'failed',
+        updatedAt: Date.now(),
+        sessionId: currentSessionId,
+        errorMessage: 'Ausführung wurde gestoppt.',
+      });
+      bridgeState.setActiveTaskSession(null);
+    };
+
+    void handleTerminalEvent();
+  }, [
+    lastTerminalEvent,
+    activeTaskContext,
+    activeTaskSessionId,
+    currentSessionId,
+    messages,
+    syncTaskCompletedAfterRun,
+  ]);
 
   const handleNewSession = useCallback(() => {
     quickCreateSessionRef.current?.();

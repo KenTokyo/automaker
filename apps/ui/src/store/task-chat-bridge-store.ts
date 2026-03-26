@@ -22,8 +22,25 @@ export interface TaskChatContext {
   summary?: string;
   /** Source type: 'file' for file-based tasks, 'supabase' for Supabase tasks */
   source: 'file' | 'supabase';
+  /** Optional local project path (needed for file-task status sync). */
+  projectPath?: string;
+  /** Optional Supabase project ID (for reference/debugging). */
+  projectId?: string;
   /** Timestamp when the task was sent to chat */
   sentAt: number;
+}
+
+export type TaskExecutionStateType = 'starting' | 'running' | 'completed' | 'failed';
+
+export interface TaskExecutionState {
+  state: TaskExecutionStateType;
+  updatedAt: number;
+  sessionId?: string;
+  errorMessage?: string;
+}
+
+export function getTaskExecutionKey(context: Pick<TaskChatContext, 'taskId' | 'source'>): string {
+  return `${context.source}:${context.taskId}`;
 }
 
 interface TaskChatBridgeState {
@@ -33,6 +50,10 @@ interface TaskChatBridgeState {
   pendingTaskMessage: string | null;
   /** Whether we should navigate to the agent view */
   shouldNavigateToAgent: boolean;
+  /** Session ID that currently executes the active task (set after successful send). */
+  activeTaskSessionId: string | null;
+  /** Per-task execution status for UI badges ("Gestartet", "Laeuft", ...). */
+  taskExecutionStates: Record<string, TaskExecutionState>;
 }
 
 interface TaskChatBridgeActions {
@@ -42,6 +63,15 @@ interface TaskChatBridgeActions {
   consumePendingMessage: () => string | null;
   /** Clear the navigation flag (called after navigating). */
   clearNavigationFlag: () => void;
+  /** Set active task session after a successful send. */
+  setActiveTaskSession: (sessionId: string | null) => void;
+  /** Update runtime state for a specific task. */
+  setTaskExecutionState: (
+    context: Pick<TaskChatContext, 'taskId' | 'source'>,
+    nextState: TaskExecutionState
+  ) => void;
+  /** Remove runtime state for a specific task. */
+  clearTaskExecutionState: (context: Pick<TaskChatContext, 'taskId' | 'source'>) => void;
   /** Dismiss the active task context badge. */
   dismissTaskContext: () => void;
   /** Full reset. */
@@ -72,14 +102,25 @@ export const useTaskChatBridgeStore = create<TaskChatBridgeStore>((set, get) => 
   activeTaskContext: null,
   pendingTaskMessage: null,
   shouldNavigateToAgent: false,
+  activeTaskSessionId: null,
+  taskExecutionStates: {},
 
   // Actions
   sendTaskToAgent: (context) => {
     const message = buildTaskMessage(context);
+    const executionKey = getTaskExecutionKey(context);
     set({
       activeTaskContext: context,
       pendingTaskMessage: message,
       shouldNavigateToAgent: true,
+      activeTaskSessionId: null,
+      taskExecutionStates: {
+        ...get().taskExecutionStates,
+        [executionKey]: {
+          state: 'starting',
+          updatedAt: Date.now(),
+        },
+      },
     });
   },
 
@@ -95,6 +136,31 @@ export const useTaskChatBridgeStore = create<TaskChatBridgeStore>((set, get) => 
     set({ shouldNavigateToAgent: false });
   },
 
+  setActiveTaskSession: (sessionId) => {
+    set({ activeTaskSessionId: sessionId });
+  },
+
+  setTaskExecutionState: (context, nextState) => {
+    const executionKey = getTaskExecutionKey(context);
+    set((state) => ({
+      taskExecutionStates: {
+        ...state.taskExecutionStates,
+        [executionKey]: nextState,
+      },
+    }));
+  },
+
+  clearTaskExecutionState: (context) => {
+    const executionKey = getTaskExecutionKey(context);
+    set((state) => {
+      if (!state.taskExecutionStates[executionKey]) {
+        return state;
+      }
+      const { [executionKey]: _removed, ...rest } = state.taskExecutionStates;
+      return { taskExecutionStates: rest };
+    });
+  },
+
   dismissTaskContext: () => {
     set({ activeTaskContext: null });
   },
@@ -104,6 +170,8 @@ export const useTaskChatBridgeStore = create<TaskChatBridgeStore>((set, get) => 
       activeTaskContext: null,
       pendingTaskMessage: null,
       shouldNavigateToAgent: false,
+      activeTaskSessionId: null,
+      taskExecutionStates: {},
     });
   },
 }));

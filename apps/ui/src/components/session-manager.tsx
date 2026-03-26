@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
-import { MessageSquare, FileText, BarChart3, CheckCircle, ListTodo } from 'lucide-react';
+import { MessageSquare, BarChart3, CheckCircle, ListTodo } from 'lucide-react';
 import { createLogger } from '@automaker/utils/logger';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,7 +12,6 @@ import { queryKeys } from '@/lib/query-keys';
 import { DeleteSessionDialog } from '@/components/dialogs/delete-session-dialog';
 import { DeleteAllArchivedSessionsDialog } from '@/components/dialogs/delete-all-archived-sessions-dialog';
 import { DeleteOldSessionsDialog } from '@/components/dialogs/delete-old-sessions-dialog';
-import { DocsPanel } from '@/components/views/agent-view/components/docs-panel';
 import { LeftOverviewPanel } from '@/components/session-manager/left-overview-panel';
 import { CompletedTasksPanel } from '@/components/session-manager/completed-tasks-panel';
 import { TasksPanel } from '@/components/session-manager/tasks-panel';
@@ -167,18 +166,33 @@ export function SessionManager({
   };
 
   /**
-   * Find an existing empty session (0 messages, not archived) for the current project.
+   * Reusable empty sessions must be true "normal" chats.
+   * Sub-agent/child sessions are excluded so "New" never jumps into a sub-agent thread.
+   */
+  const isReusableEmptySession = useCallback(
+    (session: SessionListItem, targetProjectPath: string): boolean => {
+      return (
+        session.projectPath === targetProjectPath &&
+        session.messageCount === 0 &&
+        !session.isArchived &&
+        session.status !== 'running' &&
+        session.sourceType !== 'subagent' &&
+        !session.parentSessionId
+      );
+    },
+    []
+  );
+
+  /**
+   * Find an existing empty session (0 messages, not archived) for a project.
    * This prevents creating duplicate empty sessions when the user clicks "New" repeatedly.
    */
-  const findReusableEmptySession = useCallback((): SessionListItem | undefined => {
-    return sessions.find(
-      (s) =>
-        s.projectPath === projectPath &&
-        s.messageCount === 0 &&
-        !s.isArchived &&
-        s.status !== 'running'
-    );
-  }, [sessions, projectPath]);
+  const findReusableEmptySession = useCallback(
+    (targetProjectPath: string = projectPath): SessionListItem | undefined => {
+      return sessions.find((session) => isReusableEmptySession(session, targetProjectPath));
+    },
+    [sessions, projectPath, isReusableEmptySession]
+  );
 
   const handleCreateSession = async () => {
     // If user didn't type a custom name, try to reuse an existing empty session
@@ -633,13 +647,7 @@ export function SessionManager({
       if (!api?.sessions) return;
 
       // Try to reuse an existing empty session for that project
-      const existingEmpty = sessions.find(
-        (s) =>
-          s.projectPath === targetProjectPath &&
-          s.messageCount === 0 &&
-          !s.isArchived &&
-          s.status !== 'running'
-      );
+      const existingEmpty = findReusableEmptySession(targetProjectPath);
 
       if (existingEmpty) {
         // Switch to the tab and select the empty session
@@ -662,7 +670,7 @@ export function SessionManager({
         onSelectSession(result.session.id, targetProjectPath);
       }
     },
-    [sessions, activeTab, onSelectSession, invalidateSessions]
+    [findReusableEmptySession, activeTab, onSelectSession, invalidateSessions]
   );
 
   const isChildSessionHiddenAtTopLevel = (session: SessionListItem): boolean =>
@@ -767,15 +775,18 @@ export function SessionManager({
               Sessions
             </TabsTrigger>
             <TabsTrigger
+              value="tasks"
+              className="h-4.5 flex-1 gap-0.5 px-1 text-[10px] font-medium"
+            >
+              <ListTodo className="h-2.5 w-2.5" />
+              Tasks
+            </TabsTrigger>
+            <TabsTrigger
               value="completed"
               className="h-4.5 flex-1 gap-0.5 px-1 text-[10px] font-medium"
             >
               <CheckCircle className="h-2.5 w-2.5" />
               Fertig
-            </TabsTrigger>
-            <TabsTrigger value="docs" className="h-4.5 flex-1 gap-0.5 px-1 text-[10px] font-medium">
-              <FileText className="h-2.5 w-2.5" />
-              Docs
             </TabsTrigger>
             <TabsTrigger
               value="overview"
@@ -784,22 +795,11 @@ export function SessionManager({
               <BarChart3 className="h-2.5 w-2.5" />
               Übersicht
             </TabsTrigger>
-            <TabsTrigger
-              value="tasks"
-              className="h-4.5 flex-1 gap-0.5 px-1 text-[10px] font-medium"
-            >
-              <ListTodo className="h-2.5 w-2.5" />
-              Tasks
-            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
-      {leftPanelTab === 'docs' ? (
-        <div className="flex-1 overflow-hidden">
-          <DocsPanel projectPath={projectPath} />
-        </div>
-      ) : leftPanelTab === 'overview' ? (
+      {leftPanelTab === 'overview' ? (
         <div className="flex-1 overflow-hidden">
           <LeftOverviewPanel />
         </div>

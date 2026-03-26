@@ -6,6 +6,13 @@
     <title>Automaker Kanban</title>
     <meta name="description" content="Öffentliches Kanban-Board für Automaker Teamaufgaben" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <script type="module">
+      // first npm i react-grab
+      // then in head:
+      if (import.meta.env.DEV) {
+        import('react-grab');
+      }
+    </script>
   </head>
   <body class="antialiased">
     <div id="app"></div>

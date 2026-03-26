@@ -1,4 +1,4 @@
-/**
+﻿/**
  * KanbanTaskCard - Compact card for a single task inside a Kanban column.
  *
  * Shows title, priority badge, tags, creation date, and quick status-change buttons.
@@ -21,6 +21,11 @@ import type { TaskStatus } from '@/lib/supabase-types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import {
+  useTaskChatBridgeStore,
+  getTaskExecutionKey,
+  type TaskExecutionState,
+} from '@/store/task-chat-bridge-store';
 import { SupabaseTaskSendToAgent } from './task-send-to-agent';
 import { useTaskAttachments } from '@/hooks/use-task-attachments';
 import { AttachmentCountBadge, TaskAttachmentPreview } from './task-attachment-preview';
@@ -46,6 +51,37 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
   in_progress: 'In Progress',
   completed: 'Completed',
 };
+
+function getExecutionBadgeConfig(
+  executionState: TaskExecutionState | null
+): { label: string; className: string } | null {
+  if (!executionState) return null;
+
+  switch (executionState.state) {
+    case 'starting':
+      return {
+        label: 'Gestartet',
+        className: 'border-sky-500/30 bg-sky-500/10 text-sky-400',
+      };
+    case 'running':
+      return {
+        label: 'Läuft',
+        className: 'border-amber-500/30 bg-amber-500/10 text-amber-400',
+      };
+    case 'completed':
+      return {
+        label: 'Fertig',
+        className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
+      };
+    case 'failed':
+      return {
+        label: 'Fehlgeschlagen',
+        className: 'border-rose-500/30 bg-rose-500/10 text-rose-400',
+      };
+    default:
+      return null;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Priority helpers
@@ -113,6 +149,16 @@ export function KanbanTaskCard({
 
   const prevStatus = getPrevStatus(task.status);
   const nextStatus = getNextStatus(task.status);
+  const executionState = useTaskChatBridgeStore(
+    (s) =>
+      s.taskExecutionStates[
+        getTaskExecutionKey({
+          taskId: task.id,
+          source: 'supabase',
+        })
+      ] ?? null
+  );
+  const executionBadge = getExecutionBadgeConfig(executionState);
 
   const handleStatusChange = useCallback(
     async (newStatus: TaskStatus) => {
@@ -183,6 +229,12 @@ export function KanbanTaskCard({
 
       {/* Badges: priority + tags */}
       <div className="mt-1.5 flex flex-wrap gap-1">
+        {executionBadge && (
+          <Badge size="sm" className={cn('gap-0.5 border', executionBadge.className)}>
+            {executionBadge.label}
+          </Badge>
+        )}
+
         {task.priority && (
           <Badge
             size="sm"
@@ -232,6 +284,13 @@ export function KanbanTaskCard({
             <div className="rounded-md border border-white/5 bg-zinc-800/30 p-2">
               <p className="mb-0.5 text-[10px] font-medium text-zinc-500">Details</p>
               <p className="whitespace-pre-wrap text-xs text-zinc-400">{task.summary}</p>
+            </div>
+          )}
+
+          {executionState?.state === 'failed' && executionState.errorMessage && (
+            <div className="rounded-md border border-rose-500/20 bg-rose-500/5 p-2">
+              <p className="text-[10px] font-medium text-rose-400">Fehlgeschlagen</p>
+              <p className="mt-0.5 text-xs text-rose-300">{executionState.errorMessage}</p>
             </div>
           )}
 
@@ -291,14 +350,7 @@ export function KanbanTaskCard({
 
             <div className="flex items-center gap-0.5">
               {/* Send to Agent */}
-              {showSendToAgent && (
-                <SupabaseTaskSendToAgent
-                  task={task}
-                  onStatusChange={(id, status) => {
-                    void onUpdateTask(id, { status: status as TaskStatus });
-                  }}
-                />
-              )}
+              {showSendToAgent && <SupabaseTaskSendToAgent task={task} />}
 
               {/* Edit */}
               {onEditTask && (

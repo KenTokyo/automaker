@@ -391,6 +391,12 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
         </div>
       </div>
 
+      <div className="border-b border-muted bg-muted/20 px-3 py-1.5">
+        <p className="text-[10px] text-muted-foreground">
+          Hinweis: Diese Liste ist nur die Doku. Der Kanban-Status kommt aus den Supabase-Tasks.
+        </p>
+      </div>
+
       {/* Search + Filter bar */}
       <div className="space-y-2 border-b border-muted px-3 py-2">
         <CompletedTasksSearch value={filter.search ?? ''} onChange={handleSearchChange} />

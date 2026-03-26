@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TaskCard - A single card for a task in the Tasks tab.
  *
  * Displays checkbox, priority dot, title, status/priority/tag badges,
@@ -23,6 +23,11 @@ import type { Task, TaskStatus, TaskPriority } from '@automaker/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import {
+  useTaskChatBridgeStore,
+  getTaskExecutionKey,
+  type TaskExecutionState,
+} from '@/store/task-chat-bridge-store';
 import {
   getTaskStatusColor,
   getTaskStatusDotColor,
@@ -53,6 +58,37 @@ function getStatusIcon(status: TaskStatus) {
       return PlayCircle;
     default:
       return Circle;
+  }
+}
+
+function getExecutionBadgeConfig(
+  executionState: TaskExecutionState | null
+): { label: string; className: string } | null {
+  if (!executionState) return null;
+
+  switch (executionState.state) {
+    case 'starting':
+      return {
+        label: 'Gestartet',
+        className: 'border-sky-500/30 bg-sky-500/10 text-sky-400',
+      };
+    case 'running':
+      return {
+        label: 'Läuft',
+        className: 'border-amber-500/30 bg-amber-500/10 text-amber-400',
+      };
+    case 'completed':
+      return {
+        label: 'Fertig',
+        className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
+      };
+    case 'failed':
+      return {
+        label: 'Fehlgeschlagen',
+        className: 'border-rose-500/30 bg-rose-500/10 text-rose-400',
+      };
+    default:
+      return null;
   }
 }
 
@@ -125,6 +161,16 @@ export function TaskCard({ task, onUpdate, onDelete, onEdit, fontSize = 14 }: Ta
   }, [task.filename, task.status, onUpdate]);
 
   const isDone = task.status === 'done';
+  const executionState = useTaskChatBridgeStore(
+    (s) =>
+      s.taskExecutionStates[
+        getTaskExecutionKey({
+          taskId: task.filename,
+          source: 'file',
+        })
+      ] ?? null
+  );
+  const executionBadge = getExecutionBadgeConfig(executionState);
   const hasSummary = !!task.summary;
   const StatusIcon = getStatusIcon(task.status);
   const titleSize = Math.max(11, fontSize);
@@ -184,7 +230,7 @@ export function TaskCard({ task, onUpdate, onDelete, onEdit, fontSize = 14 }: Ta
         {/* Action buttons (visible on hover) */}
         <div className="flex shrink-0 items-center gap-0.5">
           {/* Send to Agent button */}
-          <TaskSendToAgent task={task} onStatusChange={onUpdate} />
+          <TaskSendToAgent task={task} />
 
           {/* Status cycle button */}
           <Button
@@ -249,6 +295,12 @@ export function TaskCard({ task, onUpdate, onDelete, onEdit, fontSize = 14 }: Ta
         <Badge size="sm" className={cn('gap-1 border', getTaskStatusColor(task.status))}>
           {getTaskStatusLabel(task.status)}
         </Badge>
+
+        {executionBadge && (
+          <Badge size="sm" className={cn('gap-1 border', executionBadge.className)}>
+            {executionBadge.label}
+          </Badge>
+        )}
 
         {/* Priority badge */}
         {task.priority && (
@@ -318,6 +370,15 @@ export function TaskCard({ task, onUpdate, onDelete, onEdit, fontSize = 14 }: Ta
             </div>
           )}
         </div>
+      )}
+
+      {executionState?.state === 'failed' && executionState.errorMessage && (
+        <p
+          className="mt-1.5 rounded-md border border-rose-500/20 bg-rose-500/5 px-2 py-1 text-[10px] text-rose-400"
+          style={{ fontSize: `${metaSize}px` }}
+        >
+          {executionState.errorMessage}
+        </p>
       )}
 
       {/* Footer: project name + relative time + date */}

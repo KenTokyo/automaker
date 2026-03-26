@@ -3,7 +3,7 @@
  *
  * Columns: "To Do", "In Progress", "Completed".
  * Each column shows tasks filtered by status with a count badge.
- * Quick-add buttons per column. Responsive: vertical on small screens.
+ * Floating FAB + bottom drawer for task creation.
  */
 
 import { useCallback, useMemo, useState } from 'react';
@@ -21,7 +21,7 @@ import type { SupabaseTask, UpdateTaskInput, CreateTaskInput } from '@ui/hooks/u
 import { Button } from '@ui/components/ui/button';
 import { cn } from '@ui/lib/utils';
 import { KanbanTaskCard } from './kanban-task-card';
-import { KanbanQuickAdd } from './kanban-quick-add';
+import { KanbanTaskDrawer } from './kanban-task-drawer';
 
 // ---------------------------------------------------------------------------
 // Column definitions
@@ -98,6 +98,8 @@ export function KanbanBoard({
   onEditTask,
   showSendToAgent = true,
 }: KanbanBoardProps) {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
   // Group tasks by status
   const grouped = useMemo(() => {
     const map: Record<KanbanStatus, SupabaseTask[]> = {
@@ -112,6 +114,10 @@ export function KanbanBoard({
     }
     return map;
   }, [tasks]);
+
+  const openDrawer = useCallback(() => {
+    setDrawerOpen(true);
+  }, []);
 
   // Full-page loading
   if (loading && tasks.length === 0) {
@@ -150,7 +156,7 @@ export function KanbanBoard({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-zinc-950">
+    <div className="relative flex h-full min-h-0 flex-col bg-zinc-950">
       {/* Inline error banner */}
       {error && tasks.length > 0 && (
         <div className="mx-4 mb-2 flex items-center justify-between gap-2 rounded-md border border-rose-500/20 bg-rose-500/5 px-3 py-1.5">
@@ -174,15 +180,28 @@ export function KanbanBoard({
             column={col}
             tasks={grouped[col.status]}
             loading={loading}
-            projectId={projectId}
-            onUpdateTask={onUpdateTask}
             onDeleteTask={onDeleteTask}
-            onCreateTask={onCreateTask}
             onEditTask={onEditTask}
             showSendToAgent={showSendToAgent}
+            onAddClick={() => openDrawer()}
           />
         ))}
       </div>
+
+      {/* Floating FAB */}
+      <button
+        onClick={() => openDrawer()}
+        className={cn(
+          'absolute bottom-14 right-6 z-30',
+          'flex h-12 w-12 items-center justify-center rounded-full',
+          'bg-cyan-600 text-white shadow-lg shadow-cyan-500/20',
+          'transition-all duration-200 hover:bg-cyan-500 hover:shadow-cyan-500/30 hover:scale-105',
+          'active:scale-95'
+        )}
+        title="Neuen Task erstellen"
+      >
+        <Plus className="h-5 w-5" />
+      </button>
 
       {/* Footer stats */}
       <div className="border-t border-white/5 px-4 py-2">
@@ -197,51 +216,42 @@ export function KanbanBoard({
           {loading && <Loader2 className="ml-2 inline-block h-3 w-3 animate-spin text-zinc-600" />}
         </p>
       </div>
+
+      {/* Task creation drawer */}
+      <KanbanTaskDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onCreateTask={onCreateTask}
+        projectId={projectId}
+      />
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Single Column
+// Single Column (simplified - no inline quick-add)
 // ---------------------------------------------------------------------------
 
 interface KanbanColumnProps {
   column: ColumnDef;
   tasks: SupabaseTask[];
   loading: boolean;
-  projectId: string | null;
-  onUpdateTask: (id: string, updates: UpdateTaskInput) => Promise<SupabaseTask | null>;
   onDeleteTask: (id: string) => Promise<boolean>;
-  onCreateTask: (input: CreateTaskInput) => Promise<SupabaseTask | null>;
   onEditTask?: (task: SupabaseTask) => void;
   showSendToAgent?: boolean;
+  onAddClick: () => void;
 }
 
 function KanbanColumn({
   column,
   tasks,
   loading,
-  projectId,
-  onUpdateTask,
   onDeleteTask,
-  onCreateTask,
   onEditTask,
   showSendToAgent = true,
+  onAddClick,
 }: KanbanColumnProps) {
-  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const Icon = column.icon;
-
-  const handleQuickCreate = useCallback(
-    async (title: string) => {
-      if (!projectId) return;
-      await onCreateTask({
-        projectId,
-        title,
-      });
-      setShowQuickAdd(false);
-    },
-    [projectId, onCreateTask]
-  );
 
   return (
     <div className="flex min-h-0 flex-col rounded-xl border border-white/5 bg-zinc-900/50">
@@ -264,23 +274,12 @@ function KanbanColumn({
           variant="ghost"
           size="sm"
           className="h-6 w-6 p-0 text-zinc-600 hover:text-cyan-400 hover:bg-cyan-500/10"
-          onClick={() => setShowQuickAdd((v) => !v)}
-          title="Neuen Task hinzufuegen"
+          onClick={onAddClick}
+          title="Neuen Task hinzufügen"
         >
           <Plus className="h-3.5 w-3.5" />
         </Button>
       </div>
-
-      {/* Quick add inline */}
-      {showQuickAdd && (
-        <div className="border-b border-white/5 p-2">
-          <KanbanQuickAdd
-            onSubmit={handleQuickCreate}
-            onCancel={() => setShowQuickAdd(false)}
-            placeholder={`Neuer Task in "${column.label}"...`}
-          />
-        </div>
-      )}
 
       {/* Task cards list */}
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
@@ -294,7 +293,6 @@ function KanbanColumn({
             <KanbanTaskCard
               key={task.id}
               task={task}
-              onUpdateTask={onUpdateTask}
               onDeleteTask={onDeleteTask}
               onEditTask={onEditTask}
               showSendToAgent={showSendToAgent}

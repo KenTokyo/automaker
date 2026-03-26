@@ -32,6 +32,7 @@ function fileTaskToContext(task: Task): TaskChatContext {
     description: task.description,
     summary: task.summary || undefined,
     source: 'file',
+    projectPath: task.projectPath,
     sentAt: Date.now(),
   };
 }
@@ -43,6 +44,7 @@ function supabaseTaskToContext(task: SupabaseTask): TaskChatContext {
     description: task.description,
     summary: task.summary || undefined,
     source: 'supabase',
+    projectId: task.projectId,
     sentAt: Date.now(),
   };
 }
@@ -53,10 +55,9 @@ function supabaseTaskToContext(task: SupabaseTask): TaskChatContext {
 
 interface TaskSendToAgentProps {
   task: Task;
-  onStatusChange?: (filename: string, updates: Partial<Task>) => void;
 }
 
-export function TaskSendToAgent({ task, onStatusChange }: TaskSendToAgentProps) {
+export function TaskSendToAgent({ task }: TaskSendToAgentProps) {
   const [open, setOpen] = useState(false);
   const [showModelPicker, setShowModelPicker] = useState(false);
   const sendTaskToAgent = useTaskChatBridgeStore((s) => s.sendTaskToAgent);
@@ -68,16 +69,11 @@ export function TaskSendToAgent({ task, onStatusChange }: TaskSendToAgentProps) 
     const ctx = fileTaskToContext(task);
     sendTaskToAgent(ctx);
 
-    // Set task status to in_progress
-    if (onStatusChange && task.status !== 'in_progress') {
-      onStatusChange(task.filename, { status: 'in_progress' });
-    }
-
     // Navigate to agent view
     setCurrentView('agent');
     setOpen(false);
     setShowModelPicker(false);
-  }, [task, sendTaskToAgent, onStatusChange, setCurrentView]);
+  }, [task, sendTaskToAgent, setCurrentView]);
 
   const handleModelSelect = useCallback(
     (entry: PhaseModelEntry) => {
@@ -86,15 +82,11 @@ export function TaskSendToAgent({ task, onStatusChange }: TaskSendToAgentProps) 
       const ctx = fileTaskToContext(task);
       sendTaskToAgent(ctx);
 
-      if (onStatusChange && task.status !== 'in_progress') {
-        onStatusChange(task.filename, { status: 'in_progress' });
-      }
-
       setCurrentView('agent');
       setOpen(false);
       setShowModelPicker(false);
     },
-    [task, sendTaskToAgent, onStatusChange, setCurrentView, setSelectedAgentModel]
+    [task, sendTaskToAgent, setCurrentView, setSelectedAgentModel]
   );
 
   const isDone = task.status === 'done';
@@ -177,10 +169,9 @@ export function TaskSendToAgent({ task, onStatusChange }: TaskSendToAgentProps) 
 
 interface SupabaseTaskSendToAgentProps {
   task: SupabaseTask;
-  onStatusChange?: (id: string, status: string) => void;
 }
 
-export function SupabaseTaskSendToAgent({ task, onStatusChange }: SupabaseTaskSendToAgentProps) {
+export function SupabaseTaskSendToAgent({ task }: SupabaseTaskSendToAgentProps) {
   const [open, setOpen] = useState(false);
   const [showModelPicker, setShowModelPicker] = useState(false);
   const sendTaskToAgent = useTaskChatBridgeStore((s) => s.sendTaskToAgent);
@@ -192,14 +183,10 @@ export function SupabaseTaskSendToAgent({ task, onStatusChange }: SupabaseTaskSe
     const ctx = supabaseTaskToContext(task);
     sendTaskToAgent(ctx);
 
-    if (onStatusChange && task.status !== 'in_progress') {
-      onStatusChange(task.id, 'in_progress');
-    }
-
     setCurrentView('agent');
     setOpen(false);
     setShowModelPicker(false);
-  }, [task, sendTaskToAgent, onStatusChange, setCurrentView]);
+  }, [task, sendTaskToAgent, setCurrentView]);
 
   const handleModelSelect = useCallback(
     (entry: PhaseModelEntry) => {
@@ -207,15 +194,11 @@ export function SupabaseTaskSendToAgent({ task, onStatusChange }: SupabaseTaskSe
       const ctx = supabaseTaskToContext(task);
       sendTaskToAgent(ctx);
 
-      if (onStatusChange && task.status !== 'in_progress') {
-        onStatusChange(task.id, 'in_progress');
-      }
-
       setCurrentView('agent');
       setOpen(false);
       setShowModelPicker(false);
     },
-    [task, sendTaskToAgent, onStatusChange, setCurrentView, setSelectedAgentModel]
+    [task, sendTaskToAgent, setCurrentView, setSelectedAgentModel]
   );
 
   const isCompleted = task.status === 'completed';

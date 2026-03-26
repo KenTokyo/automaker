@@ -39,6 +39,34 @@ function slugify(text: string): string {
     .substring(0, 50);
 }
 
+function sanitizeOptionalId(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function appendLinkReferenceBlock(
+  summary: string,
+  taskId: string | null,
+  chatSessionId: string | null
+): string {
+  if (!taskId && !chatSessionId) {
+    return summary;
+  }
+
+  const lines: string[] = ['### Verknuepfung'];
+  if (taskId) {
+    lines.push(`- Task-ID: \`${taskId}\``);
+  }
+  if (chatSessionId) {
+    lines.push(`- Chat-Session-ID: \`${chatSessionId}\``);
+  }
+  lines.push('- Kanban-Status: Supabase tasks');
+
+  const block = lines.join('\n');
+  return summary.trim().length > 0 ? `${summary.trim()}\n\n---\n\n${block}` : block;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // LIST
 // ────────────────────────────────────────────────────────────────────────────
@@ -201,6 +229,8 @@ export function createCreateHandler(events: EventEmitter) {
         files,
         tags,
         summary,
+        taskId,
+        chatSessionId,
       } = req.body;
 
       if (!projectPath || typeof projectPath !== 'string') {
@@ -222,6 +252,15 @@ export function createCreateHandler(events: EventEmitter) {
       const slug = slugify(title);
       const filename = `${taskDate}_${slug}.md`;
 
+      const normalizedTaskId = sanitizeOptionalId(taskId);
+      const normalizedChatSessionId = sanitizeOptionalId(chatSessionId);
+      const summaryText = typeof summary === 'string' ? summary : '';
+      const linkedSummary = appendLinkReferenceBlock(
+        summaryText,
+        normalizedTaskId,
+        normalizedChatSessionId
+      );
+
       const task: CompletedTask = {
         filename,
         title: title.length > MAX_TITLE_LENGTH ? title.slice(0, MAX_TITLE_LENGTH) : title,
@@ -233,7 +272,7 @@ export function createCreateHandler(events: EventEmitter) {
         provider: provider || '',
         files: Array.isArray(files) ? files : [],
         tags: Array.isArray(tags) ? tags : [],
-        summary: summary || '',
+        summary: linkedSummary,
       };
 
       await writeCompletedTask(projectPath, task);

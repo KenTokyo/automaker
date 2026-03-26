@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TasksPanel - Left sidebar panel for the "Tasks" tab.
  *
  * Full card layout with search, tag/status/priority filters,
@@ -35,6 +35,7 @@ import type {
   TaskPriority,
 } from '@automaker/types';
 import { useAppStore } from '@/store/app-store';
+import { useTaskChatBridgeStore } from '@/store/task-chat-bridge-store';
 import { useTasksSource, type TaskCreateInput } from '@/hooks/use-tasks-source';
 import { useTaskAttachments } from '@/hooks/use-task-attachments';
 import { Button } from '@/components/ui/button';
@@ -151,6 +152,7 @@ export function TasksPanel({ projectPath }: TasksPanelProps) {
   const setSortOrder = useAppStore((s) => s.setTasksSortOrder);
   const sessionFontSize = useAppStore((s) => s.sessionFontSize);
   const setSessionFontSize = useAppStore((s) => s.setSessionFontSize);
+  const taskExecutionStates = useTaskChatBridgeStore((s) => s.taskExecutionStates);
 
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -181,6 +183,36 @@ export function TasksPanel({ projectPath }: TasksPanelProps) {
     const proj = projects.find((p) => p.path === projectPath);
     return proj?.name ?? 'Projekt';
   }, [projects, projectPath]);
+
+  const taskExecutionSummary = useMemo(() => {
+    const values = Object.values(taskExecutionStates);
+    if (values.length === 0) return null;
+
+    const summary = {
+      starting: 0,
+      running: 0,
+      completed: 0,
+      failed: 0,
+    };
+
+    for (const state of values) {
+      if (state.state === 'starting') summary.starting += 1;
+      if (state.state === 'running') summary.running += 1;
+      if (state.state === 'completed') summary.completed += 1;
+      if (state.state === 'failed') summary.failed += 1;
+    }
+
+    if (
+      summary.starting === 0 &&
+      summary.running === 0 &&
+      summary.completed === 0 &&
+      summary.failed === 0
+    ) {
+      return null;
+    }
+
+    return summary;
+  }, [taskExecutionStates]);
 
   // Extract unique project names from loaded tasks for the filter dropdown
   const projectsInTasks = useMemo(() => {
@@ -322,39 +354,18 @@ export function TasksPanel({ projectPath }: TasksPanelProps) {
     setProjectFilter(null);
   }, [setFilter]);
 
-  // Full-page loading
-  if (loading && tasks.length === 0) {
-    return <LoadingState />;
-  }
-
-  // Full-page error
-  if (error && tasks.length === 0) {
-    return <ErrorState message={error} onRetry={() => void refetch()} />;
-  }
-
-  // Empty (no tasks at all)
-  if (tasks.length === 0) {
-    return (
-      <EmptyState
-        source={source}
-        onCreate={() => {
-          setEditingTask(null);
-          setCreateDialogOpen(true);
-        }}
-        dialogOpen={createDialogOpen}
-        onDialogClose={handleDialogClose}
-        onSave={handleCreate}
-      />
-    );
-  }
+  // Determine body content
+  const isEmptyLoading = loading && tasks.length === 0;
+  const isEmptyError = error && tasks.length === 0;
+  const isEmpty = tasks.length === 0 && !isEmptyLoading && !isEmptyError;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Header */}
+      {/* Header - always visible */}
       <div className="flex items-center justify-between border-b border-muted px-3 py-2">
         <div className="flex items-center gap-1.5">
           <h3 className="text-xs font-semibold text-muted-foreground">
-            Tasks ({filteredTasks.length})
+            Tasks{tasks.length > 0 ? ` (${filteredTasks.length})` : ''}
           </h3>
           <DataSourceBadge source={source} />
         </div>
@@ -409,102 +420,153 @@ export function TasksPanel({ projectPath }: TasksPanelProps) {
         </div>
       </div>
 
-      {/* Project filter (only show if file source with multiple projects) */}
-      {source === 'file' && projectsInTasks.length > 1 && (
-        <div className="border-b border-muted px-3 py-1.5">
-          <div className="flex items-center gap-1.5">
-            <FolderOpen className="h-3 w-3 shrink-0 text-muted-foreground" />
-            <select
-              className="min-w-0 flex-1 truncate rounded-md border border-muted bg-transparent px-1.5 py-0.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              value={projectFilter || ALL_PROJECTS_VALUE}
-              onChange={(e) =>
-                setProjectFilter(e.target.value === ALL_PROJECTS_VALUE ? null : e.target.value)
-              }
-            >
-              <option value={ALL_PROJECTS_VALUE}>Alle Projekte ({tasks.length})</option>
-              {projectsInTasks.map(([path, name]) => {
-                const count = tasks.filter((t) => t.projectPath === path).length;
-                return (
-                  <option key={path} value={path}>
-                    {name} ({count})
-                  </option>
-                );
-              })}
-            </select>
-          </div>
+      {taskExecutionSummary && (
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-muted bg-muted/20 px-3 py-1.5">
+          <span className="text-[10px] text-muted-foreground">Agent-Status:</span>
+          {taskExecutionSummary.starting > 0 && (
+            <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-400">
+              Gestartet {taskExecutionSummary.starting}
+            </span>
+          )}
+          {taskExecutionSummary.running > 0 && (
+            <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-400">
+              Läuft {taskExecutionSummary.running}
+            </span>
+          )}
+          {taskExecutionSummary.completed > 0 && (
+            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-400">
+              Fertig {taskExecutionSummary.completed}
+            </span>
+          )}
+          {taskExecutionSummary.failed > 0 && (
+            <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[10px] text-rose-400">
+              Fehlgeschlagen {taskExecutionSummary.failed}
+            </span>
+          )}
         </div>
       )}
 
-      {/* Search + Filter bar */}
-      <div className="space-y-2 border-b border-muted px-3 py-2">
-        <CompletedTasksSearch value={filter.search ?? ''} onChange={handleSearchChange} />
-        <TasksFilterBar
-          filter={filter}
-          onFilterChange={setFilter}
-          sortField={sortField}
-          sortOrder={sortOrder}
-          onSortChange={handleSortChange}
-          availableTags={availableTags}
+      {/* Loading state */}
+      {isEmptyLoading && <LoadingState />}
+
+      {/* Error state */}
+      {isEmptyError && <ErrorState message={error} onRetry={() => void refetch()} />}
+
+      {/* Empty state */}
+      {isEmpty && (
+        <EmptyState
+          source={source}
+          onCreate={() => {
+            setEditingTask(null);
+            setCreateDialogOpen(true);
+          }}
+          dialogOpen={createDialogOpen}
+          onDialogClose={handleDialogClose}
+          onSave={handleCreate}
         />
-      </div>
-
-      <div className="border-b border-muted px-3 py-1.5">
-        <div className="flex items-center gap-1.5">
-          <AArrowDown className="h-3 w-3 shrink-0 text-muted-foreground" />
-          <Slider
-            value={[sessionFontSize]}
-            onValueChange={([value]) => setSessionFontSize(value)}
-            min={10}
-            max={18}
-            step={1}
-            className="flex-1"
-            aria-label="Schriftgroesse fuer Tasks"
-          />
-          <AArrowUp className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="w-7 text-right text-xs tabular-nums text-muted-foreground">
-            {sessionFontSize}
-          </span>
-        </div>
-      </div>
-
-      {/* Error banner (inline, when we have data but also an error) */}
-      {error && (
-        <div className="mx-3 mt-2 flex items-center justify-between gap-2 rounded-md border border-muted bg-destructive/5 px-2 py-1.5">
-          <p className="text-xs text-muted-foreground">{error}</p>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void refetch()}
-            className="h-6 border-muted text-xs"
-          >
-            Erneut laden
-          </Button>
-        </div>
       )}
 
-      {/* Task cards or empty filter result */}
-      {filteredTasks.length === 0 && hasActiveFilters ? (
-        <NoResultsState onClearFilters={handleClearFilters} />
-      ) : (
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 py-2">
-          {filteredTasks.map((task) => (
-            <TaskCard
-              key={`${task.projectPath || ''}:${task.filename}`}
-              task={task}
-              fontSize={sessionFontSize}
-              onUpdate={(fn, updates) => void handleUpdate(fn, updates)}
-              onDelete={(fn) => void handleDelete(fn)}
-              onEdit={handleEdit}
+      {/* Body content - only when tasks exist */}
+      {tasks.length > 0 && (
+        <>
+          {/* Project filter (only show if file source with multiple projects) */}
+          {source === 'file' && projectsInTasks.length > 1 && (
+            <div className="border-b border-muted px-3 py-1.5">
+              <div className="flex items-center gap-1.5">
+                <FolderOpen className="h-3 w-3 shrink-0 text-muted-foreground" />
+                <select
+                  className="min-w-0 flex-1 truncate rounded-md border border-muted bg-transparent px-1.5 py-0.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  value={projectFilter || ALL_PROJECTS_VALUE}
+                  onChange={(e) =>
+                    setProjectFilter(e.target.value === ALL_PROJECTS_VALUE ? null : e.target.value)
+                  }
+                >
+                  <option value={ALL_PROJECTS_VALUE}>Alle Projekte ({tasks.length})</option>
+                  {projectsInTasks.map(([path, name]) => {
+                    const count = tasks.filter((t) => t.projectPath === path).length;
+                    return (
+                      <option key={path} value={path}>
+                        {name} ({count})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Search + Filter bar */}
+          <div className="space-y-2 border-b border-muted px-3 py-2">
+            <CompletedTasksSearch value={filter.search ?? ''} onChange={handleSearchChange} />
+            <TasksFilterBar
+              filter={filter}
+              onFilterChange={setFilter}
+              sortField={sortField}
+              sortOrder={sortOrder}
+              onSortChange={handleSortChange}
+              availableTags={availableTags}
             />
-          ))}
-        </div>
-      )}
+          </div>
 
-      {/* Stats footer */}
-      {tasks.length > 0 && statsLine && (
-        <div className="border-t border-muted px-3 py-1.5">
-          <p className="text-[10px] text-muted-foreground">{statsLine}</p>
-        </div>
+          <div className="border-b border-muted px-3 py-1.5">
+            <div className="flex items-center gap-1.5">
+              <AArrowDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+              <Slider
+                value={[sessionFontSize]}
+                onValueChange={([value]) => setSessionFontSize(value)}
+                min={10}
+                max={18}
+                step={1}
+                className="flex-1"
+                aria-label="Schriftgroesse fuer Tasks"
+              />
+              <AArrowUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="w-7 text-right text-xs tabular-nums text-muted-foreground">
+                {sessionFontSize}
+              </span>
+            </div>
+          </div>
+
+          {/* Error banner (inline, when we have data but also an error) */}
+          {error && (
+            <div className="mx-3 mt-2 flex items-center justify-between gap-2 rounded-md border border-muted bg-destructive/5 px-2 py-1.5">
+              <p className="text-xs text-muted-foreground">{error}</p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void refetch()}
+                className="h-6 border-muted text-xs"
+              >
+                Erneut laden
+              </Button>
+            </div>
+          )}
+
+          {/* Task cards or empty filter result */}
+          {filteredTasks.length === 0 && hasActiveFilters ? (
+            <NoResultsState onClearFilters={handleClearFilters} />
+          ) : (
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 py-2">
+              {filteredTasks.map((task) => (
+                <TaskCard
+                  key={`${task.projectPath || ''}:${task.filename}`}
+                  task={task}
+                  fontSize={sessionFontSize}
+                  onUpdate={(fn, updates) => void handleUpdate(fn, updates)}
+                  onDelete={(fn) => void handleDelete(fn)}
+                  onEdit={handleEdit}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Stats footer */}
+          {statsLine && (
+            <div className="border-t border-muted px-3 py-1.5">
+              <p className="text-[10px] text-muted-foreground">{statsLine}</p>
+            </div>
+          )}
+        </>
       )}
 
       {/* Create/Edit Dialog */}

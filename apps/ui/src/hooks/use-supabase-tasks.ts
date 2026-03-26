@@ -55,6 +55,46 @@ function dbToSupabaseTask(row: DbTask): SupabaseTask {
   };
 }
 
+function mapTaskUpdatesToDb(updates: UpdateTaskInput, userId: string): DbTaskUpdate {
+  const dbUpdates: DbTaskUpdate = {
+    updated_by: userId,
+  };
+
+  if (updates.title !== undefined) dbUpdates.title = updates.title;
+  if (updates.description !== undefined) dbUpdates.description = updates.description;
+  if (updates.summary !== undefined) dbUpdates.summary = updates.summary;
+  if (updates.status !== undefined) {
+    dbUpdates.status = updates.status;
+    dbUpdates.completed_at = updates.status === 'completed' ? new Date().toISOString() : null;
+  }
+  if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
+  if (updates.tags !== undefined) dbUpdates.tags = updates.tags;
+  if (updates.chatSessionId !== undefined) dbUpdates.chat_session_id = updates.chatSessionId;
+  if (updates.completedNotes !== undefined) dbUpdates.completed_notes = updates.completedNotes;
+  if (updates.completedFiles !== undefined) dbUpdates.completed_files = updates.completedFiles;
+
+  return dbUpdates;
+}
+
+export async function updateSupabaseTaskById(
+  id: string,
+  updates: UpdateTaskInput,
+  userId: string
+): Promise<SupabaseTask | null> {
+  if (!isSupabaseConfigured() || !userId) return null;
+
+  const dbUpdates = mapTaskUpdatesToDb(updates, userId);
+  const { data, error } = await getSupabaseClient()
+    .from('tasks')
+    .update(dbUpdates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error || !data) return null;
+  return dbToSupabaseTask(data as DbTask);
+}
+
 interface UseSupabaseTasksOptions {
   projectId: string | null;
   statusFilter?: TaskStatus[];
@@ -75,6 +115,7 @@ export interface CreateTaskInput {
   title: string;
   description?: string;
   summary?: string;
+  status?: TaskStatus;
   priority?: TaskPriority;
   tags?: string[];
 }
@@ -212,6 +253,7 @@ export function useSupabaseTasks({
         title: input.title,
         description: input.description ?? '',
         summary: input.summary ?? '',
+        status: input.status ?? 'todo',
         priority: input.priority ?? '',
         tags: input.tags ?? [],
         created_by: user.id,
@@ -232,29 +274,7 @@ export function useSupabaseTasks({
   const updateTask = useCallback(
     async (id: string, updates: UpdateTaskInput): Promise<SupabaseTask | null> => {
       if (!isSupabaseConfigured() || !user) return null;
-
-      const dbUpdates: DbTaskUpdate = {
-        updated_by: user.id,
-      };
-      if (updates.title !== undefined) dbUpdates.title = updates.title;
-      if (updates.description !== undefined) dbUpdates.description = updates.description;
-      if (updates.summary !== undefined) dbUpdates.summary = updates.summary;
-      if (updates.status !== undefined) dbUpdates.status = updates.status;
-      if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
-      if (updates.tags !== undefined) dbUpdates.tags = updates.tags;
-      if (updates.chatSessionId !== undefined) dbUpdates.chat_session_id = updates.chatSessionId;
-      if (updates.completedNotes !== undefined) dbUpdates.completed_notes = updates.completedNotes;
-      if (updates.completedFiles !== undefined) dbUpdates.completed_files = updates.completedFiles;
-
-      const { data, error } = await getSupabaseClient()
-        .from('tasks')
-        .update(dbUpdates)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error || !data) return null;
-      return dbToSupabaseTask(data as DbTask);
+      return updateSupabaseTaskById(id, updates, user.id);
     },
     [user]
   );

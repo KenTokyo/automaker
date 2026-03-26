@@ -41,6 +41,14 @@ interface QueuedPrompt {
   addedAt: string;
 }
 
+export interface AgentTerminalEvent {
+  type: 'complete' | 'stopped' | 'error';
+  sessionId: string;
+  at: number;
+  messageId?: string;
+  error?: string;
+}
+
 interface UseElectronAgentResult {
   messages: Message[];
   isProcessing: boolean;
@@ -53,6 +61,7 @@ interface UseElectronAgentResult {
   stopExecution: () => Promise<void>;
   clearHistory: () => Promise<void>;
   error: string | null;
+  lastTerminalEvent: AgentTerminalEvent | null;
   // Client-side queue (local)
   queuedMessages: {
     id: string;
@@ -94,6 +103,7 @@ export function useElectronAgent({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastTerminalEvent, setLastTerminalEvent] = useState<AgentTerminalEvent | null>(null);
   const [serverQueue, setServerQueue] = useState<QueuedPrompt[]>([]);
   const [activeSubAgents, setActiveSubAgents] = useState<ActiveSubAgent[]>([]);
   const unsubscribeRef = useRef<(() => void) | null>(null);
@@ -245,6 +255,7 @@ export function useElectronAgent({
           setError(errorText);
           appendLocalErrorMessage(errorText);
           setIsProcessing(false);
+          throw new Error(errorText);
         }
         // Note: We don't set isProcessing to false here because
         // it will be set by the "complete" or "error" stream event
@@ -295,6 +306,7 @@ export function useElectronAgent({
       setIsConnected(false);
       setIsProcessing(false);
       setError(null);
+      setLastTerminalEvent(null);
       return;
     }
 
@@ -307,6 +319,7 @@ export function useElectronAgent({
     setIsConnected(false);
     setIsProcessing(false);
     setActiveSubAgents([]); // Clear sub-agents from previous session to prevent bleeding
+    setLastTerminalEvent(null);
 
     const initialize = async () => {
       // Reset error state when switching sessions
@@ -380,6 +393,7 @@ export function useElectronAgent({
           logger.info('Agent started processing for session:', sessionId);
           pendingToolCallsRef.current = [];
           setIsProcessing(true);
+          setLastTerminalEvent(null);
           break;
 
         case 'message':
@@ -436,6 +450,12 @@ export function useElectronAgent({
           // Agent finished processing for THIS session
           logger.info('Processing complete for session:', sessionId);
           setIsProcessing(false);
+          setLastTerminalEvent({
+            type: 'complete',
+            sessionId,
+            at: Date.now(),
+            messageId: event.messageId,
+          });
           // Keep background sub-agents visible until they emit subagent_stopped.
           // This prevents them from disappearing when the parent agent completes first.
           setActiveSubAgents((prev) => prev.filter((agent) => agent.runInBackground));
@@ -486,6 +506,12 @@ export function useElectronAgent({
           logger.error('Agent error for session:', sessionId, event.error);
           setIsProcessing(false);
           setError(event.error);
+          setLastTerminalEvent({
+            type: 'error',
+            sessionId,
+            at: Date.now(),
+            error: event.error,
+          });
           if (event.message) {
             const errorMessage = event.message;
             setMessages((prev) => [...prev, errorMessage]);
@@ -519,6 +545,11 @@ export function useElectronAgent({
           // Session was manually stopped by the user
           logger.info('Session stopped for:', sessionId);
           setIsProcessing(false);
+          setLastTerminalEvent({
+            type: 'stopped',
+            sessionId,
+            at: Date.now(),
+          });
           // Keep background sub-agents visible until explicit stop events arrive.
           setActiveSubAgents((prev) => prev.filter((agent) => agent.runInBackground));
           break;
@@ -589,7 +620,7 @@ export function useElectronAgent({
 
       if (isProcessing) {
         logger.warn('Already processing a message');
-        return;
+        throw new Error('Agent is already processing a message');
       }
 
       setIsProcessing(true);
@@ -631,6 +662,7 @@ export function useElectronAgent({
           setError(errorText);
           appendLocalErrorMessage(errorText);
           setIsProcessing(false);
+          throw new Error(errorText);
         }
         // Note: We don't set isProcessing to false here because
         // it will be set by the "complete" or "error" stream event
@@ -640,6 +672,7 @@ export function useElectronAgent({
         setError(errorText);
         appendLocalErrorMessage(errorText);
         setIsProcessing(false);
+        throw err;
       }
     },
     [
@@ -799,6 +832,7 @@ export function useElectronAgent({
     stopExecution,
     clearHistory,
     error,
+    lastTerminalEvent,
     queuedMessages,
     isQueueProcessing: isProcessingQueue,
     clearMessageQueue: clearQueue,

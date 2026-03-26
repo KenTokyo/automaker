@@ -87,7 +87,7 @@ export const RIGHT_PANEL_FONT_SIZE_DEFAULT = 13;
 export const RIGHT_PANEL_SPLIT_SIZE_DEFAULT = 50;
 
 /** Which content the left panel shows in Agent View */
-export type LeftPanelTab = 'sessions' | 'docs' | 'overview' | 'completed' | 'tasks';
+export type LeftPanelTab = 'sessions' | 'overview' | 'completed' | 'tasks';
 
 // Keyboard Shortcut with optional modifiers
 export interface ShortcutKey {

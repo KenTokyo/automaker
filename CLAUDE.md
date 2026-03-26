@@ -163,6 +163,12 @@ Use `resolveModelString()` from `@automaker/model-resolver` to convert model ali
 - `sonnet` → `claude-sonnet-4-6`
 - `opus` → `claude-opus-4-6`
 
+## Kanban-Web (Standalone Board)
+
+Bei Arbeiten am Kanban-Board oder `apps/kanban-web/` → **LESE `apps/kanban-web/ARCHITEKTUR.md`** für vollständige Architektur, Datenfluss, Supabase-Schema, Deployment und Regeln.
+
+Kurzfassung: Eigenständige SPA auf Vercel (`https://automaker-kanban.vercel.app`), spricht direkt mit Supabase (kein Backend). Shared Code (Hooks, Stores, UI) kommt aus `apps/ui/src/` - Änderungen dort betreffen beide Apps.
+
 ## Chat-Zusammenführung
 
 `apps/ui` ist der Haupt-Chat. `apps/chat` ist nur noch eine Übergangs-Quelle.

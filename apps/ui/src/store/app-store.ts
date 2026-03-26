@@ -541,8 +541,7 @@ const initialState: AppState = {
   lastProjectDir: '',
   recentFolders: [],
   initScriptState: {},
-  // Docs Panel State
-  docsOpen: false,
+  // Left Panel State
   leftPanelTab: 'sessions' as const,
   currentDocPath: null,
   docsViewMode: (getItem('automaker:docsViewMode') as 'rendered' | 'raw') || 'rendered',
@@ -3038,9 +3037,8 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       .map(([key, state]) => ({ key, state }));
   },
 
-  // Docs Panel actions
-  setDocsOpen: (open) => set({ docsOpen: open, leftPanelTab: open ? 'docs' : 'sessions' }),
-  setLeftPanelTab: (tab) => set({ leftPanelTab: tab, docsOpen: tab === 'docs' }),
+  // Left Panel actions
+  setLeftPanelTab: (tab) => set({ leftPanelTab: tab }),
   setCurrentDocPath: (path) => set({ currentDocPath: path }),
   setDocsViewMode: (mode) => {
     set({ docsViewMode: mode });

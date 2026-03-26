@@ -52,5 +52,7 @@ Regeln:
 - Erstelle pro abgeschlossener Aufgabe EINEN Eintrag
 - Fasse mehrere kleine Aenderungen NICHT in einen Eintrag zusammen, ausser sie gehoeren logisch zusammen
 - Wenn der Befehl fehlschlaegt, mach einfach weiter - die Erfassung ist optional
+- Optional fuer Verknuepfung: Fuege in den Summary-Text Task-ID und Chat-Session-ID ein, wenn bekannt
+- Wichtig: Der Kanban-Status kommt aus Supabase "tasks" (todo/in_progress/completed), nicht aus .completed
 `.trim();
 }

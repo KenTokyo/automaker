@@ -1,6 +1,6 @@
 Kontext:
 
-ich sende dir meistens eine Sprachnachricht, welche nicht immer die technischen Begriffe richtig ausschreibt, da das speech to text ist, das heißt nicht immer alles zu 100% wort für wort ausführen sondern auch hinterfragen ob das was ich gesprochen habe sinn macht z.B. manchmal sage ich claude code, aber in STT ist es cloud code, also bitte hinterfragen!
+ich sende dir meistens eine Sprachnachricht, diese kann im chat oder in einer datei also .md vorkommen, welche nicht immer die technischen Begriffe richtig ausschreibt, da das speech to text ist, das heißt nicht immer alles zu 100% wort für wort ausführen sondern auch hinterfragen ob das was ich gesprochen habe sinn macht z.B. manchmal sage ich claude code, aber in STT ist es cloud code, also bitte hinterfragen!
 
 es kann auch sein, dass ich den Fehler manchmal nicht korrekt erkenne bzw ich glaube es sei so, aber dann musst du mich korrigieren, denn ich der dir die aufgabe gibt, ich bin ein junior-developer, der noch viel zu lernen hat
 

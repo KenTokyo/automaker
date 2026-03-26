@@ -309,7 +309,6 @@ function InsertIntoDocsButton({ content }: { content: string }) {
   const [isCreating, setIsCreating] = useState(false);
   const projectPath = useAppStore((s) => s.currentProject?.path);
   const currentDocPath = useAppStore((s) => s.currentDocPath);
-  const setDocsOpen = useAppStore((s) => s.setDocsOpen);
   const setCurrentDocPath = useAppStore((s) => s.setCurrentDocPath);
 
   const handleNewDoc = useCallback(async () => {
@@ -325,8 +324,6 @@ function InsertIntoDocsButton({ content }: { content: string }) {
       const name = (firstLine.slice(0, 40) || 'AI Response') + '.md';
       const newDoc = await api.docs.create({ projectPath, name, content });
       toast.success('Document created');
-      // Open the new doc
-      setDocsOpen(true);
       setCurrentDocPath(newDoc.path);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to create document';
@@ -334,7 +331,7 @@ function InsertIntoDocsButton({ content }: { content: string }) {
     } finally {
       setIsCreating(false);
     }
-  }, [content, projectPath, isCreating, setDocsOpen, setCurrentDocPath]);
+  }, [content, projectPath, isCreating, setCurrentDocPath]);
 
   const handleAppendToCurrent = useCallback(async () => {
     if (!projectPath || !currentDocPath || isCreating) return;
@@ -351,15 +348,13 @@ function InsertIntoDocsButton({ content }: { content: string }) {
         content: existing + separator + content,
       });
       toast.success('Content appended to document');
-      // Switch to docs view
-      setDocsOpen(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to append to document';
       toast.error(msg);
     } finally {
       setIsCreating(false);
     }
-  }, [content, projectPath, currentDocPath, isCreating, setDocsOpen]);
+  }, [content, projectPath, currentDocPath, isCreating]);
 
   const handleCopyAsMarkdown = useCallback(() => {
     navigator.clipboard.writeText(content).then(
