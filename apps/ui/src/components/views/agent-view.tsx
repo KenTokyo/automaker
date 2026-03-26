@@ -329,7 +329,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     if (contextMessageCount <= 0) return 0;
     return estimatedConversationTokens + CONTEXT_BASELINE_TOKENS;
   }, [contextMessageCount, estimatedConversationTokens]);
-  const measuredContextTokens = useMemo(() => {
+  const rawMeasuredContextTokens = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       const message = messages[index];
       if (message.role !== 'assistant' || !message.tokenUsage) continue;
@@ -342,7 +342,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
         (usage.cacheCreationInputTokens ?? 0) +
         (usage.outputTokens ?? 0) +
         (usage.reasoningTokens ?? 0);
-      const measuredTotal = totalTokens > 0 ? totalTokens : fromParts;
+      const measuredTotal = fromParts > 0 ? fromParts : totalTokens;
 
       if (Number.isFinite(measuredTotal) && measuredTotal > 0) {
         return Math.max(0, Math.round(measuredTotal));
@@ -350,13 +350,6 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     }
     return null;
   }, [messages]);
-  const contextTokens = useMemo(() => {
-    if (measuredContextTokens !== null) {
-      return measuredContextTokens;
-    }
-    return estimatedContextTokens;
-  }, [measuredContextTokens, estimatedContextTokens]);
-  const isContextUsageMeasured = measuredContextTokens !== null;
   const hasConversationMessages = useMemo(() => {
     return messages.some((message) => message.role === 'user' || message.role === 'assistant');
   }, [messages]);
@@ -424,6 +417,34 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
     return null;
   }, [modelContextWindowTokens, contextWindowOverrideTokens]);
+  const measuredContextTokens = useMemo(() => {
+    if (rawMeasuredContextTokens === null) {
+      return null;
+    }
+
+    if (!contextWindowTokens || contextWindowTokens <= 0) {
+      return rawMeasuredContextTokens;
+    }
+
+    // Guard against provider payloads that accidentally report cumulative totals.
+    const maxReasonableMeasuredTokens = Math.max(
+      contextWindowTokens + CONTEXT_BASELINE_TOKENS,
+      Math.round(contextWindowTokens * 1.15)
+    );
+
+    if (rawMeasuredContextTokens > maxReasonableMeasuredTokens) {
+      return null;
+    }
+
+    return rawMeasuredContextTokens;
+  }, [rawMeasuredContextTokens, contextWindowTokens]);
+  const contextTokens = useMemo(() => {
+    if (measuredContextTokens !== null) {
+      return measuredContextTokens;
+    }
+    return estimatedContextTokens;
+  }, [measuredContextTokens, estimatedContextTokens]);
+  const isContextUsageMeasured = measuredContextTokens !== null;
 
   const contextUsagePercent = useMemo(() => {
     if (!contextWindowTokens || contextWindowTokens <= 0) return null;
@@ -1056,6 +1077,25 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     return <NoProjectState />;
   }
 
+  const hasLeftDesktopPanel = showSessionManager;
+  const hasRightDesktopPanel = browserPanelOpen;
+  const panelLayoutVariant = hasLeftDesktopPanel
+    ? hasRightDesktopPanel
+      ? 'left-chat-right'
+      : 'left-chat'
+    : hasRightDesktopPanel
+      ? 'chat-right'
+      : 'chat-only';
+  const panelAutoSaveId = `agent-view-panels-${panelLayoutVariant}`;
+  const chatPanelOrder = hasLeftDesktopPanel ? 2 : 1;
+  const rightPanelOrder = hasLeftDesktopPanel ? 3 : 2;
+  const chatPanelDefaultSize =
+    hasLeftDesktopPanel && hasRightDesktopPanel
+      ? 60
+      : hasLeftDesktopPanel || hasRightDesktopPanel
+        ? 80
+        : 100;
+
   // Build worktree actions props for the AgentHeader
   const worktreeActionsProps = worktreeActions.mainWorktree
     ? {
@@ -1127,12 +1167,19 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       )}
 
       {isDesktop ? (
-        <ResizablePanelGroup direction="horizontal" className="flex" autoSaveId="agent-view-panels">
+        <ResizablePanelGroup
+          key={panelLayoutVariant}
+          id="agent-view-panel-group"
+          direction="horizontal"
+          className="flex"
+          autoSaveId={panelAutoSaveId}
+        >
           {/* Session Manager Sidebar - Desktop (resizable) */}
           {showSessionManager && currentProject && (
             <>
               <ResizablePanel
                 id="session-manager"
+                order={1}
                 defaultSize={20}
                 minSize={15}
                 maxSize={35}
@@ -1146,12 +1193,21 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
                   onQuickCreateRef={quickCreateSessionRef}
                 />
               </ResizablePanel>
-              <ResizableHandle withHandle className={chatActivityHandleClass} />
+              <ResizableHandle
+                id="session-chat-handle"
+                withHandle
+                className={chatActivityHandleClass}
+              />
             </>
           )}
 
           {/* Chat Area - Desktop */}
-          <ResizablePanel id="chat-area" defaultSize={60} minSize={30}>
+          <ResizablePanel
+            id="chat-area"
+            order={chatPanelOrder}
+            defaultSize={chatPanelDefaultSize}
+            minSize={30}
+          >
             <div className="flex-1 flex flex-col overflow-hidden h-full">
               {/* Header */}
               {!hideHeader && (
@@ -1249,8 +1305,18 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
           {/* Right Panel - Desktop (resizable): Browser, Files, Terminal, Dashboard */}
           {browserPanelOpen && currentProject && (
             <>
-              <ResizableHandle withHandle className={chatActivityHandleClass} />
-              <ResizablePanel id="right-panel" defaultSize={20} minSize={15} maxSize={50}>
+              <ResizableHandle
+                id="chat-right-handle"
+                withHandle
+                className={chatActivityHandleClass}
+              />
+              <ResizablePanel
+                id="right-panel"
+                order={rightPanelOrder}
+                defaultSize={20}
+                minSize={15}
+                maxSize={50}
+              >
                 <RightPanelShell projectPath={currentProject.path} />
               </ResizablePanel>
             </>

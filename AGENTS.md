@@ -1,3 +1,19 @@
+Kontext:
+
+ich sende dir meistens eine Sprachnachricht, welche nicht immer die technischen Begriffe richtig ausschreibt, da das speech to text ist, das heißt nicht immer alles zu 100% wort für wort ausführen sondern auch hinterfragen ob das was ich gesprochen habe sinn macht z.B. manchmal sage ich claude code, aber in STT ist es cloud code, also bitte hinterfragen!
+
+es kann auch sein, dass ich den Fehler manchmal nicht korrekt erkenne bzw ich glaube es sei so, aber dann musst du mich korrigieren, denn ich der dir die aufgabe gibt, ich bin ein junior-developer, der noch viel zu lernen hat
+
+die app ist riesig und es kann sein, dass wenn du 1 sache änderst, dass du irgendwas anderes dann evtl kapputt machen könntest, deswegen vorher evtl search tools verwenden mit subagents, um zu schauen was alles zu dem Thema gefunden wird, sodass man einen Überblick bekommt was alles kapputt gehen kann
+
+ich als junior developer der dir aufgaben gibt, weiß meistens nicht oder kann nicht den Schaden oder den Radius der Änderung betrachten, welche dateien alles geändert werden muss
+
+ich kann dir Frontend-Komponenten mitgeben, weil ich durch React Grab quasi das auswählen kann, was ich in der Oberfläche sehe. Aber ich kann dir nicht die Backend-Komponenten geben. Das heißt, du musst alles selber recherchieren.
+
+versuche bitte so einfach wie möglich zu reden, so wie ich es gerade tue, aber mit deutlich besserer formatierung wie z.B. fett, kursiv, icons, listen etc.. und sehr motiviert und benutze so gut es geht soviele alltagsbegriffe z.B. statt persistenz könntest du sowas wie speicherung sagen, war nur ein beispiel, aber es geht um das allgemeine
+
+SEI BITTE Motivierter, versuche einfach zu reden & menschlicher, nicht so viele Technische Begriffe, versuche Alltagsbegriffe zu verwenden und es einfach zu halten auch die Planungen, Edge Cases betrachten, einfache Beispiele wie der User die App verwenden würde, was man noch ergänzen könnte etc..
+
 # Allgemeine Regeln
 
 **Maximal 700 Zeilen Code pro Datei**
@@ -61,13 +77,6 @@ Damit die Prüfung nicht selbst kaputte Zeichen erzeugt:
 3. Klare Wörter.
 4. So erklären, dass 8.-Klässler es direkt verstehen.
 
-## Ton
-
-1. Freundlich.
-2. Ruhig.
-3. Motivierend.
-4. Alltagssprache vor Fachsprache.
-
 ## Antwort-Aufbau
 
 Immer dieses Muster:
@@ -120,12 +129,6 @@ Immer dieses Muster:
 2. Zu viele technische Begriffe auf einmal.
 3. Kühle oder harte Formulierungen.
 
-## Icons in Antworten
-
-1. In Antworten gerne kleine, klare Icons nutzen (z.B. ✅, ⚠️, 🔧, 👉), wenn es die Lesbarkeit verbessert.
-2. Icons sparsam einsetzen: pro Abschnitt maximal 1 Icon.
-3. Icons ersetzen keine Erklärung. Einfache Sprache bleibt Pflicht.
-
 # Verlauf-Dateien pro Chat
 
 Erstelle für den aktuellen Chat immer eine passende Datei im Ordner `History`, zum Beispiel `[thema]-verlauf.md`.
@@ -141,10 +144,6 @@ Sinn:
 1. Kontextverlust vermeiden.
 2. Neue Chats schnell fortsetzen können.
 3. Alte Entscheidungen nachvollziehbar halten.
-
-# automaker spezifisch:
-
-SEI BITTE Motivierter, versuche einfach zu reden & menschlicher, nicht so viele Technische Begriffe, versuche Alltagsbegriffe zu verwenden und es einfach zu halten auch die Planungen, Edge Cases betrachten, einfache Beispiele wie der User die App verwenden würde, was man noch ergänzen könnte etc..
 
 ACHTE AUF Caused by:
 
@@ -176,3 +175,5 @@ UI bitte keine Fachbegriffe, soll einfach verständlich sein auch für 8.Klässl
 Nutze subagents wenn es geht immer
 
 **Completed-Task Dokumentation**: Nach erfolgreichem Abschluss einer Aufgabe MUSS eine Datei in `.completed/<YYYY-MM-DD>_<slug>.md` erstellt werden. Format: YAML Frontmatter mit title, description, date, status, effort + Markdown Body. Siehe: `shared-docs/agents/completed-task-rule.md`
+
+LESE auch die CLAUDE.md

@@ -155,8 +155,55 @@ const REASONING_TOKEN_KEYS = [
   'reasoning_output_tokens',
   'reasoningOutputTokens',
 ] as const;
+const INPUT_TOKEN_DETAIL_CONTAINER_KEYS = [
+  'input_tokens_details',
+  'inputTokensDetails',
+  'input_token_details',
+] as const;
+const OUTPUT_TOKEN_DETAIL_CONTAINER_KEYS = [
+  'output_tokens_details',
+  'outputTokensDetails',
+  'output_token_details',
+] as const;
+const CACHE_READ_DETAIL_KEYS = ['cached_tokens', 'cache_read_tokens', 'cacheReadTokens'] as const;
+const CACHE_CREATE_DETAIL_KEYS = [
+  'cache_creation_tokens',
+  'cacheCreationTokens',
+  'cache_write_tokens',
+  'cacheWriteTokens',
+] as const;
+const TOKEN_USAGE_CONTAINER_KEYS = [
+  'usage',
+  'token_usage',
+  'tokenUsage',
+  'stats',
+  'metrics',
+  'usage_stats',
+  'token_usage_info',
+  'tokenUsageInfo',
+  // Prefer "last" usage over running totals for context-related UI values.
+  'last_token_usage',
+  'lastTokenUsage',
+  'last',
+  'total_token_usage',
+  'totalTokenUsage',
+  'total',
+] as const;
+const TOKEN_USAGE_PARENT_KEYS = [
+  'result',
+  'response',
+  'turn',
+  'item',
+  'data',
+  'payload',
+  'info',
+  'event',
+  'message',
+  'output',
+] as const;
+const TOKEN_USAGE_LIKE_KEY_PATTERN = /(usage|token)/i;
 const IN_PROCESS_STREAM_LAG_PATTERN =
-  /\bin-process app-server event stream lagged; dropped \d+ events\b/i;
+  /\bin-process app-server event stream lagged; dropped \d+ events?\b/i;
 const PARSE_OUTPUT_PREFIX = 'Failed to parse output:';
 const OUTPUT_SCHEMA_FILENAME = 'output-schema.json';
 const OUTPUT_SCHEMA_INDENT_SPACES = 2;
@@ -321,9 +368,19 @@ function normalizeTokenUsageFromRecord(
   const inputTokens = readTokenField(record, INPUT_TOKEN_KEYS);
   const outputTokens = readTokenField(record, OUTPUT_TOKEN_KEYS);
   const totalTokens = readTokenField(record, TOTAL_TOKEN_KEYS);
-  const cacheReadInputTokens = readTokenField(record, CACHE_READ_TOKEN_KEYS);
-  const cacheCreationInputTokens = readTokenField(record, CACHE_CREATE_TOKEN_KEYS);
-  const reasoningTokens = readTokenField(record, REASONING_TOKEN_KEYS);
+  const cacheReadInputTokens =
+    readTokenField(record, CACHE_READ_TOKEN_KEYS) ??
+    readTokenFieldFromContainers(record, INPUT_TOKEN_DETAIL_CONTAINER_KEYS, CACHE_READ_DETAIL_KEYS);
+  const cacheCreationInputTokens =
+    readTokenField(record, CACHE_CREATE_TOKEN_KEYS) ??
+    readTokenFieldFromContainers(
+      record,
+      INPUT_TOKEN_DETAIL_CONTAINER_KEYS,
+      CACHE_CREATE_DETAIL_KEYS
+    );
+  const reasoningTokens =
+    readTokenField(record, REASONING_TOKEN_KEYS) ??
+    readTokenFieldFromContainers(record, OUTPUT_TOKEN_DETAIL_CONTAINER_KEYS, REASONING_TOKEN_KEYS);
 
   if (
     !inputTokens &&
@@ -346,44 +403,71 @@ function normalizeTokenUsageFromRecord(
   };
 }
 
+function readTokenFieldFromContainers(
+  record: Record<string, unknown>,
+  containerKeys: readonly string[],
+  tokenKeys: readonly string[]
+): number | undefined {
+  for (const containerKey of containerKeys) {
+    const container = asRecord(record[containerKey]);
+    if (!container) continue;
+    const tokenCount = readTokenField(container, tokenKeys);
+    if (typeof tokenCount === 'number') {
+      return tokenCount;
+    }
+  }
+  return undefined;
+}
+
 function collectTokenUsageCandidates(event: Record<string, unknown>): Record<string, unknown>[] {
   const candidates: Record<string, unknown>[] = [];
+  const seenCandidates = new Set<Record<string, unknown>>();
+  const seenNodes = new Set<Record<string, unknown>>();
   const pushCandidate = (value: unknown) => {
     const candidate = asRecord(value);
-    if (candidate) {
+    if (candidate && !seenCandidates.has(candidate)) {
+      seenCandidates.add(candidate);
       candidates.push(candidate);
     }
   };
 
-  pushCandidate(event.usage);
-  pushCandidate(event.token_usage);
-  pushCandidate(event.tokenUsage);
-  pushCandidate(event.stats);
-  pushCandidate(event.metrics);
+  const queue: Array<{ record: Record<string, unknown>; depth: number }> = [
+    { record: event, depth: 0 },
+  ];
+  const maxDepth = 3;
 
-  const result = asRecord(event.result);
-  if (result) {
-    pushCandidate(result.usage);
-    pushCandidate(result.token_usage);
-    pushCandidate(result.tokenUsage);
-    pushCandidate(result.stats);
-    pushCandidate(result.metrics);
-  }
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) continue;
+    const { record, depth } = current;
 
-  const turn = asRecord(event.turn);
-  if (turn) {
-    pushCandidate(turn.usage);
-    pushCandidate(turn.token_usage);
-    pushCandidate(turn.tokenUsage);
-    pushCandidate(turn.stats);
-  }
+    if (seenNodes.has(record)) {
+      continue;
+    }
+    seenNodes.add(record);
 
-  const item = asRecord(event.item);
-  if (item) {
-    pushCandidate(item.usage);
-    pushCandidate(item.token_usage);
-    pushCandidate(item.tokenUsage);
-    pushCandidate(item.stats);
+    pushCandidate(record);
+
+    for (const key of TOKEN_USAGE_CONTAINER_KEYS) {
+      pushCandidate(record[key]);
+    }
+
+    for (const [key, value] of Object.entries(record)) {
+      if (TOKEN_USAGE_LIKE_KEY_PATTERN.test(key)) {
+        pushCandidate(value);
+      }
+    }
+
+    if (depth >= maxDepth) {
+      continue;
+    }
+
+    for (const key of TOKEN_USAGE_PARENT_KEYS) {
+      const nestedRecord = asRecord(record[key]);
+      if (nestedRecord && !seenNodes.has(nestedRecord)) {
+        queue.push({ record: nestedRecord, depth: depth + 1 });
+      }
+    }
   }
 
   return candidates;
@@ -467,18 +551,55 @@ function isInProcessStreamLagMessage(text: string): boolean {
   return IN_PROCESS_STREAM_LAG_PATTERN.test(text.trim());
 }
 
+function normalizeLagCandidateLine(line: string): string {
+  const trimmedLine = line.trim();
+  if (!trimmedLine) {
+    return '';
+  }
+
+  if (trimmedLine.startsWith(PARSE_OUTPUT_PREFIX)) {
+    return trimmedLine.slice(PARSE_OUTPUT_PREFIX.length).trim();
+  }
+
+  return trimmedLine;
+}
+
+function stripIgnorableCodexLagOutput(text: string): {
+  sanitizedText: string | null;
+  removedLines: number;
+} {
+  const lines = text.split(/\r?\n/);
+  const keptLines: string[] = [];
+  let removedLines = 0;
+
+  for (const line of lines) {
+    const normalized = normalizeLagCandidateLine(line);
+    if (normalized && isInProcessStreamLagMessage(normalized)) {
+      removedLines += 1;
+      continue;
+    }
+    keptLines.push(line);
+  }
+
+  const sanitized = keptLines.join('\n').trim();
+  return {
+    sanitizedText: sanitized.length > 0 ? sanitized : null,
+    removedLines,
+  };
+}
+
+function sanitizeCodexOutput(text: string): string | null {
+  const { sanitizedText } = stripIgnorableCodexLagOutput(text);
+  return sanitizedText;
+}
+
 function isIgnorableCodexLagOutput(text: string): boolean {
-  const trimmed = text.trim();
-  if (isInProcessStreamLagMessage(trimmed)) {
-    return true;
+  const { sanitizedText, removedLines } = stripIgnorableCodexLagOutput(text);
+  if (!sanitizedText) {
+    return removedLines > 0;
   }
 
-  if (!trimmed.startsWith(PARSE_OUTPUT_PREFIX)) {
-    return false;
-  }
-
-  const parsedPayload = trimmed.slice(PARSE_OUTPUT_PREFIX.length).trim();
-  return isInProcessStreamLagMessage(parsedPayload);
+  return false;
 }
 
 function resolveSystemPrompt(systemPrompt?: unknown): string | null {
@@ -1015,9 +1136,15 @@ export class CodexProvider extends BaseProvider {
         stdinData: promptText, // Pass prompt via stdin
       });
 
+      let latestTokenUsage: ProviderTokenUsage | undefined;
+
       for await (const rawEvent of stream) {
         const event = rawEvent as Record<string, unknown>;
         const eventType = getEventType(event);
+        const eventUsage = extractCodexTokenUsage(event);
+        if (eventUsage) {
+          latestTokenUsage = eventUsage;
+        }
 
         // Track thread/session ID from events
         const threadId = event.thread_id;
@@ -1026,12 +1153,13 @@ export class CodexProvider extends BaseProvider {
         }
 
         if (eventType === CODEX_EVENT_TYPES.error) {
-          const errorText = extractText(event.error ?? event.message) || 'Codex CLI error';
-          if (isIgnorableCodexLagOutput(errorText)) {
+          const rawErrorText = extractText(event.error ?? event.message) || 'Codex CLI error';
+          const errorText = sanitizeCodexOutput(rawErrorText);
+          if (!errorText) {
             logger.warn(
               '[CodexProvider] Suppressed in-process stream lag warning from chat output',
               {
-                errorText,
+                errorText: rawErrorText,
               }
             );
             continue;
@@ -1068,28 +1196,31 @@ export class CodexProvider extends BaseProvider {
         }
 
         if (eventType === CODEX_EVENT_TYPES.turnCompleted) {
-          const resultText = extractText(event.result) || undefined;
-          const usage = extractCodexTokenUsage(event);
+          const resultTextRaw = extractText(event.result);
+          const resultText = resultTextRaw
+            ? sanitizeCodexOutput(resultTextRaw) || undefined
+            : undefined;
+          const usage = eventUsage ?? latestTokenUsage;
           yield { type: 'result', subtype: 'success', result: resultText, usage };
           continue;
         }
 
         if (!eventType) {
-          const fallbackText = extractText(event);
+          const fallbackTextRaw = extractText(event);
+          const fallbackText = fallbackTextRaw ? sanitizeCodexOutput(fallbackTextRaw) : null;
           if (fallbackText) {
-            if (isIgnorableCodexLagOutput(fallbackText)) {
-              logger.warn(
-                '[CodexProvider] Suppressed in-process stream lag warning from fallback event'
-              );
-              continue;
-            }
             yield {
               type: 'assistant',
+              usage: latestTokenUsage,
               message: {
                 role: 'assistant',
                 content: [{ type: 'text', text: fallbackText }],
               },
             };
+          } else if (fallbackTextRaw && isIgnorableCodexLagOutput(fallbackTextRaw)) {
+            logger.warn(
+              '[CodexProvider] Suppressed in-process stream lag warning from fallback event'
+            );
           }
           continue;
         }
@@ -1106,6 +1237,7 @@ export class CodexProvider extends BaseProvider {
           const toolUseId = toolUseTracker.register(event, item);
           yield {
             type: 'assistant',
+            usage: latestTokenUsage,
             message: {
               role: 'assistant',
               content: [
@@ -1126,6 +1258,7 @@ export class CodexProvider extends BaseProvider {
           if (todos) {
             yield {
               type: 'assistant',
+              usage: latestTokenUsage,
               message: {
                 role: 'assistant',
                 content: [
@@ -1142,6 +1275,7 @@ export class CodexProvider extends BaseProvider {
             const formatted = todoText ? `Updated TODO list:\n${todoText}` : 'Updated TODO list';
             yield {
               type: 'assistant',
+              usage: latestTokenUsage,
               message: {
                 role: 'assistant',
                 content: [{ type: 'text', text: formatted }],
@@ -1153,9 +1287,14 @@ export class CodexProvider extends BaseProvider {
 
         if (eventType === CODEX_EVENT_TYPES.itemCompleted) {
           if (itemType === CODEX_ITEM_TYPES.reasoning) {
-            const thinkingText = extractText(item) || '';
+            const thinkingRaw = extractText(item) || '';
+            const thinkingText = sanitizeCodexOutput(thinkingRaw) || '';
+            if (!thinkingText) {
+              continue;
+            }
             yield {
               type: 'assistant',
+              usage: latestTokenUsage,
               message: {
                 role: 'assistant',
                 content: [{ type: 'thinking', thinking: thinkingText }],
@@ -1165,8 +1304,9 @@ export class CodexProvider extends BaseProvider {
           }
 
           if (itemType === CODEX_ITEM_TYPES.commandExecution) {
-            const commandOutput =
+            const commandOutputRaw =
               extractCommandOutput(item) ?? extractCommandText(item) ?? extractText(item) ?? '';
+            const commandOutput = sanitizeCodexOutput(commandOutputRaw) || '';
             if (commandOutput) {
               const toolUseId = toolUseTracker.resolve(event, item);
               const toolResultBlock: {
@@ -1179,30 +1319,35 @@ export class CodexProvider extends BaseProvider {
               }
               yield {
                 type: 'assistant',
+                usage: latestTokenUsage,
                 message: {
                   role: 'assistant',
                   content: [toolResultBlock],
                 },
               };
+            } else if (commandOutputRaw && isIgnorableCodexLagOutput(commandOutputRaw)) {
+              logger.warn(
+                '[CodexProvider] Suppressed in-process stream lag warning from command output event'
+              );
             }
             continue;
           }
 
-          const text = extractText(item) || extractText(event);
+          const textRaw = extractText(item) || extractText(event);
+          const text = textRaw ? sanitizeCodexOutput(textRaw) : null;
           if (text) {
-            if (isIgnorableCodexLagOutput(text)) {
-              logger.warn(
-                '[CodexProvider] Suppressed in-process stream lag warning from item-completed event'
-              );
-              continue;
-            }
             yield {
               type: 'assistant',
+              usage: latestTokenUsage,
               message: {
                 role: 'assistant',
                 content: [{ type: 'text', text }],
               },
             };
+          } else if (textRaw && isIgnorableCodexLagOutput(textRaw)) {
+            logger.warn(
+              '[CodexProvider] Suppressed in-process stream lag warning from item-completed event'
+            );
           }
         }
       }

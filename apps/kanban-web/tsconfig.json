@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "target": "ESNext",
+    "module": "ESNext",
+    "lib": ["dom", "ESNext"],
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/store/app-store": ["./src/shims/app-store.d.ts"],
+      "@/*": ["../ui/src/*"],
+      "@ui/*": ["../ui/src/*"],
+      "@kanban/*": ["./src/*"]
+    },
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true
+  },
+  "include": ["src/**/*", "*.mts"],
+  "exclude": ["node_modules", "dist", "dist-electron"]
+}

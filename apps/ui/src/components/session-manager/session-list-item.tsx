@@ -12,6 +12,7 @@ import {
   FileCode2,
   FileText,
   MessageSquare,
+  Sparkles,
   StopCircle,
   Timer,
   Trash2,
@@ -25,7 +26,7 @@ import { ProjectBadge } from '@/components/project-badge';
 import { useElapsedTime } from '@/hooks/use-elapsed-time';
 import { useSessionFiles } from '@/hooks/use-session-files';
 import { buildSessionFilesCopyText } from '@/lib/extract-session-files';
-import { cn } from '@/lib/utils';
+import { cn, getModelDisplayName } from '@/lib/utils';
 import type { Project } from '@/lib/electron';
 import type { SessionListItem } from '@/types/electron';
 
@@ -250,6 +251,7 @@ export function SessionListItemRow({
             </div>
           ) : (
             <>
+              {/* Row 1: Status icon + Title (full width) */}
               <div className="mb-0.5 flex items-center gap-1.5">
                 {isRunning ? (
                   <Spinner size="sm" className="shrink-0 text-amber-500" />
@@ -287,56 +289,94 @@ export function SessionListItemRow({
                   />
                 )}
 
+                <h3 className="truncate font-medium" style={{ fontSize: 'inherit' }}>
+                  {session.name || 'Unbenannte Session'}
+                </h3>
+              </div>
+
+              {/* Row 2: Badges (status, phase, sub-agent, model, timer) */}
+              <div
+                className="mb-0.5 flex flex-wrap items-center gap-1"
+                style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
+              >
                 {isPhaseItem && (
-                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-muted-foreground">
                     Phase {phaseIndex}
                   </span>
                 )}
 
                 {isSubagent && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-500">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/10 px-1.5 py-0.5 text-sky-500">
                     <Bot className="h-2.5 w-2.5" />
                     Sub-Agent
                   </span>
                 )}
 
-                <h3 className="truncate font-medium" style={{ fontSize: 'inherit' }}>
-                  {session.name || 'Unbenannte Session'}
-                </h3>
-
                 {isRunning && (
-                  <span
-                    className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-amber-500"
-                    style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
-                  >
+                  <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-amber-500">
                     läuft
                   </span>
                 )}
 
                 {wasStopped && (
-                  <span
-                    className="rounded-full bg-red-500/10 px-1.5 py-0.5 text-red-500"
-                    style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
-                  >
+                  <span className="rounded-full bg-red-500/10 px-1.5 py-0.5 text-red-500">
                     Gestoppt
                   </span>
                 )}
 
                 {isDirty && (
-                  <span
-                    className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-emerald-500"
-                    style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
-                  >
+                  <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-emerald-500">
                     Fertig
                   </span>
                 )}
 
                 {hasFailed && (
-                  <span
-                    className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-destructive"
-                    style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
-                  >
+                  <span className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-destructive">
                     Fehler
+                  </span>
+                )}
+
+                {session.model && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-1.5 py-0.5 text-violet-400"
+                    title={`Model: ${session.model}${session.thinkingLevel && session.thinkingLevel !== 'none' ? ` (${session.thinkingLevel} thinking)` : ''}${session.reasoningEffort && session.reasoningEffort !== 'none' ? ` (${session.reasoningEffort} reasoning)` : ''}`}
+                  >
+                    <Sparkles
+                      className="shrink-0"
+                      style={{
+                        width: `${Math.max(8, sessionFontSize - 5)}px`,
+                        height: `${Math.max(8, sessionFontSize - 5)}px`,
+                      }}
+                    />
+                    <span className="truncate">
+                      {getModelDisplayName(session.model).replace('Claude ', '')}
+                      {session.thinkingLevel && session.thinkingLevel !== 'none' && (
+                        <span className="ml-0.5 text-violet-400/70">
+                          (
+                          {session.thinkingLevel === 'ultrathink'
+                            ? 'Ultra'
+                            : session.thinkingLevel === 'medium'
+                              ? 'Med'
+                              : session.thinkingLevel.charAt(0).toUpperCase() +
+                                session.thinkingLevel.slice(1)}
+                          )
+                        </span>
+                      )}
+                      {session.reasoningEffort && session.reasoningEffort !== 'none' && (
+                        <span className="ml-0.5 text-violet-400/70">
+                          (
+                          {session.reasoningEffort === 'medium'
+                            ? 'Med'
+                            : session.reasoningEffort === 'xhigh'
+                              ? 'XHigh'
+                              : session.reasoningEffort === 'minimal'
+                                ? 'Min'
+                                : session.reasoningEffort.charAt(0).toUpperCase() +
+                                  session.reasoningEffort.slice(1)}
+                          )
+                        </span>
+                      )}
+                    </span>
                   </span>
                 )}
 
@@ -346,7 +386,6 @@ export function SessionListItemRow({
                       'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-mono tabular-nums',
                       isRunning ? 'bg-red-500/10 text-red-500' : 'bg-muted text-muted-foreground'
                     )}
-                    style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
                     title="Elapsed time"
                   >
                     <Timer

@@ -1,0 +1,41 @@
+# Deploy nur Public-Kanban (apps/kanban-web) plus geteilte Quellen aus apps/ui + libs
+# Alles andere wird ausgeschlossen
+
+# Other apps
+apps/server
+apps/chat
+apps/markdown-explorer-extension
+
+# Data & docs
+data
+docs
+Favorites
+History
+output
+plans
+shared-docs
+supabase
+test
+tests
+
+# Dev & config directories
+.agents
+.automaker
+.claude
+.codex
+.completed
+.husky
+.playwright-cli
+.uniai-chat
+.unityAIChat
+.vscode
+
+# Electron-specific (not needed for web deploy)
+apps/ui/src/main.ts
+apps/ui/src/preload.ts
+apps/ui/electron-builder.*
+
+# Large files
+*.md
+!README.md
+*.sql

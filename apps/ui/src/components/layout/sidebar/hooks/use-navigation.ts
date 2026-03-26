@@ -15,6 +15,7 @@ import {
   Bell,
   Settings,
   Home,
+  ShieldCheck,
 } from 'lucide-react';
 import type { NavSection, NavItem } from '../types';
 import type { KeyboardShortcut } from '@/hooks/use-keyboard-shortcuts';
@@ -44,6 +45,8 @@ interface UseNavigationProps {
     notifications: string;
   };
   hideSpecEditor: boolean;
+  hideBoard: boolean;
+  hideGraph: boolean;
   hideContext: boolean;
   hideTerminal: boolean;
   currentProject: Project | null;
@@ -62,9 +65,18 @@ interface UseNavigationProps {
   isSpecGenerating?: boolean;
 }
 
+export interface HiddenNavItem {
+  id: string;
+  label: string;
+  reason: string;
+  target?: string;
+}
+
 export function useNavigation({
   shortcuts,
   hideSpecEditor,
+  hideBoard,
+  hideGraph,
   hideContext,
   hideTerminal,
   currentProject,
@@ -144,8 +156,7 @@ export function useNavigation({
       return true;
     });
 
-    // Build project items - Terminal is conditionally included
-    const projectItems: NavItem[] = [
+    const allProjectItems: NavItem[] = [
       {
         id: 'project-overview',
         label: 'Übersicht',
@@ -170,7 +181,22 @@ export function useNavigation({
         icon: Bot,
         shortcut: shortcuts.agent,
       },
+      {
+        id: 'team-rights',
+        label: 'Team & Rechte',
+        icon: ShieldCheck,
+      },
     ];
+
+    const projectItems = allProjectItems.filter((item) => {
+      if (item.id === 'board' && hideBoard) {
+        return false;
+      }
+      if (item.id === 'graph' && hideGraph) {
+        return false;
+      }
+      return true;
+    });
 
     // Add Terminal to Project section if not hidden
     if (!hideTerminal) {
@@ -258,6 +284,8 @@ export function useNavigation({
   }, [
     shortcuts,
     hideSpecEditor,
+    hideBoard,
+    hideGraph,
     hideContext,
     hideTerminal,
     hasGitHubRemote,
@@ -265,6 +293,37 @@ export function useNavigation({
     unreadNotificationsCount,
     isSpecGenerating,
   ]);
+
+  const hiddenNavItems: HiddenNavItem[] = useMemo(() => {
+    const items: HiddenNavItem[] = [];
+
+    if (hideBoard) {
+      items.push({
+        id: 'board',
+        label: 'Kanban Board',
+        reason: 'Veraltet. Nutze das neue Public-Kanban.',
+        target: 'https://automaker-kanban.vercel.app/',
+      });
+    }
+
+    if (hideGraph) {
+      items.push({
+        id: 'graph',
+        label: 'Graph View',
+        reason: 'Derzeit nicht genutzt, deshalb ausgeblendet.',
+      });
+    }
+
+    if (hideSpecEditor) {
+      items.push({
+        id: 'spec',
+        label: 'Spec Editor',
+        reason: 'Aktuell entfernt, um die Oberfläche schlanker zu halten.',
+      });
+    }
+
+    return items;
+  }, [hideBoard, hideGraph, hideSpecEditor]);
 
   // Build keyboard shortcuts for navigation
   const navigationShortcuts: KeyboardShortcut[] = useMemo(() => {
@@ -338,5 +397,6 @@ export function useNavigation({
   return {
     navSections,
     navigationShortcuts,
+    hiddenNavItems,
   };
 }

@@ -15,6 +15,10 @@ import type {
 } from '@automaker/types';
 import { stripProviderPrefix } from '@automaker/types';
 import {
+  initLogger as initEvlogLogger,
+  createRequestLogger as createEvlogRequestLogger,
+} from 'evlog';
+import {
   readImageAsBase64,
   buildPromptWithImages,
   isAbortError,
@@ -92,6 +96,8 @@ interface SessionMetadata {
   isDirty?: boolean; // Session completed work that hasn't been reviewed yet
   tags?: string[];
   model?: string;
+  thinkingLevel?: ThinkingLevel; // Thinking level for Claude models
+  reasoningEffort?: ReasoningEffort; // Reasoning effort for Codex models
   orchestratorRunId?: string;
   sourceType?: SessionSourceType;
   parentSessionId?: string;
@@ -99,6 +105,27 @@ interface SessionMetadata {
   sdkSessionId?: string; // Claude SDK session ID for conversation continuity
   totalElapsedMs?: number; // Accumulated running time in milliseconds
   lastStartedAt?: string; // ISO timestamp of when the session last started running
+}
+
+type AiCallOutcome = 'success' | 'error' | 'aborted';
+
+interface AiCallWideEventParams {
+  requestId: string;
+  sessionId: string;
+  provider: string;
+  model: string;
+  thinkingLevel?: ThinkingLevel;
+  reasoningEffort?: ReasoningEffort;
+  imageCount: number;
+  startedAtMs: number;
+  firstChunkAtMs: number | null;
+  endedAtMs: number;
+  stepCount: number;
+  toolUses: Array<{ name: string; input: unknown }>;
+  usage: ProviderTokenUsage | null;
+  outcome: AiCallOutcome;
+  status: number;
+  errorMessage?: string;
 }
 
 const INPUT_TOKEN_KEYS = ['inputTokens', 'input_tokens', 'promptTokens', 'prompt_tokens'] as const;
@@ -127,6 +154,71 @@ const REASONING_TOKEN_KEYS = [
   'reasoningOutputTokens',
   'reasoning_output_tokens',
 ] as const;
+const EVLOG_DEFAULT_SERVICE_NAME = 'automaker-server';
+const EVLOG_AGENT_METHOD = 'POST';
+const EVLOG_AGENT_PATH = '/api/agent/send';
+const DEFAULT_AI_STEP_COUNT = 1;
+const DEFAULT_LOG_STATUS_SUCCESS = 200;
+const DEFAULT_LOG_STATUS_ERROR = 500;
+const DEFAULT_LOG_STATUS_ABORTED = 499;
+const TOKENS_PER_SECOND_DECIMALS = 2;
+let evlogInitialized = false;
+
+function ensureEvlogInitialized(): void {
+  if (evlogInitialized) {
+    return;
+  }
+
+  initEvlogLogger({
+    env: {
+      service: process.env.EVLOG_SERVICE_NAME || EVLOG_DEFAULT_SERVICE_NAME,
+      environment: process.env.NODE_ENV || 'development',
+      version: process.env.npm_package_version,
+    },
+    silent: process.env.EVLOG_SILENT === 'true',
+  });
+  evlogInitialized = true;
+}
+
+function resolveUsageTotalTokens(usage: ProviderTokenUsage | null): number {
+  if (!usage) return 0;
+  if (typeof usage.totalTokens === 'number' && usage.totalTokens > 0) {
+    return usage.totalTokens;
+  }
+
+  return (
+    (usage.inputTokens ?? 0) +
+    (usage.outputTokens ?? 0) +
+    (usage.cacheReadInputTokens ?? 0) +
+    (usage.cacheCreationInputTokens ?? 0) +
+    (usage.reasoningTokens ?? 0)
+  );
+}
+
+function resolveTokensPerSecond(
+  outputTokens: number | undefined,
+  msToFinish: number,
+  msToFirstChunk?: number
+): number | undefined {
+  if (!outputTokens || outputTokens <= 0) {
+    return undefined;
+  }
+
+  const streamDurationMs =
+    typeof msToFirstChunk === 'number' && msToFinish > msToFirstChunk
+      ? msToFinish - msToFirstChunk
+      : msToFinish;
+  if (streamDurationMs <= 0) {
+    return undefined;
+  }
+
+  const tokensPerSecond = outputTokens / (streamDurationMs / 1000);
+  if (!Number.isFinite(tokensPerSecond) || tokensPerSecond <= 0) {
+    return undefined;
+  }
+
+  return Number(tokensPerSecond.toFixed(TOKENS_PER_SECOND_DECIMALS));
+}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -272,6 +364,9 @@ export class AgentService {
         wasStopped: false,
         abortController: null,
         workingDirectory: resolvedWorkingDirectory,
+        model: sessionMetadata?.model,
+        thinkingLevel: sessionMetadata?.thinkingLevel,
+        reasoningEffort: sessionMetadata?.reasoningEffort,
         sdkSessionId: sessionMetadata?.sdkSessionId, // Load persisted SDK session ID
         promptQueue,
       });
@@ -323,9 +418,11 @@ export class AgentService {
     }
     if (thinkingLevel !== undefined) {
       session.thinkingLevel = thinkingLevel;
+      await this.updateSession(sessionId, { thinkingLevel });
     }
     if (reasoningEffort !== undefined) {
       session.reasoningEffort = reasoningEffort;
+      await this.updateSession(sessionId, { reasoningEffort });
     }
 
     // Validate vision support before processing images
@@ -396,6 +493,9 @@ export class AgentService {
     });
 
     await this.saveSession(sessionId, session.messages);
+    let emitAiCallObservability:
+      | ((outcome: AiCallOutcome, status: number, errorMessage?: string) => void)
+      | null = null;
 
     try {
       // Determine the effective working directory for context loading
@@ -567,6 +667,7 @@ export class AgentService {
 
       // Get provider for this model (with prefix)
       const provider = ProviderFactory.getProviderForModel(effectiveModel);
+      const providerName = provider.getName();
 
       // Strip provider prefix - providers should receive bare model IDs
       const bareModel = stripProviderPrefix(effectiveModel);
@@ -612,14 +713,45 @@ export class AgentService {
       // Set the prompt in options
       options.prompt = finalPrompt;
 
+      const aiCallRequestId = this.generateId();
+      const aiCallStartedAtMs = Date.now();
+      let aiFirstChunkAtMs: number | null = null;
+      let aiStepCount = 0;
+      let aiCallObservabilityEmitted = false;
+      const toolUses: Array<{ name: string; input: unknown }> = [];
+      let latestTokenUsage: ProviderTokenUsage | null = null;
+      emitAiCallObservability = (outcome: AiCallOutcome, status: number, errorMessage?: string) => {
+        if (aiCallObservabilityEmitted) {
+          return;
+        }
+
+        aiCallObservabilityEmitted = true;
+        this.emitAiCallWideEvent({
+          requestId: aiCallRequestId,
+          sessionId,
+          provider: providerName,
+          model: effectiveModel,
+          thinkingLevel: effectiveThinkingLevel,
+          reasoningEffort: effectiveReasoningEffort,
+          imageCount: imagePaths?.length ?? 0,
+          startedAtMs: aiCallStartedAtMs,
+          firstChunkAtMs: aiFirstChunkAtMs,
+          endedAtMs: Date.now(),
+          stepCount: aiStepCount,
+          toolUses,
+          usage: latestTokenUsage,
+          outcome,
+          status,
+          errorMessage,
+        });
+      };
+
       // Execute via provider
       const stream = provider.executeQuery(options);
 
       let currentAssistantMessage: Message | null = null;
       let responseText = '';
       let sessionInfoParsed = false; // Track if we've already extracted session info
-      const toolUses: Array<{ name: string; input: unknown }> = [];
-      let latestTokenUsage: ProviderTokenUsage | null = null;
 
       for await (const msg of stream) {
         // Capture SDK session ID from any message and persist it
@@ -636,6 +768,10 @@ export class AgentService {
 
         if (msg.type === 'assistant') {
           if (msg.message?.content) {
+            if (aiFirstChunkAtMs === null && msg.message.content.length > 0) {
+              aiFirstChunkAtMs = Date.now();
+            }
+
             // Add newline separator between assistant turns so multi-turn
             // responses don't concatenate without breaks
             let needsTurnSeparator = responseText.length > 0;
@@ -753,6 +889,10 @@ export class AgentService {
             }
           }
         } else if (msg.type === 'result') {
+          if (msg.subtype === 'success') {
+            aiStepCount += 1;
+          }
+
           if (msg.subtype === 'success' && msg.result) {
             // For first messages, ensure SESSION_INFO is parsed from result
             // if it wasn't caught during streaming
@@ -846,6 +986,7 @@ export class AgentService {
             error: enhancedText,
             message: errorMessage,
           });
+          emitAiCallObservability?.('error', DEFAULT_LOG_STATUS_ERROR, enhancedText);
 
           // Don't continue streaming after an error message
           return {
@@ -911,6 +1052,7 @@ export class AgentService {
         toolUses,
         usage: latestTokenUsage ?? undefined,
       });
+      emitAiCallObservability?.('success', DEFAULT_LOG_STATUS_SUCCESS);
 
       // Mark session as dirty (needs review) after successful completion
       await this.markSessionDirty(sessionId);
@@ -932,6 +1074,11 @@ export class AgentService {
         // This enables the "stop to send next" workflow:
         // User queues a prompt → clicks Stop → queued prompt sends immediately
         setImmediate(() => this.processNextInQueue(sessionId));
+        emitAiCallObservability?.(
+          'aborted',
+          DEFAULT_LOG_STATUS_ABORTED,
+          error instanceof Error ? error.message : undefined
+        );
 
         return { success: false, aborted: true };
       }
@@ -960,6 +1107,7 @@ export class AgentService {
         error: (error as Error).message,
         message: errorMessage,
       });
+      emitAiCallObservability?.('error', DEFAULT_LOG_STATUS_ERROR, (error as Error).message);
 
       throw error;
     }
@@ -1525,6 +1673,83 @@ export class AgentService {
         agentId: toolUseId,
         childSessionId: active.childSessionId,
       });
+    }
+  }
+
+  private emitAiCallWideEvent(params: AiCallWideEventParams): void {
+    try {
+      ensureEvlogInitialized();
+      const log = createEvlogRequestLogger({
+        method: EVLOG_AGENT_METHOD,
+        path: EVLOG_AGENT_PATH,
+        requestId: params.requestId,
+      });
+
+      const msToFinish = Math.max(0, params.endedAtMs - params.startedAtMs);
+      const msToFirstChunk =
+        typeof params.firstChunkAtMs === 'number'
+          ? Math.max(0, params.firstChunkAtMs - params.startedAtMs)
+          : undefined;
+      const totalTokens = resolveUsageTotalTokens(params.usage);
+      const tokensPerSecond = resolveTokensPerSecond(
+        params.usage?.outputTokens,
+        msToFinish,
+        msToFirstChunk
+      );
+      const toolCallNames = Array.from(
+        new Set(params.toolUses.map((tool) => tool.name).filter(Boolean))
+      );
+
+      const aiEvent: Record<string, unknown> = {
+        calls: 1,
+        model: params.model,
+        provider: params.provider,
+        inputTokens: params.usage?.inputTokens ?? 0,
+        outputTokens: params.usage?.outputTokens ?? 0,
+        totalTokens,
+        steps: Math.max(DEFAULT_AI_STEP_COUNT, params.stepCount),
+        msToFinish,
+      };
+
+      if (params.usage?.cacheReadInputTokens) {
+        aiEvent.cacheReadTokens = params.usage.cacheReadInputTokens;
+      }
+      if (params.usage?.cacheCreationInputTokens) {
+        aiEvent.cacheWriteTokens = params.usage.cacheCreationInputTokens;
+      }
+      if (params.usage?.reasoningTokens) {
+        aiEvent.reasoningTokens = params.usage.reasoningTokens;
+      }
+      if (typeof msToFirstChunk === 'number') {
+        aiEvent.msToFirstChunk = msToFirstChunk;
+      }
+      if (typeof tokensPerSecond === 'number') {
+        aiEvent.tokensPerSecond = tokensPerSecond;
+      }
+      if (toolCallNames.length > 0) {
+        aiEvent.toolCalls = toolCallNames;
+      }
+      if (params.errorMessage) {
+        aiEvent.error = params.errorMessage;
+      }
+
+      log.set({
+        sessionId: params.sessionId,
+        model: params.model,
+        provider: params.provider,
+        thinkingLevel: params.thinkingLevel ?? 'none',
+        reasoningEffort: params.reasoningEffort ?? 'none',
+        imageCount: params.imageCount,
+        outcome: params.outcome,
+        ai: aiEvent,
+      });
+
+      log.emit({
+        status: params.status,
+        _forceKeep: params.outcome !== 'success',
+      });
+    } catch (error) {
+      this.logger.warn('EVLOG AI call telemetry could not be emitted:', error);
     }
   }
 

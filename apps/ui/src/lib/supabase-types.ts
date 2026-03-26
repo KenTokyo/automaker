@@ -44,6 +44,7 @@ export interface Database {
           share_enabled?: boolean;
         };
         Update: {
+          owner_id?: string;
           name?: string;
           slug?: string;
           share_enabled?: boolean;

@@ -57,6 +57,9 @@ export function createIndexHandler(agentService: AgentService) {
             lastError,
             totalElapsedMs: s.totalElapsedMs || 0,
             lastStartedAt: s.lastStartedAt,
+            model: s.model,
+            thinkingLevel: s.thinkingLevel,
+            reasoningEffort: s.reasoningEffort,
           };
         })
       );

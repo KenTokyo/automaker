@@ -488,9 +488,9 @@ export function InputControls({
         )}
       </div>
 
-      {/* Controls row - compact single line (scrolls on small widths) */}
-      <div className="overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex min-w-max items-center gap-1 whitespace-nowrap">
+      {/* Controls row - wraps into multiple lines when needed */}
+      <div className="pb-0.5">
+        <div className="flex flex-wrap items-center gap-1">
           {/* New Session Button */}
           {onNewSession && (
             <Button

@@ -1,7 +1,6 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { X, FileText } from 'lucide-react';
 import type { ImageAttachment, TextFileAttachment } from '@/store/app-store';
-import { formatFileSize } from '@/lib/image-utils';
 
 interface FilePreviewProps {
   selectedImages: ImageAttachment[];
@@ -18,87 +17,83 @@ export const FilePreview = memo(function FilePreview({
   isProcessing,
   onRemoveImage,
   onRemoveTextFile,
-  onClearAll,
 }: FilePreviewProps) {
   const totalFiles = selectedImages.length + selectedTextFiles.length;
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   if (totalFiles === 0) {
     return null;
   }
 
   return (
-    <div className="mb-4 space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-foreground">
-          {totalFiles} file{totalFiles > 1 ? 's' : ''} attached
-        </p>
-        <button
-          onClick={onClearAll}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Clear all
-        </button>
-      </div>
-      <div className="flex max-h-28 flex-wrap gap-2 overflow-y-auto pr-1 scrollbar-styled">
-        {/* Image attachments */}
+    <>
+      <div className="flex flex-wrap items-center gap-1.5 mb-2">
+        {/* Image attachments - compact floating thumbnails */}
         {selectedImages.map((image) => (
-          <div
-            key={image.id}
-            className="group relative rounded-lg border border-border bg-muted/30 p-2 flex items-center gap-2 hover:border-primary/30 transition-colors"
-          >
-            {/* Image thumbnail */}
-            <div className="w-8 h-8 rounded-md overflow-hidden bg-muted flex-shrink-0">
+          <div key={image.id} className="group relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setLightboxSrc(image.data)}
+              className="w-10 h-10 rounded-lg overflow-hidden border border-border bg-muted/30 hover:border-primary/50 hover:ring-2 hover:ring-primary/20 transition-all cursor-pointer"
+              title="Click to preview"
+            >
               <img src={image.data} alt={image.filename} className="w-full h-full object-cover" />
-            </div>
-            {/* Image info */}
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-foreground truncate max-w-24">
-                {image.filename}
-              </p>
-              {image.size !== undefined && (
-                <p className="text-[10px] text-muted-foreground">{formatFileSize(image.size)}</p>
-              )}
-            </div>
-            {/* Remove button */}
+            </button>
+            {/* Remove button - floating top-right */}
             {image.id && (
               <button
-                onClick={() => onRemoveImage(image.id!)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveImage(image.id!);
+                }}
+                className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity w-4 h-4 rounded-full bg-destructive/90 text-white flex items-center justify-center hover:bg-destructive"
                 disabled={isProcessing}
               >
-                <X className="h-3 w-3" />
+                <X className="h-2.5 w-2.5" />
               </button>
             )}
           </div>
         ))}
-        {/* Text file attachments */}
+        {/* Text file attachments - compact pill */}
         {selectedTextFiles.map((file) => (
-          <div
-            key={file.id}
-            className="group relative rounded-lg border border-border bg-muted/30 p-2 flex items-center gap-2 hover:border-primary/30 transition-colors"
-          >
-            {/* File icon */}
-            <div className="w-8 h-8 rounded-md bg-muted flex-shrink-0 flex items-center justify-center">
-              <FileText className="w-4 h-4 text-muted-foreground" />
+          <div key={file.id} className="group relative shrink-0">
+            <div className="h-10 rounded-lg border border-border bg-muted/30 hover:border-primary/30 transition-colors flex items-center gap-1.5 px-2.5">
+              <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <span className="text-[11px] text-foreground truncate max-w-20">{file.filename}</span>
             </div>
-            {/* File info */}
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-foreground truncate max-w-24">
-                {file.filename}
-              </p>
-              <p className="text-[10px] text-muted-foreground">{formatFileSize(file.size)}</p>
-            </div>
-            {/* Remove button */}
+            {/* Remove button - floating top-right */}
             <button
               onClick={() => onRemoveTextFile(file.id)}
-              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+              className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity w-4 h-4 rounded-full bg-destructive/90 text-white flex items-center justify-center hover:bg-destructive"
               disabled={isProcessing}
             >
-              <X className="h-3 w-3" />
+              <X className="h-2.5 w-2.5" />
             </button>
           </div>
         ))}
       </div>
-    </div>
+
+      {/* Lightbox overlay for image preview */}
+      {lightboxSrc && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm cursor-pointer"
+          onClick={() => setLightboxSrc(null)}
+        >
+          <div className="relative max-w-[90vw] max-h-[90vh]">
+            <img
+              src={lightboxSrc}
+              alt="Preview"
+              className="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain"
+            />
+            <button
+              onClick={() => setLightboxSrc(null)}
+              className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 });

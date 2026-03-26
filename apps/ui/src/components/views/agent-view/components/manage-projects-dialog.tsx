@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Eye,
   EyeOff,
@@ -10,6 +10,7 @@ import {
   Users,
   Database,
   Loader2,
+  LogIn,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -27,6 +28,7 @@ import { cn } from '@/lib/utils';
 import { getAuthenticatedImageUrl } from '@/lib/api-fetch';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/app-store';
+import { useSupabaseAuthStore } from '@/store/supabase-auth-store';
 import { useSupabaseProjects } from '@/hooks/use-supabase-projects';
 import type { Project, TrashedProject } from '@/lib/electron';
 import { ProjectMembersDialog } from './project-members-dialog';
@@ -49,6 +51,11 @@ export function ManageProjectsDialog({ open, onOpenChange }: ManageProjectsDialo
   const [membersProjectId, setMembersProjectId] = useState<string | null>(null);
   const [membersProjectName, setMembersProjectName] = useState('');
   const [togglingTeamDb, setTogglingTeamDb] = useState<string | null>(null);
+  const [showSupabaseConnect, setShowSupabaseConnect] = useState(false);
+  const [supabaseEmail, setSupabaseEmail] = useState('');
+  const [supabasePassword, setSupabasePassword] = useState('');
+  const [connectingSupabase, setConnectingSupabase] = useState(false);
+  const [supabaseConnectError, setSupabaseConnectError] = useState<string | null>(null);
 
   const projects = useAppStore((s) => s.projects);
   const trashedProjects = useAppStore((s) => s.trashedProjects);
@@ -59,28 +66,47 @@ export function ManageProjectsDialog({ open, onOpenChange }: ManageProjectsDialo
   const emptyTrash = useAppStore((s) => s.emptyTrash);
 
   const supabaseEnabled = isSupabaseConfigured();
+  const supabaseUser = useSupabaseAuthStore((s) => s.user);
+  const supabaseAuthInitialized = useSupabaseAuthStore((s) => s.initialized);
+  const supabaseAuthLoading = useSupabaseAuthStore((s) => s.loading);
+  const initializeSupabaseAuth = useSupabaseAuthStore((s) => s.initialize);
+  const signInSupabase = useSupabaseAuthStore((s) => s.signIn);
   const {
     projects: supabaseProjects,
+    error: supabaseProjectsError,
     createProject,
-    deleteProject: deleteSupabaseProject,
+    updateProject,
     getMembers,
     addMember,
     updateMemberRole,
     removeMember,
+    transferOwnership,
   } = useSupabaseProjects();
+
+  useEffect(() => {
+    if (!open || !supabaseEnabled || supabaseAuthInitialized) return;
+    void initializeSupabaseAuth();
+  }, [open, supabaseEnabled, supabaseAuthInitialized, initializeSupabaseAuth]);
+
+  useEffect(() => {
+    if (open) return;
+    setShowSupabaseConnect(false);
+    setSupabaseConnectError(null);
+    setSupabasePassword('');
+  }, [open]);
 
   // Map: local project path -> supabase project (using slug = project path)
   const supabaseProjectBySlug = useMemo(() => {
-    const map = new Map<string, { id: string; name: string }>();
+    const map = new Map<string, { id: string; name: string; shareEnabled: boolean }>();
     for (const sp of supabaseProjects) {
-      map.set(sp.slug, { id: sp.id, name: sp.name });
+      map.set(sp.slug, { id: sp.id, name: sp.name, shareEnabled: sp.shareEnabled });
     }
     return map;
   }, [supabaseProjects]);
 
   const isTeamDbEnabled = useCallback(
     (project: Project | TrashedProject) => {
-      return supabaseProjectBySlug.has(project.path);
+      return supabaseProjectBySlug.get(project.path)?.shareEnabled ?? false;
     },
     [supabaseProjectBySlug]
   );
@@ -94,32 +120,69 @@ export function ManageProjectsDialog({ open, onOpenChange }: ManageProjectsDialo
 
   const handleToggleTeamDb = useCallback(
     async (project: Project | TrashedProject) => {
+      if (!supabaseUser) {
+        toast.error('Bitte zuerst Supabase verbinden. Den Button findest du unten im Dialog.');
+        return;
+      }
+
       setTogglingTeamDb(project.id);
       try {
-        const existingSpId = getSupabaseProjectId(project);
-        if (existingSpId) {
-          // Disable: remove from Supabase
-          const ok = await deleteSupabaseProject(existingSpId);
+        const existingSp = supabaseProjectBySlug.get(project.path);
+        if (existingSp) {
+          // Toggle sharing without deleting project/tasks.
+          const nextEnabled = !existingSp.shareEnabled;
+          const ok = await updateProject(existingSp.id, { shareEnabled: nextEnabled });
           if (ok) {
-            toast.success(`Team-DB fuer "${project.name}" deaktiviert`);
+            toast.success(
+              nextEnabled
+                ? `Team-DB fuer "${project.name}" aktiviert`
+                : `Team-DB fuer "${project.name}" deaktiviert`
+            );
           } else {
-            toast.error('Fehler beim Deaktivieren der Team-DB');
+            toast.error(supabaseProjectsError || 'Fehler beim Umschalten der Team-DB');
           }
         } else {
-          // Enable: create in Supabase (slug = project path for unique mapping)
-          const created = await createProject(project.name, project.path);
+          // First-time enable: create Supabase project with sharing enabled.
+          const created = await createProject(project.name, project.path, true);
           if (created) {
             toast.success(`Team-DB fuer "${project.name}" aktiviert`);
           } else {
-            toast.error('Fehler beim Aktivieren der Team-DB');
+            toast.error(supabaseProjectsError || 'Fehler beim Aktivieren der Team-DB');
           }
         }
       } finally {
         setTogglingTeamDb(null);
       }
     },
-    [getSupabaseProjectId, deleteSupabaseProject, createProject]
+    [supabaseProjectBySlug, updateProject, createProject, supabaseProjectsError, supabaseUser]
   );
+
+  const handleSupabaseConnect = useCallback(async () => {
+    const email = supabaseEmail.trim();
+    if (!email || !supabasePassword.trim()) {
+      setSupabaseConnectError('Bitte E-Mail und Passwort eingeben.');
+      return;
+    }
+
+    setSupabaseConnectError(null);
+    setConnectingSupabase(true);
+
+    try {
+      const result = await signInSupabase(email, supabasePassword);
+      if (result.error) {
+        setSupabaseConnectError(result.error);
+        toast.error(result.error);
+        return;
+      }
+
+      await initializeSupabaseAuth();
+      setShowSupabaseConnect(false);
+      setSupabasePassword('');
+      toast.success('Supabase verbunden. Du kannst Team-DB jetzt aktivieren.');
+    } finally {
+      setConnectingSupabase(false);
+    }
+  }, [supabaseEmail, supabasePassword, signInSupabase, initializeSupabaseAuth]);
 
   const handleOpenMembers = useCallback(
     (project: Project | TrashedProject) => {
@@ -457,6 +520,90 @@ export function ManageProjectsDialog({ open, onOpenChange }: ManageProjectsDialo
         {/* Help text */}
         {activeTab === 'all' && (
           <div className="pt-2 border-t border-border">
+            {supabaseEnabled && !supabaseUser && (
+              <div className="mb-2 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2">
+                <p className="text-[11px] text-amber-300 text-center">
+                  Team-DB braucht ein Supabase-Login.
+                </p>
+                <div className="mt-2 flex justify-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs border-amber-500/40 text-amber-300 hover:text-amber-200 hover:bg-amber-500/10"
+                    onClick={() => {
+                      setSupabaseConnectError(null);
+                      setShowSupabaseConnect((prev) => !prev);
+                    }}
+                  >
+                    <LogIn className="mr-1 h-3.5 w-3.5" />
+                    {showSupabaseConnect ? 'Login schließen' : 'Supabase verbinden'}
+                  </Button>
+                </div>
+                {showSupabaseConnect && (
+                  <div className="mt-2 space-y-2">
+                    <input
+                      type="email"
+                      placeholder="E-Mail"
+                      autoComplete="email"
+                      value={supabaseEmail}
+                      onChange={(event) => setSupabaseEmail(event.target.value)}
+                      className={cn(
+                        'w-full h-8 px-2.5 text-xs rounded-md',
+                        'border border-white/10 bg-background/60',
+                        'text-foreground placeholder:text-muted-foreground',
+                        'focus:outline-none focus:ring-1 focus:ring-amber-500/30 focus:border-amber-500/40'
+                      )}
+                    />
+                    <input
+                      type="password"
+                      placeholder="Passwort"
+                      autoComplete="current-password"
+                      value={supabasePassword}
+                      onChange={(event) => setSupabasePassword(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          void handleSupabaseConnect();
+                        }
+                      }}
+                      className={cn(
+                        'w-full h-8 px-2.5 text-xs rounded-md',
+                        'border border-white/10 bg-background/60',
+                        'text-foreground placeholder:text-muted-foreground',
+                        'focus:outline-none focus:ring-1 focus:ring-amber-500/30 focus:border-amber-500/40'
+                      )}
+                    />
+                    {supabaseConnectError && (
+                      <p className="text-[11px] text-rose-400 text-center">
+                        {supabaseConnectError}
+                      </p>
+                    )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8 w-full text-xs"
+                      disabled={
+                        connectingSupabase ||
+                        supabaseAuthLoading ||
+                        !supabaseEmail.trim() ||
+                        !supabasePassword.trim()
+                      }
+                      onClick={() => void handleSupabaseConnect()}
+                    >
+                      {connectingSupabase || supabaseAuthLoading ? (
+                        <>
+                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          Verbinde...
+                        </>
+                      ) : (
+                        'Jetzt verbinden'
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
             <p className="text-[11px] text-muted-foreground text-center">
               💡 Versteckte Projekte tauchen nicht mehr im Projekt-Wechsler auf, bleiben aber hier
               erhalten.
@@ -481,6 +628,7 @@ export function ManageProjectsDialog({ open, onOpenChange }: ManageProjectsDialo
           addMember={addMember}
           updateMemberRole={updateMemberRole}
           removeMember={removeMember}
+          transferOwnership={transferOwnership}
         />
       )}
     </Dialog>

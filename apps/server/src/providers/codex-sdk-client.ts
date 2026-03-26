@@ -40,6 +40,50 @@ const REASONING_TOKEN_KEYS = [
   'reasoning_output_tokens',
   'reasoningOutputTokens',
 ] as const;
+const INPUT_TOKEN_DETAIL_CONTAINER_KEYS = [
+  'input_tokens_details',
+  'inputTokensDetails',
+  'input_token_details',
+] as const;
+const OUTPUT_TOKEN_DETAIL_CONTAINER_KEYS = [
+  'output_tokens_details',
+  'outputTokensDetails',
+  'output_token_details',
+] as const;
+const CACHE_READ_DETAIL_KEYS = ['cached_tokens', 'cache_read_tokens', 'cacheReadTokens'] as const;
+const CACHE_CREATE_DETAIL_KEYS = [
+  'cache_creation_tokens',
+  'cacheCreationTokens',
+  'cache_write_tokens',
+  'cacheWriteTokens',
+] as const;
+const TOKEN_USAGE_CONTAINER_KEYS = [
+  'usage',
+  'token_usage',
+  'tokenUsage',
+  'stats',
+  'metrics',
+  'usage_stats',
+  'token_usage_info',
+  'tokenUsageInfo',
+  // Prefer "last" usage over running totals for context-related UI values.
+  'last_token_usage',
+  'lastTokenUsage',
+  'last',
+  'total_token_usage',
+  'totalTokenUsage',
+  'total',
+] as const;
+const TOKEN_USAGE_PARENT_KEYS = [
+  'result',
+  'response',
+  'turn',
+  'item',
+  'data',
+  'payload',
+  'info',
+] as const;
+const TOKEN_USAGE_LIKE_KEY_PATTERN = /(usage|token)/i;
 
 type PromptBlock = {
   type: string;
@@ -138,9 +182,19 @@ function normalizeTokenUsage(record: Record<string, unknown>): ProviderTokenUsag
   const inputTokens = readTokenField(record, INPUT_TOKEN_KEYS);
   const outputTokens = readTokenField(record, OUTPUT_TOKEN_KEYS);
   const totalTokens = readTokenField(record, TOTAL_TOKEN_KEYS);
-  const cacheReadInputTokens = readTokenField(record, CACHE_READ_TOKEN_KEYS);
-  const cacheCreationInputTokens = readTokenField(record, CACHE_CREATE_TOKEN_KEYS);
-  const reasoningTokens = readTokenField(record, REASONING_TOKEN_KEYS);
+  const cacheReadInputTokens =
+    readTokenField(record, CACHE_READ_TOKEN_KEYS) ??
+    readTokenFieldFromContainers(record, INPUT_TOKEN_DETAIL_CONTAINER_KEYS, CACHE_READ_DETAIL_KEYS);
+  const cacheCreationInputTokens =
+    readTokenField(record, CACHE_CREATE_TOKEN_KEYS) ??
+    readTokenFieldFromContainers(
+      record,
+      INPUT_TOKEN_DETAIL_CONTAINER_KEYS,
+      CACHE_CREATE_DETAIL_KEYS
+    );
+  const reasoningTokens =
+    readTokenField(record, REASONING_TOKEN_KEYS) ??
+    readTokenFieldFromContainers(record, OUTPUT_TOKEN_DETAIL_CONTAINER_KEYS, REASONING_TOKEN_KEYS);
 
   if (
     !inputTokens &&
@@ -163,13 +217,77 @@ function normalizeTokenUsage(record: Record<string, unknown>): ProviderTokenUsag
   };
 }
 
+function readTokenFieldFromContainers(
+  record: Record<string, unknown>,
+  containerKeys: readonly string[],
+  tokenKeys: readonly string[]
+): number | undefined {
+  for (const containerKey of containerKeys) {
+    const container = asRecord(record[containerKey]);
+    if (!container) continue;
+    const tokenCount = readTokenField(container, tokenKeys);
+    if (typeof tokenCount === 'number') {
+      return tokenCount;
+    }
+  }
+  return undefined;
+}
+
+function collectSdkUsageCandidates(
+  resultRecord: Record<string, unknown>
+): Record<string, unknown>[] {
+  const candidates: Record<string, unknown>[] = [];
+  const seenCandidates = new Set<Record<string, unknown>>();
+  const seenNodes = new Set<Record<string, unknown>>();
+  const pushCandidate = (value: unknown) => {
+    const candidate = asRecord(value);
+    if (candidate && !seenCandidates.has(candidate)) {
+      seenCandidates.add(candidate);
+      candidates.push(candidate);
+    }
+  };
+
+  const queue: Array<{ record: Record<string, unknown>; depth: number }> = [
+    { record: resultRecord, depth: 0 },
+  ];
+  const maxDepth = 3;
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) continue;
+    const { record, depth } = current;
+    if (seenNodes.has(record)) continue;
+    seenNodes.add(record);
+
+    pushCandidate(record);
+    for (const key of TOKEN_USAGE_CONTAINER_KEYS) {
+      pushCandidate(record[key]);
+    }
+    for (const [key, value] of Object.entries(record)) {
+      if (TOKEN_USAGE_LIKE_KEY_PATTERN.test(key)) {
+        pushCandidate(value);
+      }
+    }
+
+    if (depth >= maxDepth) continue;
+    for (const key of TOKEN_USAGE_PARENT_KEYS) {
+      const nested = asRecord(record[key]);
+      if (nested && !seenNodes.has(nested)) {
+        queue.push({ record: nested, depth: depth + 1 });
+      }
+    }
+  }
+
+  return candidates;
+}
+
 function extractSdkTokenUsage(result: unknown): ProviderTokenUsage | undefined {
   const resultRecord = asRecord(result);
   if (!resultRecord) return undefined;
 
-  const usageCandidate = asRecord(resultRecord.usage);
-  if (usageCandidate) {
-    const normalized = normalizeTokenUsage(usageCandidate);
+  const candidates = collectSdkUsageCandidates(resultRecord);
+  for (const candidate of candidates) {
+    const normalized = normalizeTokenUsage(candidate);
     if (normalized) return normalized;
   }
 

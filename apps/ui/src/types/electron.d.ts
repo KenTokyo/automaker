@@ -148,6 +148,9 @@ export interface SessionListItem {
   lastError?: string;
   totalElapsedMs?: number; // Accumulated running time in milliseconds
   lastStartedAt?: string; // ISO timestamp of when the session last started running
+  model?: string; // Model alias or ID used for this session
+  thinkingLevel?: 'none' | 'low' | 'medium' | 'high' | 'ultrathink';
+  reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 }
 
 export interface AgentAPI {

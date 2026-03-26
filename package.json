@@ -16,6 +16,7 @@
     "dev": "node start-automaker.mjs",
     "start": "node start-automaker.mjs --production",
     "_dev:web": "npm run dev:web --workspace=apps/ui",
+    "_dev:kanban-web": "npm run dev --workspace=apps/kanban-web",
     "_dev:electron": "npm run dev:electron --workspace=apps/ui",
     "_dev:electron:debug": "npm run dev:electron:debug --workspace=apps/ui",
     "_dev:electron:wsl": "npm run dev:electron:wsl --workspace=apps/ui",
@@ -24,6 +25,7 @@
     "_dev:server": "npm run dev --workspace=apps/server",
     "_dev:server:chat": "npm run dev:chat --workspace=apps/server",
     "dev:web": "npm run build:packages && npm run _dev:web",
+    "dev:kanban-web": "npm run _dev:kanban-web",
     "dev:electron": "npm run build:packages && npm run _dev:electron",
     "dev:electron:debug": "npm run build:packages && npm run _dev:electron:debug",
     "dev:electron:fast": "npm run _dev:electron",
@@ -39,6 +41,7 @@
     "dev:full": "npm run build:packages && npx --yes concurrently \"npm run _dev:server\" \"npm run _dev:web\"",
     "dev:stable": "npm run build:packages && npx --yes concurrently -n server,ui -c blue,green \"npm run dev:test --workspace=apps/server\" \"npm run _dev:web\"",
     "build": "npm run build:packages && npm run build --workspace=apps/ui",
+    "build:kanban-web": "npm run build:packages && npm run build --workspace=apps/kanban-web",
     "build:packages": "npm run build -w @automaker/types && npm run build -w @automaker/platform && npm run build -w @automaker/utils -w @automaker/spec-parser && npm run build -w @automaker/prompts -w @automaker/model-resolver -w @automaker/dependency-resolver && npm run build -w @automaker/git-utils",
     "build:chat": "npm run build:packages && npm run build --workspace=apps/chat",
     "start:chat": "npm run build:chat && npx --yes concurrently -n server,chat -c blue,magenta \"cross-env AUTOMAKER_MODE=chat npm run start --workspace=apps/server\" \"npm run preview --workspace=apps/chat -- --port 3009\"",
@@ -62,6 +65,7 @@
     "lint:errors": "npm run lint --workspace=apps/ui -- --quiet",
     "lint:server:errors": "npm run lint --workspace=apps/server -- --quiet",
     "typecheck": "npm run typecheck --workspace=apps/ui",
+    "typecheck:kanban-web": "npm run typecheck --workspace=apps/kanban-web",
     "test": "npm run test --workspace=apps/ui",
     "test:headed": "npm run test:headed --workspace=apps/ui",
     "test:ui": "npm run test --workspace=apps/ui -- --ui",
@@ -84,8 +88,13 @@
   },
   "dependencies": {
     "cross-spawn": "7.0.6",
+    "evlog": "^2.10.0",
     "rehype-sanitize": "6.0.0",
     "tree-kill": "1.2.2"
+  },
+  "overrides": {
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
   },
   "devDependencies": {
     "husky": "9.1.7",

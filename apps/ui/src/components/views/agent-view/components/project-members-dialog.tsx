@@ -34,6 +34,10 @@ interface ProjectMembersDialogProps {
   ) => Promise<{ error: string | null }>;
   updateMemberRole: (memberId: string, role: ProjectMemberRole) => Promise<boolean>;
   removeMember: (memberId: string) => Promise<boolean>;
+  transferOwnership: (
+    projectId: string,
+    newOwnerUserId: string
+  ) => Promise<{ error: string | null }>;
 }
 
 const ROLE_LABELS: Record<ProjectMemberRole, string> = {
@@ -57,6 +61,7 @@ export function ProjectMembersDialog({
   addMember,
   updateMemberRole,
   removeMember,
+  transferOwnership,
 }: ProjectMembersDialogProps) {
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(false);
@@ -64,8 +69,12 @@ export function ProjectMembersDialog({
   const [inviteRole, setInviteRole] = useState<ProjectMemberRole>('editor');
   const [inviting, setInviting] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [transferringOwnerId, setTransferringOwnerId] = useState<string | null>(null);
 
   const currentUser = useSupabaseAuthStore((s) => s.user);
+  const currentUserIsOwner = members.some(
+    (member) => member.userId === currentUser?.id && member.role === 'owner'
+  );
 
   const loadMembers = useCallback(async () => {
     if (!supabaseProjectId) return;
@@ -133,6 +142,31 @@ export function ProjectMembersDialog({
       );
     } else {
       toast.error('Fehler beim Aendern der Rolle');
+    }
+  };
+
+  const handleTransferOwnership = async (member: ProjectMember) => {
+    if (!currentUserIsOwner) return;
+    if (member.role === 'owner') return;
+
+    const confirmed = window.confirm(
+      `Owner-Rechte wirklich an ${member.email ?? member.displayName ?? 'dieses Mitglied'} übertragen?`
+    );
+    if (!confirmed) return;
+
+    setTransferringOwnerId(member.id);
+    try {
+      const { error } = await transferOwnership(supabaseProjectId, member.userId);
+      if (error) {
+        toast.error(error);
+        return;
+      }
+      toast.success(
+        `Owner-Rechte an ${member.email ?? member.displayName ?? 'Mitglied'} übertragen`
+      );
+      await loadMembers();
+    } finally {
+      setTransferringOwnerId(null);
     }
   };
 
@@ -281,14 +315,30 @@ export function ProjectMembersDialog({
                     )}
                   </div>
 
-                  {/* Remove button (not for owner or self) */}
-                  <div className="shrink-0 w-7">
+                  {/* Transfer + remove actions (not for owner or self) */}
+                  <div className="shrink-0 flex items-center gap-1">
+                    {currentUserIsOwner && !isOwner && !isCurrentUser && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-[10px] text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                        disabled={transferringOwnerId === member.id || removingId === member.id}
+                        onClick={() => void handleTransferOwnership(member)}
+                        title="Owner-Rechte übertragen"
+                      >
+                        {transferringOwnerId === member.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          'Owner'
+                        )}
+                      </Button>
+                    )}
                     {!isOwner && !isCurrentUser && (
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-7 w-7 p-0 text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-opacity"
-                        disabled={removingId === member.id}
+                        disabled={removingId === member.id || transferringOwnerId === member.id}
                         onClick={() => void handleRemove(member)}
                         title="Mitglied entfernen"
                       >

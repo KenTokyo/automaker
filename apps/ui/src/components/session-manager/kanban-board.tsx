@@ -78,6 +78,7 @@ interface KanbanBoardProps {
   onCreateTask: (input: CreateTaskInput) => Promise<SupabaseTask | null>;
   onRefetch: () => Promise<void>;
   onEditTask?: (task: SupabaseTask) => void;
+  showSendToAgent?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -94,6 +95,7 @@ export function KanbanBoard({
   onCreateTask,
   onRefetch,
   onEditTask,
+  showSendToAgent = true,
 }: KanbanBoardProps) {
   // Group tasks by status
   const grouped = useMemo(() => {
@@ -176,6 +178,7 @@ export function KanbanBoard({
             onDeleteTask={onDeleteTask}
             onCreateTask={onCreateTask}
             onEditTask={onEditTask}
+            showSendToAgent={showSendToAgent}
           />
         ))}
       </div>
@@ -210,6 +213,7 @@ interface KanbanColumnProps {
   onDeleteTask: (id: string) => Promise<boolean>;
   onCreateTask: (input: CreateTaskInput) => Promise<SupabaseTask | null>;
   onEditTask?: (task: SupabaseTask) => void;
+  showSendToAgent?: boolean;
 }
 
 function KanbanColumn({
@@ -221,6 +225,7 @@ function KanbanColumn({
   onDeleteTask,
   onCreateTask,
   onEditTask,
+  showSendToAgent = true,
 }: KanbanColumnProps) {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const Icon = column.icon;
@@ -291,6 +296,7 @@ function KanbanColumn({
               onUpdateTask={onUpdateTask}
               onDeleteTask={onDeleteTask}
               onEditTask={onEditTask}
+              showSendToAgent={showSendToAgent}
             />
           ))
         )}

@@ -73,8 +73,15 @@ export function Sidebar() {
   const isCompact = useIsCompact();
 
   // Environment variable flags for hiding sidebar items
-  const { hideTerminal, hideRunningAgents, hideContext, hideSpecEditor, hideWiki } =
-    SIDEBAR_FEATURE_FLAGS;
+  const {
+    hideTerminal,
+    hideRunningAgents,
+    hideContext,
+    hideSpecEditor,
+    hideBoard,
+    hideGraph,
+    hideWiki,
+  } = SIDEBAR_FEATURE_FLAGS;
 
   // Get customizable keyboard shortcuts
   const shortcuts = useKeyboardShortcutsConfig();
@@ -256,9 +263,11 @@ export function Sidebar() {
   }, [setShowNewProjectModal]);
 
   // Navigation sections and keyboard shortcuts
-  const { navSections, navigationShortcuts } = useNavigation({
+  const { navSections, navigationShortcuts, hiddenNavItems } = useNavigation({
     shortcuts,
     hideSpecEditor,
+    hideBoard,
+    hideGraph,
     hideContext,
     hideTerminal,
     currentProject,
@@ -398,6 +407,7 @@ export function Sidebar() {
             sidebarOpen={sidebarOpen}
             sidebarStyle={sidebarStyle}
             navSections={navSections}
+            hiddenNavItems={hiddenNavItems}
             isActiveRoute={isActiveRoute}
             navigate={navigate}
             onScrollStateChange={setCanScrollDown}

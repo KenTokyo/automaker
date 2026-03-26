@@ -2,6 +2,9 @@
  * Session types for agent conversations
  */
 
+import type { ThinkingLevel } from './settings.js';
+import type { ReasoningEffort } from './provider.js';
+
 export interface AgentSession {
   id: string;
   name: string;
@@ -17,6 +20,9 @@ export interface AgentSession {
   lastError?: string;
   totalElapsedMs?: number; // Accumulated running time in milliseconds
   lastStartedAt?: string; // ISO timestamp of when the session last started running
+  model?: string; // Model alias or ID used for this session (e.g. 'sonnet', 'opus')
+  thinkingLevel?: ThinkingLevel; // Thinking level for Claude models
+  reasoningEffort?: ReasoningEffort; // Reasoning effort for Codex models
 }
 
 export interface SessionListItem extends AgentSession {

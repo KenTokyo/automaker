@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { NavigateOptions } from '@tanstack/react-router';
-import { ChevronDown, Wrench, Github, Folder } from 'lucide-react';
+import { ChevronDown, Wrench, Github, Folder, EyeOff } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn, isMac } from '@/lib/utils';
@@ -31,6 +31,12 @@ interface SidebarNavigationProps {
   sidebarOpen: boolean;
   sidebarStyle: SidebarStyle;
   navSections: NavSection[];
+  hiddenNavItems: Array<{
+    id: string;
+    label: string;
+    reason: string;
+    target?: string;
+  }>;
   isActiveRoute: (id: string) => boolean;
   navigate: (opts: NavigateOptions) => void;
   onScrollStateChange?: (canScrollDown: boolean) => void;
@@ -41,6 +47,7 @@ export function SidebarNavigation({
   sidebarOpen,
   sidebarStyle,
   navSections,
+  hiddenNavItems,
   isActiveRoute,
   navigate,
   onScrollStateChange,
@@ -409,6 +416,41 @@ export function SidebarNavigation({
           </div>
         );
       })}
+
+      {hiddenNavItems.length > 0 && (
+        <div className={cn('mt-3', sidebarOpen ? 'px-2' : 'px-1')}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  'group w-full rounded-lg border border-border/50 bg-card px-2.5 py-2',
+                  'text-muted-foreground hover:text-foreground hover:border-border transition-colors',
+                  sidebarOpen ? 'flex items-center gap-2.5' : 'flex items-center justify-center'
+                )}
+                data-testid="hidden-nav-items"
+              >
+                <EyeOff className="h-4 w-4 shrink-0" />
+                {sidebarOpen && <span className="text-xs font-medium">Ausgeblendete Bereiche</span>}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8} className="max-w-xs">
+              <p className="mb-2 text-xs font-semibold">Derzeit ausgeblendet</p>
+              <ul className="space-y-1.5">
+                {hiddenNavItems.map((item) => (
+                  <li key={item.id} className="text-xs leading-snug">
+                    <span className="font-medium">{item.label}</span>
+                    <span className="text-muted-foreground">: {item.reason}</span>
+                    {item.target && (
+                      <div className="mt-0.5 text-[11px] text-brand-400">{item.target}</div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      )}
 
       {/* Placeholder when no project is selected */}
       {!currentProject && sidebarOpen && (

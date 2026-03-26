@@ -17,7 +17,7 @@ const logger = createLogger('App');
 // Key for localStorage to persist splash screen preference
 const DISABLE_SPLASH_KEY = 'automaker-disable-splash';
 
-export default function App() {
+function FullAutomakerApp() {
   const disableSplashScreen = useAppStore((state) => state.disableSplashScreen);
 
   const [showSplash, setShowSplash] = useState(() => {
@@ -81,4 +81,8 @@ export default function App() {
       {showSplash && !disableSplashScreen && <SplashScreen onComplete={handleSplashComplete} />}
     </TooltipProvider>
   );
+}
+
+export default function App() {
+  return <FullAutomakerApp />;
 }

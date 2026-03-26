@@ -1,8 +1,18 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './supabase-types';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
+function sanitizeEnvValue(value: string | undefined): string {
+  // Remove accidental line breaks from copied ENV values (common cause of broken websocket URLs).
+  return (value ?? '').trim().replace(/[\r\n]+/g, '');
+}
+
+const rawSupabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const rawSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const rawSupabaseAuthRedirectUrl = import.meta.env.VITE_SUPABASE_AUTH_REDIRECT_URL;
+
+const supabaseUrl = sanitizeEnvValue(rawSupabaseUrl);
+const supabaseAnonKey = sanitizeEnvValue(rawSupabaseAnonKey);
+const supabaseAuthRedirectUrl = sanitizeEnvValue(rawSupabaseAuthRedirectUrl);
 
 let _client: SupabaseClient<Database> | null = null;
 
@@ -12,6 +22,24 @@ if (supabaseUrl && supabaseAnonKey) {
 
 export function isSupabaseConfigured(): boolean {
   return _client !== null;
+}
+
+/**
+ * Redirect URL used in Supabase auth emails (signup / magic link / recovery).
+ * Priority:
+ * 1. VITE_SUPABASE_AUTH_REDIRECT_URL (explicit override, useful on Vercel)
+ * 2. Current origin (works for local and preview deployments)
+ */
+export function getSupabaseAuthRedirectUrl(): string | undefined {
+  if (supabaseAuthRedirectUrl) {
+    return supabaseAuthRedirectUrl;
+  }
+
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+
+  return undefined;
 }
 
 /**

@@ -5,12 +5,16 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { isSupabaseConfigured, getSupabaseClient } from '@/lib/supabase';
 import type { Database, ProjectMemberRole } from '@/lib/supabase-types';
 import { useSupabaseAuthStore } from '@/store/supabase-auth-store';
 
 type DbProject = Database['public']['Tables']['task_projects']['Row'];
 type DbProjectInsert = Database['public']['Tables']['task_projects']['Insert'];
+const logger = createLogger('useSupabaseProjects');
+const RLS_RECURSION_ERROR =
+  'infinite recursion detected in policy for relation "task_project_members"';
 
 export interface TaskProject {
   id: string;
@@ -44,11 +48,25 @@ function dbToProject(row: DbProject): TaskProject {
   };
 }
 
+function normalizeProjectError(message: string): string {
+  if (message.includes(RLS_RECURSION_ERROR)) {
+    return 'Supabase-Policy-Fehler: Bitte Migration 005 (RLS-Fix) ausführen und dann erneut versuchen.';
+  }
+  return message;
+}
+
 export function useSupabaseProjects() {
   const user = useSupabaseAuthStore((s) => s.user);
+  const initialized = useSupabaseAuthStore((s) => s.initialized);
+  const initializeAuth = useSupabaseAuthStore((s) => s.initialize);
   const [projects, setProjects] = useState<TaskProject[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured() || initialized) return;
+    void initializeAuth();
+  }, [initialized, initializeAuth]);
 
   const fetchProjects = useCallback(async () => {
     if (!isSupabaseConfigured() || !user) {
@@ -79,10 +97,19 @@ export function useSupabaseProjects() {
   }, [fetchProjects]);
 
   const createProject = useCallback(
-    async (name: string, slug: string): Promise<TaskProject | null> => {
-      if (!isSupabaseConfigured() || !user) return null;
+    async (name: string, slug: string, shareEnabled = false): Promise<TaskProject | null> => {
+      if (!isSupabaseConfigured()) return null;
+      if (!user) {
+        setError('Nicht bei Supabase angemeldet.');
+        return null;
+      }
 
-      const insert: DbProjectInsert = { owner_id: user.id, name, slug };
+      const insert: DbProjectInsert = {
+        owner_id: user.id,
+        name,
+        slug,
+        share_enabled: shareEnabled,
+      };
 
       const { data, error } = await getSupabaseClient()
         .from('task_projects')
@@ -90,7 +117,19 @@ export function useSupabaseProjects() {
         .select()
         .single();
 
-      if (error || !data) return null;
+      if (error || !data) {
+        const rawMessage = error?.message ?? 'Projekt konnte nicht erstellt werden.';
+        const message = normalizeProjectError(rawMessage);
+        setError(message);
+        logger.warn('createProject failed:', {
+          message: rawMessage,
+          normalizedMessage: message,
+          slug,
+          name,
+          userId: user.id,
+        });
+        return null;
+      }
 
       const project = dbToProject(data as DbProject);
       setProjects((prev) => [...prev, project]);
@@ -105,6 +144,10 @@ export function useSupabaseProjects() {
       updates: { name?: string; slug?: string; shareEnabled?: boolean }
     ): Promise<boolean> => {
       if (!isSupabaseConfigured()) return false;
+      if (!user) {
+        setError('Nicht bei Supabase angemeldet.');
+        return false;
+      }
 
       const dbUpdates: Database['public']['Tables']['task_projects']['Update'] = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
@@ -116,12 +159,23 @@ export function useSupabaseProjects() {
         .update(dbUpdates)
         .eq('id', id);
 
-      if (error) return false;
+      if (error) {
+        const message = normalizeProjectError(error.message);
+        setError(message);
+        logger.warn('updateProject failed:', {
+          id,
+          updates,
+          message: error.message,
+          normalizedMessage: message,
+          userId: user.id,
+        });
+        return false;
+      }
 
       setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
       return true;
     },
-    []
+    [user]
   );
 
   const deleteProject = useCallback(async (id: string): Promise<boolean> => {
@@ -216,6 +270,98 @@ export function useSupabaseProjects() {
     return !error;
   }, []);
 
+  const transferOwnership = useCallback(
+    async (projectId: string, newOwnerUserId: string): Promise<{ error: string | null }> => {
+      if (!isSupabaseConfigured()) return { error: 'Supabase not configured' };
+      if (!user) return { error: 'Nicht bei Supabase angemeldet.' };
+      if (!projectId || !newOwnerUserId) return { error: 'Projekt oder Nutzer fehlt.' };
+      if (newOwnerUserId === user.id) return { error: null };
+
+      const client = getSupabaseClient();
+
+      const { data: existingMember, error: memberLookupError } = await client
+        .from('task_project_members')
+        .select('id, role')
+        .eq('project_id', projectId)
+        .eq('user_id', newOwnerUserId)
+        .maybeSingle();
+
+      if (memberLookupError) {
+        const message = normalizeProjectError(memberLookupError.message);
+        setError(message);
+        return { error: message };
+      }
+
+      if (!existingMember) {
+        const { error: insertError } = await client
+          .from('task_project_members')
+          .insert({ project_id: projectId, user_id: newOwnerUserId, role: 'owner' });
+        if (insertError) {
+          const message = normalizeProjectError(insertError.message);
+          setError(message);
+          return { error: message };
+        }
+      } else if (existingMember.role !== 'owner') {
+        const { error: promoteError } = await client
+          .from('task_project_members')
+          .update({ role: 'owner' })
+          .eq('id', existingMember.id);
+        if (promoteError) {
+          const message = normalizeProjectError(promoteError.message);
+          setError(message);
+          return { error: message };
+        }
+      }
+
+      const { error: demoteOldOwnerError } = await client
+        .from('task_project_members')
+        .update({ role: 'editor' })
+        .eq('project_id', projectId)
+        .eq('user_id', user.id)
+        .eq('role', 'owner');
+
+      if (demoteOldOwnerError) {
+        const message = normalizeProjectError(demoteOldOwnerError.message);
+        setError(message);
+        return { error: message };
+      }
+
+      const { error: ownerUpdateError } = await client
+        .from('task_projects')
+        .update({ owner_id: newOwnerUserId })
+        .eq('id', projectId)
+        .eq('owner_id', user.id);
+
+      if (ownerUpdateError) {
+        const message = normalizeProjectError(ownerUpdateError.message);
+        setError(message);
+        logger.warn('transferOwnership failed:', {
+          projectId,
+          oldOwnerId: user.id,
+          newOwnerUserId,
+          message: ownerUpdateError.message,
+          normalizedMessage: message,
+        });
+        // Best-effort rollback for old owner role label.
+        await client
+          .from('task_project_members')
+          .update({ role: 'owner' })
+          .eq('project_id', projectId)
+          .eq('user_id', user.id)
+          .eq('role', 'editor');
+        return { error: message };
+      }
+
+      setProjects((prev) =>
+        prev.map((project) =>
+          project.id === projectId ? { ...project, ownerId: newOwnerUserId } : project
+        )
+      );
+      return { error: null };
+    },
+    [user]
+  );
+
   return {
     projects,
     loading,
@@ -228,5 +374,6 @@ export function useSupabaseProjects() {
     addMember,
     updateMemberRole,
     removeMember,
+    transferOwnership,
   };
 }

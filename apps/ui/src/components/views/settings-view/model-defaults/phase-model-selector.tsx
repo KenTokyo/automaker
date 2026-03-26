@@ -659,6 +659,19 @@ export function PhaseModelSelector({
     enabledProviders,
   ]);
 
+  const selectedReasoningBadgeLabel = useMemo(() => {
+    if (selectedReasoningEffort === 'none') {
+      return null;
+    }
+
+    const isCodexModelSelected = transformedCodexModels.some((model) => model.id === selectedModel);
+    if (!isCodexModelSelected || !codexModelHasThinking(selectedModel as CodexModelId)) {
+      return null;
+    }
+
+    return REASONING_EFFORT_LABELS[selectedReasoningEffort];
+  }, [selectedModel, selectedReasoningEffort, transformedCodexModels]);
+
   // Compute grouped vs standalone Cursor models
   const { groupedModels, standaloneCursorModels } = useMemo(() => {
     const grouped: GroupedModel[] = [];
@@ -2160,9 +2173,16 @@ export function PhaseModelSelector({
       data-testid="model-selector"
     >
       {currentModel?.icon && <currentModel.icon className="h-3 w-3 text-muted-foreground/70" />}
-      <span className="truncate text-[11px]">
-        {currentModel?.label?.replace('Claude ', '') || 'Select model...'}
-      </span>
+      <div className="min-w-0 flex flex-1 items-center gap-1">
+        <span className="truncate text-[11px]">
+          {currentModel?.label?.replace('Claude ', '') || 'Select model...'}
+        </span>
+        {selectedReasoningBadgeLabel && (
+          <span className="shrink-0 text-[10px] text-muted-foreground">
+            ({selectedReasoningBadgeLabel})
+          </span>
+        )}
+      </div>
       <ChevronsUpDown className="ml-0.5 h-2.5 w-2.5 shrink-0 opacity-50" />
     </Button>
   );
@@ -2182,6 +2202,11 @@ export function PhaseModelSelector({
       <div className="flex items-center gap-2 truncate">
         {currentModel?.icon && <currentModel.icon className="h-4 w-4 text-muted-foreground/70" />}
         <span className="truncate text-sm">{currentModel?.label || 'Select model...'}</span>
+        {selectedReasoningBadgeLabel && (
+          <span className="shrink-0 text-xs text-muted-foreground">
+            ({selectedReasoningBadgeLabel})
+          </span>
+        )}
       </div>
       <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
     </Button>

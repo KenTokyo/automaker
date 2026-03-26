@@ -56,5 +56,9 @@ export const SIDEBAR_FEATURE_FLAGS = {
   hideWiki: import.meta.env.VITE_HIDE_WIKI === 'true',
   hideRunningAgents: import.meta.env.VITE_HIDE_RUNNING_AGENTS === 'true',
   hideContext: import.meta.env.VITE_HIDE_CONTEXT === 'true',
-  hideSpecEditor: import.meta.env.VITE_HIDE_SPEC_EDITOR === 'true',
+  // Legacy Views sind standardmäßig ausgeblendet, damit die App schlanker startet.
+  // Mit VITE_HIDE_*='false' kann man sie bei Bedarf wieder sichtbar machen.
+  hideSpecEditor: import.meta.env.VITE_HIDE_SPEC_EDITOR !== 'false',
+  hideBoard: import.meta.env.VITE_HIDE_BOARD !== 'false',
+  hideGraph: import.meta.env.VITE_HIDE_GRAPH !== 'false',
 } as const;

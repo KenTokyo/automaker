@@ -312,7 +312,7 @@ export function AgentHeader({
     <>
       <div
         className={cn(
-          'relative z-50 flex items-center justify-between px-4 py-2.5 border-b backdrop-blur-sm',
+          'relative z-50 flex flex-wrap items-center justify-between gap-y-1 px-4 py-2.5 border-b backdrop-blur-sm',
           !hasCustomStyling && 'border-border bg-card/50'
         )}
         style={{
@@ -659,7 +659,7 @@ export function AgentHeader({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {worktreeActions && (
             <WorktreeActionsDropdown
               worktree={worktreeActions.mainWorktree}

@@ -95,6 +95,7 @@ interface KanbanTaskCardProps {
   onUpdateTask: (id: string, updates: UpdateTaskInput) => Promise<SupabaseTask | null>;
   onDeleteTask: (id: string) => Promise<boolean>;
   onEditTask?: (task: SupabaseTask) => void;
+  showSendToAgent?: boolean;
 }
 
 export function KanbanTaskCard({
@@ -102,6 +103,7 @@ export function KanbanTaskCard({
   onUpdateTask,
   onDeleteTask,
   onEditTask,
+  showSendToAgent = true,
 }: KanbanTaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -289,12 +291,14 @@ export function KanbanTaskCard({
 
             <div className="flex items-center gap-0.5">
               {/* Send to Agent */}
-              <SupabaseTaskSendToAgent
-                task={task}
-                onStatusChange={(id, status) => {
-                  void onUpdateTask(id, { status: status as TaskStatus });
-                }}
-              />
+              {showSendToAgent && (
+                <SupabaseTaskSendToAgent
+                  task={task}
+                  onStatusChange={(id, status) => {
+                    void onUpdateTask(id, { status: status as TaskStatus });
+                  }}
+                />
+              )}
 
               {/* Edit */}
               {onEditTask && (

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build:packages && npm run build --workspace=apps/kanban-web",
+  "outputDirectory": "apps/kanban-web/dist",
+  "installCommand": "npm install --ignore-scripts && node scripts/fix-lockfile-urls.mjs || true",
+  "framework": "vite",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
