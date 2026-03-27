@@ -129,6 +129,52 @@ Wenn ein Task an den Agent gesendet wird, soll der Ablauf sauber sein:
 
 ---
 
+## Phase 6 – Hotfix: DB-Task-Status wirklich speichern
+
+- [x] `TaskCard` gibt die echte Quelle (`file` oder `supabase`) an den Send-Flow weiter
+- [x] `TaskSendToAgent` setzt den Bridge-Kontext abhängig von der Quelle
+- [x] Laufstatus-Badges nutzen denselben Schlüssel wie der Send-Flow
+
+**Dateien:**
+
+- `apps/ui/src/components/session-manager/task-card.tsx`
+- `apps/ui/src/components/session-manager/task-send-to-agent.tsx`
+- `apps/ui/src/components/session-manager/tasks-panel.tsx`
+
+**Abnahme:**
+
+- In DB-Modus (`DB` Badge) setzt `Sofort starten` den Task wieder zuverlässig auf `in_progress`.
+
+**Status (2026-03-26):**
+
+- Erledigt. Der falsche File-Branch bei DB-Tasks wurde entfernt.
+- `Task-Status konnte nicht gespeichert werden` tritt bei normalem DB-Flow nicht mehr auf.
+
+---
+
+## Phase 7 – Hotfix: DOM-Fehler + bessere Fehlerdiagnose
+
+- [x] `<button>`-in-`<button>` im Fertig-Panel entfernt
+- [x] Header bleibt per Tastatur bedienbar (Enter/Leertaste)
+- [x] Zusätzliche Debug-Logs für Task-Status-Sync eingebaut
+
+**Dateien:**
+
+- `apps/ui/src/components/session-manager/completed-task-project-group.tsx`
+- `apps/ui/src/components/views/agent-view.tsx`
+
+**Abnahme:**
+
+- Keine React-Warnung mehr zu verschachtelten Buttons.
+- Bei zukünftigen Sync-Problemen steht im Log klar, welcher Pfad gescheitert ist.
+
+**Status (2026-03-26):**
+
+- Erledigt. Der Hydration-/DOM-Warnhinweis ist behoben.
+- TaskBridge schreibt jetzt strukturierte Warn-/Fehlerlogs für beide Sync-Schritte.
+
+---
+
 ## Pflicht-Check pro Phase
 
 1. TypeScript prüfen: `npm run type-check`
@@ -141,4 +187,4 @@ Wenn ein Task an den Agent gesendet wird, soll der Ablauf sauber sein:
 
 ## Gesamtstatus
 
-- Alle 5 Phasen sind am 2026-03-26 umgesetzt und im Code integriert.
+- Alle 7 Phasen sind am 2026-03-26 umgesetzt und im Code integriert.

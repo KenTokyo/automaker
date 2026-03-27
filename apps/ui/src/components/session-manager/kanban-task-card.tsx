@@ -20,6 +20,14 @@ import type { SupabaseTask, UpdateTaskInput } from '@/hooks/use-supabase-tasks';
 import type { TaskStatus } from '@/lib/supabase-types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import {
   useTaskChatBridgeStore,
@@ -144,6 +152,7 @@ export function KanbanTaskCard({
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const { attachments } = useTaskAttachments(task.id);
   const attachmentCount = attachments.length;
 
@@ -180,210 +189,258 @@ export function KanbanTaskCard({
       await onDeleteTask(task.id);
     } finally {
       setDeleting(false);
+      setShowDeleteDialog(false);
     }
   }, [task.id, onDeleteTask, deleting]);
 
   const isCompleted = task.status === 'completed';
 
   return (
-    <div
-      className={cn(
-        'group rounded-lg border border-white/5 bg-zinc-900/80 p-2.5 transition-all duration-150',
-        'hover:border-white/10 hover:bg-zinc-900',
-        'cursor-pointer',
-        isCompleted && 'opacity-60'
-      )}
-      onClick={() => setExpanded((v) => !v)}
-    >
-      {/* Title row */}
-      <div className="flex items-start gap-2">
-        {/* Priority dot */}
-        {task.priority && (
+    <>
+      <div
+        className={cn(
+          'group rounded-lg border border-white/5 bg-zinc-900/80 p-2.5 transition-all duration-150',
+          'hover:border-white/10 hover:bg-zinc-900',
+          'cursor-pointer',
+          isCompleted && 'opacity-60'
+        )}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        {/* Title row */}
+        <div className="flex items-start gap-2">
+          {/* Priority dot */}
+          {task.priority && (
+            <span
+              className={cn(
+                'mt-1 h-2 w-2 shrink-0 rounded-full',
+                PRIORITY_DOT_COLORS[task.priority] ?? 'bg-zinc-600'
+              )}
+              title={`Prioritaet: ${task.priority}`}
+            />
+          )}
+
           <span
             className={cn(
-              'mt-1 h-2 w-2 shrink-0 rounded-full',
-              PRIORITY_DOT_COLORS[task.priority] ?? 'bg-zinc-600'
-            )}
-            title={`Prioritaet: ${task.priority}`}
-          />
-        )}
-
-        <span
-          className={cn(
-            'min-w-0 flex-1 text-sm font-medium leading-tight text-zinc-300',
-            isCompleted && 'line-through text-zinc-600'
-          )}
-        >
-          {task.title}
-        </span>
-
-        {/* Expand indicator */}
-        <span className="shrink-0 text-zinc-600">
-          {expanded ? (
-            <ChevronUp className="h-3.5 w-3.5" />
-          ) : (
-            <ChevronDown className="h-3.5 w-3.5" />
-          )}
-        </span>
-      </div>
-
-      {/* Badges: priority + tags */}
-      <div className="mt-1.5 flex flex-wrap gap-1">
-        {executionBadge && (
-          <Badge size="sm" className={cn('gap-0.5 border', executionBadge.className)}>
-            {executionBadge.label}
-          </Badge>
-        )}
-
-        {task.priority && (
-          <Badge
-            size="sm"
-            className={cn(
-              'gap-0.5 border',
-              PRIORITY_BADGE_COLORS[task.priority] ??
-                'text-zinc-500 bg-zinc-800/50 border-zinc-700/30'
+              'min-w-0 flex-1 text-sm font-medium leading-tight text-zinc-300',
+              isCompleted && 'line-through text-zinc-600'
             )}
           >
-            {task.priority}
-          </Badge>
-        )}
-        {task.tags.map((tag) => (
-          <Badge
-            key={tag}
-            variant="outline"
-            size="sm"
-            className="bg-zinc-800/50 text-zinc-400 border-zinc-700/30"
-          >
-            {tag}
-          </Badge>
-        ))}
-      </div>
+            {task.title}
+          </span>
 
-      {/* Date row + attachment count */}
-      <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-zinc-600">
-        <div className="flex items-center gap-1">
-          <Clock className="h-2.5 w-2.5" />
-          <span>{formatRelativeTime(task.createdAt)}</span>
+          {/* Time badge (right-aligned) */}
+          <span className="shrink-0 flex items-center gap-1 rounded-md bg-zinc-800/60 px-1.5 py-0.5 text-[10px] text-zinc-500">
+            <Clock className="h-2.5 w-2.5" />
+            {formatRelativeTime(task.createdAt)}
+          </span>
+
+          {/* Expand indicator */}
+          <span className="shrink-0 text-zinc-600">
+            {expanded ? (
+              <ChevronUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
+            )}
+          </span>
         </div>
-        {attachmentCount > 0 && <AttachmentCountBadge count={attachmentCount} />}
-      </div>
 
-      {/* Expanded detail view */}
-      {expanded && (
+        {/* Badges: priority + tags + attachments */}
+        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+          {executionBadge && (
+            <Badge size="sm" className={cn('gap-0.5 border', executionBadge.className)}>
+              {executionBadge.label}
+            </Badge>
+          )}
+
+          {task.priority && (
+            <Badge
+              size="sm"
+              className={cn(
+                'gap-0.5 border',
+                PRIORITY_BADGE_COLORS[task.priority] ??
+                  'text-zinc-500 bg-zinc-800/50 border-zinc-700/30'
+              )}
+            >
+              {task.priority}
+            </Badge>
+          )}
+          {task.tags.map((tag) => (
+            <Badge
+              key={tag}
+              variant="outline"
+              size="sm"
+              className="bg-zinc-800/50 text-zinc-400 border-zinc-700/30"
+            >
+              {tag}
+            </Badge>
+          ))}
+          {attachmentCount > 0 && <AttachmentCountBadge count={attachmentCount} />}
+        </div>
+
+        {/* Description preview (3 lines, collapsed) */}
+        {task.description && !expanded && (
+          <p className="mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-zinc-500 line-clamp-3">
+            {task.description}
+          </p>
+        )}
+
+        {/* Action icons row (always visible) */}
         <div
-          className="mt-2 space-y-2 border-t border-white/5 pt-2"
+          className="mt-1.5 flex items-center justify-end gap-0.5"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Description */}
-          {task.description && (
-            <p className="text-xs leading-relaxed text-zinc-400">{task.description}</p>
+          {/* Edit */}
+          {onEditTask && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-zinc-600 hover:text-violet-400 hover:bg-violet-500/10"
+              onClick={() => onEditTask(task)}
+              title="Task bearbeiten"
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
           )}
 
-          {/* Summary / Details */}
-          {task.summary && (
-            <div className="rounded-md border border-white/5 bg-zinc-800/30 p-2">
-              <p className="mb-0.5 text-[10px] font-medium text-zinc-500">Details</p>
-              <p className="whitespace-pre-wrap text-xs text-zinc-400">{task.summary}</p>
-            </div>
-          )}
+          {/* Delete */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10"
+            onClick={() => setShowDeleteDialog(true)}
+            title="Task loeschen"
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
 
-          {executionState?.state === 'failed' && executionState.errorMessage && (
-            <div className="rounded-md border border-rose-500/20 bg-rose-500/5 p-2">
-              <p className="text-[10px] font-medium text-rose-400">Fehlgeschlagen</p>
-              <p className="mt-0.5 text-xs text-rose-300">{executionState.errorMessage}</p>
-            </div>
-          )}
+        {/* Expanded detail view */}
+        {expanded && (
+          <div
+            className="mt-2 space-y-2 border-t border-white/5 pt-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Description (full) */}
+            {task.description && (
+              <p className="whitespace-pre-wrap text-xs leading-relaxed text-zinc-400">
+                {task.description}
+              </p>
+            )}
 
-          {/* Attachments */}
-          {attachmentCount > 0 && (
-            <div className="space-y-1">
-              <p className="text-[10px] font-medium text-zinc-500">Anhaenge</p>
-              <TaskAttachmentPreview taskId={task.id} editable />
-            </div>
-          )}
+            {/* Summary / Details */}
+            {task.summary && (
+              <div className="rounded-md border border-white/5 bg-zinc-800/30 p-2">
+                <p className="mb-0.5 text-[10px] font-medium text-zinc-500">Details</p>
+                <p className="whitespace-pre-wrap text-xs text-zinc-400">{task.summary}</p>
+              </div>
+            )}
 
-          {/* Status change + action buttons */}
-          <div className="flex items-center justify-between gap-1">
-            <div className="flex items-center gap-1">
-              {/* Move left (previous status) */}
-              {prevStatus && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={cn(
-                    'h-6 gap-1 px-2 text-[10px] border-white/5 bg-zinc-800/50',
-                    prevStatus === 'todo' &&
-                      'text-cyan-400 hover:bg-cyan-500/10 hover:border-cyan-500/20',
-                    prevStatus === 'in_progress' &&
-                      'text-orange-400 hover:bg-orange-500/10 hover:border-orange-500/20'
-                  )}
-                  onClick={() => void handleStatusChange(prevStatus)}
-                  disabled={updating}
-                  title={`Verschieben nach ${STATUS_LABELS[prevStatus]}`}
-                >
-                  <ArrowLeft className="h-3 w-3" />
-                  {STATUS_LABELS[prevStatus]}
-                </Button>
-              )}
+            {executionState?.state === 'failed' && executionState.errorMessage && (
+              <div className="rounded-md border border-rose-500/20 bg-rose-500/5 p-2">
+                <p className="text-[10px] font-medium text-rose-400">Fehlgeschlagen</p>
+                <p className="mt-0.5 text-xs text-rose-300">{executionState.errorMessage}</p>
+              </div>
+            )}
 
-              {/* Move right (next status) */}
-              {nextStatus && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={cn(
-                    'h-6 gap-1 px-2 text-[10px] border-white/5 bg-zinc-800/50',
-                    nextStatus === 'in_progress' &&
-                      'text-orange-400 hover:bg-orange-500/10 hover:border-orange-500/20',
-                    nextStatus === 'completed' &&
-                      'text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/20'
-                  )}
-                  onClick={() => void handleStatusChange(nextStatus)}
-                  disabled={updating}
-                  title={`Verschieben nach ${STATUS_LABELS[nextStatus]}`}
-                >
-                  {STATUS_LABELS[nextStatus]}
-                  <ArrowRight className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
+            {/* Attachments */}
+            {attachmentCount > 0 && (
+              <div className="space-y-1">
+                <p className="text-[10px] font-medium text-zinc-500">Anhaenge</p>
+                <TaskAttachmentPreview taskId={task.id} editable />
+              </div>
+            )}
 
-            <div className="flex items-center gap-0.5">
-              {/* Send to Agent */}
-              {showSendToAgent && <SupabaseTaskSendToAgent task={task} />}
-
-              {/* Edit */}
-              {onEditTask && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 text-zinc-600 hover:text-violet-400 hover:bg-violet-500/10"
-                  onClick={() => onEditTask(task)}
-                  title="Task bearbeiten"
-                >
-                  <Pencil className="h-3 w-3" />
-                </Button>
-              )}
-
-              {/* Delete */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10"
-                onClick={() => void handleDelete()}
-                disabled={deleting}
-                title="Task loeschen"
-              >
-                {deleting ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Trash2 className="h-3 w-3" />
+            {/* Status change + action buttons */}
+            <div className="flex items-center justify-between gap-1">
+              <div className="flex items-center gap-1">
+                {/* Move left (previous status) */}
+                {prevStatus && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      'h-6 gap-1 px-2 text-[10px] border-white/5 bg-zinc-800/50',
+                      prevStatus === 'todo' &&
+                        'text-cyan-400 hover:bg-cyan-500/10 hover:border-cyan-500/20',
+                      prevStatus === 'in_progress' &&
+                        'text-orange-400 hover:bg-orange-500/10 hover:border-orange-500/20'
+                    )}
+                    onClick={() => void handleStatusChange(prevStatus)}
+                    disabled={updating}
+                    title={`Verschieben nach ${STATUS_LABELS[prevStatus]}`}
+                  >
+                    <ArrowLeft className="h-3 w-3" />
+                    {STATUS_LABELS[prevStatus]}
+                  </Button>
                 )}
-              </Button>
+
+                {/* Move right (next status) */}
+                {nextStatus && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      'h-6 gap-1 px-2 text-[10px] border-white/5 bg-zinc-800/50',
+                      nextStatus === 'in_progress' &&
+                        'text-orange-400 hover:bg-orange-500/10 hover:border-orange-500/20',
+                      nextStatus === 'completed' &&
+                        'text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/20'
+                    )}
+                    onClick={() => void handleStatusChange(nextStatus)}
+                    disabled={updating}
+                    title={`Verschieben nach ${STATUS_LABELS[nextStatus]}`}
+                  >
+                    {STATUS_LABELS[nextStatus]}
+                    <ArrowRight className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-0.5">
+                {/* Send to Agent */}
+                {showSendToAgent && <SupabaseTaskSendToAgent task={task} />}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Task loeschen</DialogTitle>
+            <DialogDescription>
+              Bist du sicher, dass du <strong>"{task.title}"</strong> loeschen moechtest? Diese
+              Aktion kann nicht rueckgaengig gemacht werden.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeleteDialog(false)}
+              className="border-white/10 bg-zinc-900 text-zinc-300 hover:bg-zinc-800"
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
+              onClick={() => void handleDelete()}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+              ) : (
+                <Trash2 className="mr-1.5 h-3 w-3" />
+              )}
+              Loeschen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

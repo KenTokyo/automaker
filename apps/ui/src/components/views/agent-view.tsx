@@ -943,12 +943,24 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
   const syncTaskInProgressAfterSend = useCallback(
     async (
-      context: { source: 'file' | 'supabase'; taskId: string; projectPath?: string },
+      context: {
+        source: 'file' | 'supabase';
+        taskId: string;
+        projectPath?: string;
+        projectId?: string;
+      },
       sessionId: string
     ): Promise<boolean> => {
       try {
         if (context.source === 'supabase') {
-          if (!supabaseUser?.id) return false;
+          if (!supabaseUser?.id) {
+            logger.warn('[TaskBridge] Missing Supabase user for in_progress sync', {
+              taskId: context.taskId,
+              projectId: context.projectId,
+              sessionId,
+            });
+            return false;
+          }
           const updated = await updateSupabaseTaskById(
             context.taskId,
             {
@@ -957,18 +969,46 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
             },
             supabaseUser.id
           );
+          if (!updated) {
+            logger.warn('[TaskBridge] Supabase in_progress sync returned no task', {
+              taskId: context.taskId,
+              projectId: context.projectId,
+              sessionId,
+              userId: supabaseUser.id,
+            });
+          }
           return updated !== null;
         }
 
         const localProjectPath = context.projectPath || currentProject?.path;
-        if (!localProjectPath) return false;
+        if (!localProjectPath) {
+          logger.warn('[TaskBridge] Missing project path for file in_progress sync', {
+            taskId: context.taskId,
+            sessionId,
+          });
+          return false;
+        }
 
         const updated = await updateFileTask(context.taskId, localProjectPath, {
           status: 'in_progress',
         });
+        if (!updated) {
+          logger.warn('[TaskBridge] File in_progress sync returned no task', {
+            taskId: context.taskId,
+            projectPath: localProjectPath,
+            sessionId,
+          });
+        }
         return updated !== null;
       } catch (error) {
-        logger.error('[TaskBridge] Failed to sync in_progress status after send', error);
+        logger.error('[TaskBridge] Failed to sync in_progress status after send', {
+          error,
+          source: context.source,
+          taskId: context.taskId,
+          projectPath: context.projectPath,
+          projectId: context.projectId,
+          sessionId,
+        });
         return false;
       }
     },
@@ -977,13 +1017,25 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
   const syncTaskCompletedAfterRun = useCallback(
     async (
-      context: { source: 'file' | 'supabase'; taskId: string; projectPath?: string },
+      context: {
+        source: 'file' | 'supabase';
+        taskId: string;
+        projectPath?: string;
+        projectId?: string;
+      },
       sessionId: string,
       completedNotes: string
     ): Promise<boolean> => {
       try {
         if (context.source === 'supabase') {
-          if (!supabaseUser?.id) return false;
+          if (!supabaseUser?.id) {
+            logger.warn('[TaskBridge] Missing Supabase user for completed sync', {
+              taskId: context.taskId,
+              projectId: context.projectId,
+              sessionId,
+            });
+            return false;
+          }
           const updated = await updateSupabaseTaskById(
             context.taskId,
             {
@@ -993,19 +1045,47 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
             },
             supabaseUser.id
           );
+          if (!updated) {
+            logger.warn('[TaskBridge] Supabase completed sync returned no task', {
+              taskId: context.taskId,
+              projectId: context.projectId,
+              sessionId,
+              userId: supabaseUser.id,
+            });
+          }
           return updated !== null;
         }
 
         const localProjectPath = context.projectPath || currentProject?.path;
-        if (!localProjectPath) return false;
+        if (!localProjectPath) {
+          logger.warn('[TaskBridge] Missing project path for file completed sync', {
+            taskId: context.taskId,
+            sessionId,
+          });
+          return false;
+        }
 
         const updated = await updateFileTask(context.taskId, localProjectPath, {
           status: 'done',
           summary: completedNotes,
         });
+        if (!updated) {
+          logger.warn('[TaskBridge] File completed sync returned no task', {
+            taskId: context.taskId,
+            projectPath: localProjectPath,
+            sessionId,
+          });
+        }
         return updated !== null;
       } catch (error) {
-        logger.error('[TaskBridge] Failed to sync completed status after run', error);
+        logger.error('[TaskBridge] Failed to sync completed status after run', {
+          error,
+          source: context.source,
+          taskId: context.taskId,
+          projectPath: context.projectPath,
+          projectId: context.projectId,
+          sessionId,
+        });
         return false;
       }
     },
@@ -1100,6 +1180,13 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
           currentSessionId
         );
         if (!didSyncStatus) {
+          logger.error('[TaskBridge] in_progress sync failed after successful send', {
+            source: activeTaskContext.source,
+            taskId: activeTaskContext.taskId,
+            projectPath: activeTaskContext.projectPath,
+            projectId: activeTaskContext.projectId,
+            currentSessionId,
+          });
           bridgeState.consumePendingMessage();
           bridgeState.setActiveTaskSession(null);
           bridgeState.setTaskExecutionState(activeTaskContext, {
@@ -1159,6 +1246,13 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
         );
 
         if (!didSyncCompleted) {
+          logger.error('[TaskBridge] completed sync failed after terminal complete event', {
+            source: activeTaskContext.source,
+            taskId: activeTaskContext.taskId,
+            projectPath: activeTaskContext.projectPath,
+            projectId: activeTaskContext.projectId,
+            currentSessionId,
+          });
           bridgeState.setTaskExecutionState(activeTaskContext, {
             state: 'failed',
             updatedAt: Date.now(),

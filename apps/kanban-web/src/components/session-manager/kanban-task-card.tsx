@@ -175,7 +175,9 @@ export function KanbanTaskCard({
         >
           {/* Description */}
           {task.description && (
-            <p className="text-xs leading-relaxed text-zinc-400">{task.description}</p>
+            <p className="whitespace-pre-wrap text-xs leading-relaxed text-zinc-400">
+              {task.description}
+            </p>
           )}
 
           {/* Summary / Details */}

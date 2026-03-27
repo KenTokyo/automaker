@@ -124,9 +124,19 @@ interface TaskCardProps {
   onDelete?: (filename: string) => void;
   onEdit?: (task: Task) => void;
   fontSize?: number;
+  source?: 'file' | 'supabase';
+  supabaseProjectId?: string | null;
 }
 
-export function TaskCard({ task, onUpdate, onDelete, onEdit, fontSize = 14 }: TaskCardProps) {
+export function TaskCard({
+  task,
+  onUpdate,
+  onDelete,
+  onEdit,
+  fontSize = 14,
+  source = 'file',
+  supabaseProjectId,
+}: TaskCardProps) {
   const [deleting, setDeleting] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -166,7 +176,7 @@ export function TaskCard({ task, onUpdate, onDelete, onEdit, fontSize = 14 }: Ta
       s.taskExecutionStates[
         getTaskExecutionKey({
           taskId: task.filename,
-          source: 'file',
+          source,
         })
       ] ?? null
   );
@@ -230,7 +240,7 @@ export function TaskCard({ task, onUpdate, onDelete, onEdit, fontSize = 14 }: Ta
         {/* Action buttons (visible on hover) */}
         <div className="flex shrink-0 items-center gap-0.5">
           {/* Send to Agent button */}
-          <TaskSendToAgent task={task} />
+          <TaskSendToAgent task={task} source={source} supabaseProjectId={supabaseProjectId} />
 
           {/* Status cycle button */}
           <Button

@@ -68,16 +68,27 @@ export function CompletedTaskProjectGroup({
     onCleanupProject(projectPath, tasksToDelete);
   };
 
+  const handleHeaderKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onToggleExpanded();
+    }
+  };
+
   return (
     <div className="mb-1">
       {/* Project header - clickable tree node */}
-      <button
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
         className={cn(
           'flex w-full items-center gap-1 rounded-md px-1.5 py-1 text-left',
           'transition-colors duration-150 hover:bg-accent/50',
           'group/project-header cursor-pointer select-none'
         )}
         onClick={onToggleExpanded}
+        onKeyDown={handleHeaderKeyDown}
       >
         <ChevronRight
           className={cn(
@@ -111,7 +122,7 @@ export function CompletedTaskProjectGroup({
         <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[9px] tabular-nums text-muted-foreground">
           {tasks.length}
         </span>
-      </button>
+      </div>
 
       {/* Collapsible task list */}
       <div
@@ -136,6 +147,7 @@ export function CompletedTaskProjectGroup({
             {/* Show more button */}
             {hasMore && (
               <button
+                type="button"
                 className={cn(
                   'flex w-full items-center justify-center gap-1 rounded-md py-1',
                   'text-[10px] text-muted-foreground hover:bg-accent/40 hover:text-foreground',

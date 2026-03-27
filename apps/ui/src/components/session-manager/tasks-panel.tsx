@@ -551,6 +551,8 @@ export function TasksPanel({ projectPath }: TasksPanelProps) {
                 <TaskCard
                   key={`${task.projectPath || ''}:${task.filename}`}
                   task={task}
+                  source={source}
+                  supabaseProjectId={supabaseProjectId}
                   fontSize={sessionFontSize}
                   onUpdate={(fn, updates) => void handleUpdate(fn, updates)}
                   onDelete={(fn) => void handleDelete(fn)}

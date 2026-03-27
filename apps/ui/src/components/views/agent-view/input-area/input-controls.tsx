@@ -19,6 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import { AgentModelSelector } from '../shared/agent-model-selector';
 import { AgentPromptsSelector } from './agent-prompts-selector';
+import { FavoriteAgentButtons } from './favorite-agent-buttons';
 import { TimeLimiterSettings } from './time-limiter-settings';
 import { OrchestratorSettings } from './orchestrator-settings';
 import { CompletedTasksToggle } from './completed-tasks-toggle';
@@ -649,6 +650,9 @@ export function InputControls({
             isContextUsageMeasured={isContextUsageMeasured}
             contextUsagePercent={contextUsagePercent}
           />
+
+          {/* Favorite Agent Quick Toggles */}
+          <FavoriteAgentButtons disabled={!isConnected} />
 
           {/* Stop Button (only when processing) */}
           {isProcessing && (

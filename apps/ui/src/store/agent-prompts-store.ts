@@ -18,6 +18,8 @@ const logger = createLogger('AgentPromptsStore');
 
 // Storage key for selected prompts (persisted locally)
 const SELECTED_PROMPTS_KEY = 'automaker:selected-agent-prompts';
+// Storage key for favorite prompt keys (persisted locally)
+const FAVORITE_PROMPTS_KEY = 'automaker:favorite-agent-prompts';
 
 export type AgentPromptScope = 'global' | 'local';
 
@@ -46,6 +48,8 @@ interface AgentPromptsState {
   localPrompts: AgentPrompt[];
   // Selected prompt keys (format: "scope:id")
   selectedPromptKeys: string[];
+  // Favorite prompt keys (format: "scope:id") – shown as quick-toggle buttons
+  favoritePromptKeys: string[];
   isLoading: boolean;
   error: string | null;
   projectPath: string | null;
@@ -70,6 +74,12 @@ interface AgentPromptsState {
   getAllPrompts: () => AgentPrompt[];
   /** Check if a prompt is selected */
   isSelected: (id: string, scope: AgentPromptScope) => boolean;
+  /** Toggle a prompt as favorite (shown as quick-toggle button) */
+  toggleFavorite: (id: string, scope: AgentPromptScope) => void;
+  /** Check if a prompt is favorited */
+  isFavorite: (id: string, scope: AgentPromptScope) => boolean;
+  /** Get favorite prompts sorted by their key order */
+  getFavoritePrompts: () => AgentPrompt[];
 }
 
 function loadSelectedKeys(): string[] {
@@ -93,10 +103,29 @@ function saveSelectedKeys(keys: string[]): void {
   setItem(SELECTED_PROMPTS_KEY, JSON.stringify(keys));
 }
 
+function loadFavoriteKeys(): string[] {
+  const stored = getItem(FAVORITE_PROMPTS_KEY);
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) return parsed;
+      return [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function saveFavoriteKeys(keys: string[]): void {
+  setItem(FAVORITE_PROMPTS_KEY, JSON.stringify(keys));
+}
+
 export const useAgentPromptsStore = create<AgentPromptsState>((set, get) => ({
   globalPrompts: [],
   localPrompts: [],
   selectedPromptKeys: loadSelectedKeys(),
+  favoritePromptKeys: loadFavoriteKeys(),
   isLoading: false,
   error: null,
   projectPath: null,
@@ -141,7 +170,7 @@ export const useAgentPromptsStore = create<AgentPromptsState>((set, get) => ({
       set({ globalPrompts, localPrompts, isLoading: false });
 
       // Clean up selected keys that no longer exist
-      const { selectedPromptKeys } = get();
+      const { selectedPromptKeys, favoritePromptKeys } = get();
       const allKeys = new Set([
         ...globalPrompts.map((p) => getPromptKey('global', p.id)),
         ...localPrompts.map((p) => getPromptKey('local', p.id)),
@@ -150,6 +179,12 @@ export const useAgentPromptsStore = create<AgentPromptsState>((set, get) => ({
       if (cleanedKeys.length !== selectedPromptKeys.length) {
         set({ selectedPromptKeys: cleanedKeys });
         saveSelectedKeys(cleanedKeys);
+      }
+      // Clean up favorite keys that no longer exist
+      const cleanedFavKeys = favoritePromptKeys.filter((k) => allKeys.has(k));
+      if (cleanedFavKeys.length !== favoritePromptKeys.length) {
+        set({ favoritePromptKeys: cleanedFavKeys });
+        saveFavoriteKeys(cleanedFavKeys);
       }
     } catch (err) {
       logger.error('Failed to load prompts:', err);
@@ -242,7 +277,20 @@ export const useAgentPromptsStore = create<AgentPromptsState>((set, get) => ({
         saveSelectedKeys(updatedKeys);
       }
 
-      set({ [arrayKey]: updatedArray, selectedPromptKeys: updatedKeys, error: null });
+      // Update favorites if ID changed
+      const { favoritePromptKeys } = get();
+      let updatedFavKeys = favoritePromptKeys;
+      if (oldKey !== newKey && favoritePromptKeys.includes(oldKey)) {
+        updatedFavKeys = favoritePromptKeys.map((k) => (k === oldKey ? newKey : k));
+        saveFavoriteKeys(updatedFavKeys);
+      }
+
+      set({
+        [arrayKey]: updatedArray,
+        selectedPromptKeys: updatedKeys,
+        favoritePromptKeys: updatedFavKeys,
+        error: null,
+      });
       return true;
     } catch (err) {
       logger.error('Failed to update prompt:', err);
@@ -273,9 +321,16 @@ export const useAgentPromptsStore = create<AgentPromptsState>((set, get) => ({
       const currentArray = get()[arrayKey];
       const updatedArray = currentArray.filter((p) => p.id !== id);
       const updatedKeys = selectedPromptKeys.filter((k) => k !== key);
+      const updatedFavKeys = get().favoritePromptKeys.filter((k) => k !== key);
 
-      set({ [arrayKey]: updatedArray, selectedPromptKeys: updatedKeys, error: null });
+      set({
+        [arrayKey]: updatedArray,
+        selectedPromptKeys: updatedKeys,
+        favoritePromptKeys: updatedFavKeys,
+        error: null,
+      });
       saveSelectedKeys(updatedKeys);
+      saveFavoriteKeys(updatedFavKeys);
 
       return true;
     } catch (err) {
@@ -351,5 +406,37 @@ export const useAgentPromptsStore = create<AgentPromptsState>((set, get) => ({
 
   isSelected: (id, scope) => {
     return get().selectedPromptKeys.includes(getPromptKey(scope, id));
+  },
+
+  toggleFavorite: (id, scope) => {
+    const key = getPromptKey(scope, id);
+    const { favoritePromptKeys } = get();
+
+    // Verify prompt exists
+    const allPrompts = get().getAllPrompts();
+    if (!allPrompts.some((p) => p.id === id && p.scope === scope)) return;
+
+    let updatedKeys: string[];
+    if (favoritePromptKeys.includes(key)) {
+      updatedKeys = favoritePromptKeys.filter((k) => k !== key);
+    } else {
+      updatedKeys = [...favoritePromptKeys, key];
+    }
+
+    set({ favoritePromptKeys: updatedKeys });
+    saveFavoriteKeys(updatedKeys);
+  },
+
+  isFavorite: (id, scope) => {
+    return get().favoritePromptKeys.includes(getPromptKey(scope, id));
+  },
+
+  getFavoritePrompts: () => {
+    const { globalPrompts, localPrompts, favoritePromptKeys } = get();
+    const allPrompts = [...globalPrompts, ...localPrompts];
+    // Return in the order they were favorited
+    return favoritePromptKeys
+      .map((key) => allPrompts.find((p) => getPromptKey(p.scope, p.id) === key))
+      .filter((p): p is AgentPrompt => p !== undefined);
   },
 }));

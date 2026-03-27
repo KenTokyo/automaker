@@ -25,7 +25,26 @@ import { cn } from '@/lib/utils';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function fileTaskToContext(task: Task): TaskChatContext {
+type TaskSendSource = 'file' | 'supabase';
+
+function taskToContext(
+  task: Task,
+  source: TaskSendSource,
+  supabaseProjectId?: string | null
+): TaskChatContext {
+  if (source === 'supabase') {
+    return {
+      taskId: task.filename,
+      title: task.title,
+      description: task.description,
+      summary: task.summary || undefined,
+      source: 'supabase',
+      projectPath: task.projectPath,
+      projectId: supabaseProjectId || undefined,
+      sentAt: Date.now(),
+    };
+  }
+
   return {
     taskId: task.filename,
     title: task.title,
@@ -55,9 +74,15 @@ function supabaseTaskToContext(task: SupabaseTask): TaskChatContext {
 
 interface TaskSendToAgentProps {
   task: Task;
+  source?: TaskSendSource;
+  supabaseProjectId?: string | null;
 }
 
-export function TaskSendToAgent({ task }: TaskSendToAgentProps) {
+export function TaskSendToAgent({
+  task,
+  source = 'file',
+  supabaseProjectId,
+}: TaskSendToAgentProps) {
   const [open, setOpen] = useState(false);
   const [showModelPicker, setShowModelPicker] = useState(false);
   const sendTaskToAgent = useTaskChatBridgeStore((s) => s.sendTaskToAgent);
@@ -66,27 +91,27 @@ export function TaskSendToAgent({ task }: TaskSendToAgentProps) {
   const setSelectedAgentModel = useAppStore((s) => s.setSelectedAgentModel);
 
   const handleQuickSend = useCallback(() => {
-    const ctx = fileTaskToContext(task);
+    const ctx = taskToContext(task, source, supabaseProjectId);
     sendTaskToAgent(ctx);
 
     // Navigate to agent view
     setCurrentView('agent');
     setOpen(false);
     setShowModelPicker(false);
-  }, [task, sendTaskToAgent, setCurrentView]);
+  }, [task, source, supabaseProjectId, sendTaskToAgent, setCurrentView]);
 
   const handleModelSelect = useCallback(
     (entry: PhaseModelEntry) => {
       setSelectedAgentModel(entry);
       // Now do the same as quick-send but with the selected model
-      const ctx = fileTaskToContext(task);
+      const ctx = taskToContext(task, source, supabaseProjectId);
       sendTaskToAgent(ctx);
 
       setCurrentView('agent');
       setOpen(false);
       setShowModelPicker(false);
     },
-    [task, sendTaskToAgent, setCurrentView, setSelectedAgentModel]
+    [task, source, supabaseProjectId, sendTaskToAgent, setCurrentView, setSelectedAgentModel]
   );
 
   const isDone = task.status === 'done';

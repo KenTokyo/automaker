@@ -18,6 +18,7 @@ import {
   Copy,
   Check,
   Search,
+  Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -69,6 +70,8 @@ export const AgentPromptsSelector = memo(function AgentPromptsSelector({
     togglePromptSelection,
     clearSelection,
     isSelected,
+    toggleFavorite,
+    isFavorite,
   } = useAgentPromptsStore();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -214,6 +217,7 @@ export const AgentPromptsSelector = memo(function AgentPromptsSelector({
   const renderPromptItem = (prompt: AgentPrompt) => {
     const key = getPromptKey(prompt.scope, prompt.id);
     const checked = isSelected(prompt.id, prompt.scope);
+    const favorited = isFavorite(prompt.id, prompt.scope);
 
     return (
       <div
@@ -232,12 +236,29 @@ export const AgentPromptsSelector = memo(function AgentPromptsSelector({
             {prompt.prompt.length > 60 ? '...' : ''}
           </p>
         </div>
-        {/* Action buttons - visible on hover */}
-        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Action buttons - star always visible when favorited, rest on hover */}
+        <div className="flex items-center gap-0.5 shrink-0">
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            className={cn(
+              'h-6 w-6 transition-opacity',
+              favorited
+                ? 'text-amber-500 opacity-100'
+                : 'text-muted-foreground hover:text-amber-500 opacity-0 group-hover:opacity-100'
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFavorite(prompt.id, prompt.scope);
+            }}
+            title={favorited ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            <Star className={cn('w-3 h-3', favorited && 'fill-current')} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => handleCopy(prompt, e)}
             title="Copy prompt"
           >
@@ -250,7 +271,7 @@ export const AgentPromptsSelector = memo(function AgentPromptsSelector({
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => handleEdit(prompt, e)}
             title="Edit prompt"
           >
@@ -259,7 +280,7 @@ export const AgentPromptsSelector = memo(function AgentPromptsSelector({
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+            className="h-6 w-6 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => handleDelete(prompt, e)}
             title="Delete prompt"
           >
