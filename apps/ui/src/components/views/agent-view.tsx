@@ -35,11 +35,7 @@ import {
 // Extracted components
 import { NoProjectState, AgentHeader, ChatArea, RightPanelShell } from './agent-view/components';
 import { AgentInputArea } from './agent-view/input-area';
-import {
-  ViewWorktreeChangesDialog,
-  PushToRemoteDialog,
-  MergeWorktreeDialog,
-} from '../views/board-view/dialogs';
+import { PushToRemoteDialog, MergeWorktreeDialog } from '../views/board-view/dialogs';
 import { DevServerLogsPanel } from '../views/board-view/worktree-panel/components';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { TestLogsPanel } from '@/components/ui/test-logs-panel';
@@ -1793,7 +1789,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
             </div>
           </ResizablePanel>
 
-          {/* Right Panel - Desktop (resizable): Browser, Files, Terminal, Dashboard */}
+          {/* Right Panel - Desktop (resizable): Files, Terminal, Übersicht, Git */}
           {browserPanelOpen && currentProject && (
             <>
               <ResizableHandle
@@ -1906,12 +1902,6 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       )}
 
       {/* Worktree Action Dialogs */}
-      <ViewWorktreeChangesDialog
-        open={worktreeActions.viewChangesDialogOpen}
-        onOpenChange={worktreeActions.setViewChangesDialogOpen}
-        worktree={worktreeActions.viewChangesWorktree}
-        projectPath={currentProject.path}
-      />
 
       <ConfirmDialog
         open={worktreeActions.discardChangesDialogOpen}

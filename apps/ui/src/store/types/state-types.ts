@@ -389,7 +389,7 @@ export interface AppState {
   sessionFontSize: number;
 
   // Right Panel State
-  rightPanelMode: RightPanelMode; // Which content the right panel shows ('files' | 'terminal' | 'dashboard')
+  rightPanelMode: RightPanelMode; // Which content the right panel shows ('files' | 'terminal' | 'dashboard' | 'git')
   rightPanelSecondaryMode: RightPanelMode | null; // Secondary panel in split mode (null = no split)
   rightPanelSplitSize: number; // Primary (top) panel percentage when split is active (default 50)
 

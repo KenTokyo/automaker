@@ -70,6 +70,8 @@ export function useAgentWorktreeActions({ projectPath }: UseAgentWorktreeActions
   // Auto-mode state
   const autoModeByWorktree = useAppStore((state) => state.autoModeByWorktree);
   const currentProject = useAppStore((state) => state.currentProject);
+  const setRightPanelMode = useAppStore((state) => state.setRightPanelMode);
+  const setBrowserPanelOpen = useAppStore((state) => state.setBrowserPanelOpen);
 
   const isAutoModeRunning = useCallback((): boolean => {
     if (!currentProject || !mainWorktree) return false;
@@ -128,8 +130,6 @@ export function useAgentWorktreeActions({ projectPath }: UseAgentWorktreeActions
   );
 
   // Dialog states
-  const [viewChangesDialogOpen, setViewChangesDialogOpen] = useState(false);
-  const [viewChangesWorktree, setViewChangesWorktree] = useState<WorktreeInfo | null>(null);
   const [discardChangesDialogOpen, setDiscardChangesDialogOpen] = useState(false);
   const [discardChangesWorktree, setDiscardChangesWorktree] = useState<WorktreeInfo | null>(null);
   const [logPanelOpen, setLogPanelOpen] = useState(false);
@@ -140,6 +140,11 @@ export function useAgentWorktreeActions({ projectPath }: UseAgentWorktreeActions
   const [mergeWorktree, setMergeWorktree] = useState<WorktreeInfo | null>(null);
   const [testLogsPanelOpen, setTestLogsPanelOpen] = useState(false);
   const [testLogsPanelWorktree, setTestLogsPanelWorktree] = useState<WorktreeInfo | null>(null);
+
+  const openGitPanel = useCallback(() => {
+    setBrowserPanelOpen(true);
+    setRightPanelMode('git');
+  }, [setBrowserPanelOpen, setRightPanelMode]);
 
   // Fetch branches when dropdown opens
   const handleActionsDropdownOpenChange = useCallback(
@@ -332,10 +337,12 @@ export function useAgentWorktreeActions({ projectPath }: UseAgentWorktreeActions
   );
 
   // View/Changes handlers
-  const handleViewChanges = useCallback((worktree: WorktreeInfo) => {
-    setViewChangesWorktree(worktree);
-    setViewChangesDialogOpen(true);
-  }, []);
+  const handleViewChanges = useCallback(
+    (_worktree: WorktreeInfo) => {
+      openGitPanel();
+    },
+    [openGitPanel]
+  );
 
   const handleDiscardChanges = useCallback((worktree: WorktreeInfo) => {
     setDiscardChangesWorktree(worktree);
@@ -361,10 +368,13 @@ export function useAgentWorktreeActions({ projectPath }: UseAgentWorktreeActions
     }
   }, [discardChangesWorktree]);
 
-  // Commit handler (no-op in agent view - just shows toast)
-  const handleCommit = useCallback((worktree: WorktreeInfo) => {
-    toast.info('Use the Kanban Board for commit operations');
-  }, []);
+  // Commit handler (opens the Git panel in Agent view)
+  const handleCommit = useCallback(
+    (_worktree: WorktreeInfo) => {
+      openGitPanel();
+    },
+    [openGitPanel]
+  );
 
   // PR handler (no-op in agent view)
   const handleCreatePR = useCallback((worktree: WorktreeInfo) => {
@@ -619,11 +629,9 @@ export function useAgentWorktreeActions({ projectPath }: UseAgentWorktreeActions
     handleStartTests,
     handleStopTests,
     handleViewTestLogs,
+    handleOpenGitPanel: openGitPanel,
 
     // Dialog states
-    viewChangesDialogOpen,
-    setViewChangesDialogOpen,
-    viewChangesWorktree,
     discardChangesDialogOpen,
     setDiscardChangesDialogOpen,
     discardChangesWorktree,

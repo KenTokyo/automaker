@@ -1,7 +1,7 @@
 /**
  * RightPanelShell - Container for the right panel with mode tabs and optional split.
  *
- * Wraps FilesPanel, TerminalView and DashboardPanel.
+ * Wraps FilesPanel, TerminalView, DashboardPanel and GitPanel.
  *
  * Legacy note:
  * BrowserPanel is intentionally disabled for now to reduce UI overhead.
@@ -10,8 +10,8 @@
  * The active mode is stored in app-store (rightPanelMode).
  *
  * Split mode: when rightPanelSecondaryMode is set, the content area
- * splits vertically with a resizable divider.  Each half can show a
- * different panel.  A toggle button in the tab bar activates/deactivates
+ * splits vertically with a resizable divider. Each half can show a
+ * different panel. A toggle button in the tab bar activates/deactivates
  * the split.
  *
  * Each panel section can have its own font-size stepper control.
@@ -20,8 +20,8 @@
  * with tooltips showing the full label.
  */
 
-import { lazy, memo, Suspense, useCallback, useRef, useState, useEffect } from 'react';
-import { BarChart3, Columns2, FolderOpen, Terminal, X } from 'lucide-react';
+import { lazy, memo, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { BarChart3, Columns2, FolderOpen, GitBranch, Terminal, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/store/app-store';
@@ -30,9 +30,10 @@ import { Spinner } from '@/components/ui/spinner';
 import { FontSizeStepper } from '@/components/ui/font-size-stepper';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import type { RightPanelMode } from '@/store/types/ui-types';
-import { RIGHT_PANEL_FONT_SIZE_MIN, RIGHT_PANEL_FONT_SIZE_MAX } from '@/store/types/ui-types';
+import { RIGHT_PANEL_FONT_SIZE_MAX, RIGHT_PANEL_FONT_SIZE_MIN } from '@/store/types/ui-types';
 import { DashboardPanel } from './dashboard-panel';
 import { FilesPanel } from './files-panel';
+import { GitPanel } from './git-panel';
 
 const LazyTerminalView = lazy(async () => {
   const module = await import('@/components/views/terminal-view');
@@ -50,10 +51,11 @@ const MODE_TABS: { mode: RightPanelMode; label: string; icon: LucideIcon }[] = [
   { mode: 'files', label: 'Dateien', icon: FolderOpen },
   { mode: 'terminal', label: 'Terminal', icon: Terminal },
   { mode: 'dashboard', label: 'Übersicht', icon: BarChart3 },
+  { mode: 'git', label: 'Git', icon: GitBranch },
 ];
 
 // ---------------------------------------------------------------------------
-// Panel content renderer (reused for primary & secondary)
+// Panel content renderer (reused for primary and secondary)
 // ---------------------------------------------------------------------------
 
 function PanelContent({ mode, projectPath }: { mode: RightPanelMode; projectPath: string }) {
@@ -74,6 +76,8 @@ function PanelContent({ mode, projectPath }: { mode: RightPanelMode; projectPath
       );
     case 'dashboard':
       return <DashboardPanel />;
+    case 'git':
+      return <GitPanel projectPath={projectPath} />;
     default:
       return null;
   }
@@ -133,6 +137,8 @@ function PanelFontSizeControl({ mode }: { mode: RightPanelMode }) {
           label="Schriftgröße Terminal"
         />
       );
+    case 'git':
+      return null;
     default:
       return null;
   }
@@ -157,7 +163,7 @@ function SecondaryTabBar({
   onClose: () => void;
   iconOnly: boolean;
 }) {
-  // Show all modes including primary – selecting primary's mode swaps the panels
+  // Show all modes including primary - selecting primary mode swaps the panels.
   const availableModes = MODE_TABS;
 
   return (
@@ -181,21 +187,19 @@ function SecondaryTabBar({
             )}
             onClick={() => (isPrimaryMode ? onSwapPanels() : onSelectSecondary(mode))}
           >
-            <Icon className="w-3 h-3 shrink-0" />
+            <Icon className="h-3 w-3 shrink-0" />
             {!iconOnly && label}
           </button>
         );
       })}
 
-      {/* Font size for secondary panel */}
       <div className="ml-auto mr-1">
         <PanelFontSizeControl mode={secondaryMode} />
       </div>
 
-      {/* Close split button */}
       <button
         type="button"
-        className="flex items-center justify-center h-5 w-5 mr-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+        className="mr-1 flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         onClick={onClose}
         title="Aufteilung schließen"
       >
@@ -226,25 +230,23 @@ export const RightPanelShell = memo(function RightPanelShell({
   const toggleRightPanelSplit = useAppStore((s) => s.toggleRightPanelSplit);
 
   const isSplit = rightPanelSecondaryMode != null;
-
-  // Track narrow mode via ResizeObserver
   const containerRef = useRef<HTMLDivElement>(null);
   const [iconOnly, setIconOnly] = useState(false);
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
+    const element = containerRef.current;
+    if (!element) return;
 
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         setIconOnly(entry.contentRect.width < ICON_ONLY_BREAKPOINT);
       }
     });
-    observer.observe(el);
+
+    observer.observe(element);
     return () => observer.disconnect();
   }, []);
 
-  // Handle split resize
   const handleLayout = useCallback(
     (sizes: number[]) => {
       if (sizes[0] != null && Math.abs(sizes[0] - rightPanelSplitSize) > 0.5) {
@@ -261,8 +263,8 @@ export const RightPanelShell = memo(function RightPanelShell({
     [setRightPanelSecondaryMode]
   );
 
-  // Swap primary ↔ secondary: setRightPanelMode already handles the swap
-  // when the new mode equals the current secondary
+  // Swap primary <-> secondary: setRightPanelMode already handles the swap
+  // when the new mode equals the current secondary.
   const handleSwapPanels = useCallback(() => {
     if (!rightPanelSecondaryMode) return;
     setRightPanelMode(rightPanelSecondaryMode);
@@ -275,12 +277,11 @@ export const RightPanelShell = memo(function RightPanelShell({
   return (
     <div
       ref={containerRef}
-      className="h-full flex flex-col overflow-hidden"
+      className="flex h-full flex-col overflow-hidden"
       style={{ minWidth: 220 }}
     >
-      {/* Mode tabs */}
       <div
-        className="flex items-center gap-0 bg-muted/30 border-b border-border shrink-0"
+        className="flex shrink-0 items-center gap-0 border-b border-border bg-muted/30"
         role="tablist"
         aria-label="Rechtes Panel"
       >
@@ -298,27 +299,25 @@ export const RightPanelShell = memo(function RightPanelShell({
                 'flex items-center gap-1.5 py-1.5 text-xs transition-colors',
                 iconOnly ? 'px-2.5' : 'px-3',
                 isActive
-                  ? 'bg-background text-foreground border-b-2 border-b-primary font-medium'
+                  ? 'border-b-2 border-b-primary bg-background font-medium text-foreground'
                   : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
               )}
               onClick={() => setRightPanelMode(mode)}
             >
-              <Icon className="w-3.5 h-3.5 shrink-0" />
+              <Icon className="h-3.5 w-3.5 shrink-0" />
               {!iconOnly && label}
             </button>
           );
         })}
 
-        {/* Font size for primary panel */}
         <div className="ml-auto mr-1">
           <PanelFontSizeControl mode={rightPanelMode} />
         </div>
 
-        {/* Split toggle button */}
         <button
           type="button"
           className={cn(
-            'flex items-center justify-center h-6 w-6 mr-1 rounded transition-colors',
+            'mr-1 flex h-6 w-6 items-center justify-center rounded transition-colors',
             isSplit
               ? 'bg-primary/15 text-primary hover:bg-primary/25'
               : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -327,18 +326,16 @@ export const RightPanelShell = memo(function RightPanelShell({
           title={isSplit ? 'Terminal ausblenden' : 'Terminal unten einblenden'}
           aria-label={isSplit ? 'Terminal ausblenden' : 'Terminal unten einblenden'}
         >
-          <Columns2 className="w-3.5 h-3.5" />
+          <Columns2 className="h-3.5 w-3.5" />
         </button>
       </div>
 
-      {/* Content - single or split */}
       {isSplit ? (
         <ResizablePanelGroup
           direction="vertical"
           onLayout={handleLayout}
-          className="flex-1 min-h-0"
+          className="min-h-0 flex-1"
         >
-          {/* Primary panel (top) */}
           <ResizablePanel defaultSize={rightPanelSplitSize} minSize={15} order={1}>
             <div className="h-full min-h-0 overflow-hidden" role="tabpanel">
               <PanelContent mode={rightPanelMode} projectPath={projectPath} />
@@ -347,14 +344,13 @@ export const RightPanelShell = memo(function RightPanelShell({
 
           <ResizableHandle withHandle aria-label="Trennleiste zwischen den Panels" />
 
-          {/* Secondary panel (bottom) */}
           <ResizablePanel
             defaultSize={100 - rightPanelSplitSize}
             minSize={15}
             maxSize={85}
             order={2}
           >
-            <div className="h-full min-h-0 flex flex-col overflow-hidden">
+            <div className="flex h-full min-h-0 flex-col overflow-hidden">
               <SecondaryTabBar
                 primaryMode={rightPanelMode}
                 secondaryMode={rightPanelSecondaryMode!}
@@ -363,14 +359,14 @@ export const RightPanelShell = memo(function RightPanelShell({
                 onClose={handleCloseSplit}
                 iconOnly={iconOnly}
               />
-              <div className="flex-1 min-h-0 overflow-hidden" role="tabpanel">
+              <div className="min-h-0 flex-1 overflow-hidden" role="tabpanel">
                 <PanelContent mode={rightPanelSecondaryMode!} projectPath={projectPath} />
               </div>
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
       ) : (
-        <div className="flex-1 min-h-0 overflow-hidden" role="tabpanel">
+        <div className="min-h-0 flex-1 overflow-hidden" role="tabpanel">
           <PanelContent mode={rightPanelMode} projectPath={projectPath} />
         </div>
       )}

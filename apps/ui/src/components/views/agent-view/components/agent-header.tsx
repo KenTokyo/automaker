@@ -19,6 +19,8 @@ import {
   FileInput,
   EyeOff,
   Eye,
+  GitCommit,
+  Upload,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -307,6 +309,29 @@ export function AgentHeader({
   const IconComponent = getProjectIcon(currentProject);
   const hasCustomIcon = !!currentProject.customIconPath;
   const hasCustomStyling = projectBgColor || projectBorderColor;
+  const hasGitRepo = worktreeActions?.gitRepoStatus.isGitRepo ?? false;
+  const hasGitCommits = worktreeActions?.gitRepoStatus.hasCommits ?? false;
+  const canQuickPush = Boolean(
+    worktreeActions &&
+    hasGitRepo &&
+    hasGitCommits &&
+    !worktreeActions.isPushing &&
+    (!worktreeActions.hasRemoteBranch || worktreeActions.aheadCount > 0)
+  );
+
+  const handleOpenGitPanel = useCallback(() => {
+    if (!worktreeActions) return;
+    worktreeActions.onCommit(worktreeActions.mainWorktree);
+  }, [worktreeActions]);
+
+  const handleQuickPush = useCallback(() => {
+    if (!worktreeActions || !hasGitRepo || !hasGitCommits) return;
+    if (worktreeActions.hasRemoteBranch) {
+      worktreeActions.onPush(worktreeActions.mainWorktree);
+      return;
+    }
+    worktreeActions.onPushNewBranch(worktreeActions.mainWorktree);
+  }, [hasGitCommits, hasGitRepo, worktreeActions]);
 
   return (
     <>
@@ -793,6 +818,36 @@ export function AgentHeader({
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+          )}
+
+          {worktreeActions && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleOpenGitPanel}
+              disabled={!hasGitRepo}
+              className="h-8 gap-1.5 px-2.5 text-muted-foreground hover:text-foreground"
+              title="Git Panel oeffnen (Commit + Changes)"
+              aria-label="Git Panel oeffnen"
+            >
+              <GitCommit className="h-4 w-4" />
+              <span className="hidden sm:inline">Commit</span>
+            </Button>
+          )}
+
+          {worktreeActions && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleQuickPush}
+              disabled={!canQuickPush}
+              className="h-8 gap-1.5 px-2.5 text-muted-foreground hover:text-foreground"
+              title="Aenderungen direkt pushen"
+              aria-label="Aenderungen pushen"
+            >
+              <Upload className="h-4 w-4" />
+              <span className="hidden sm:inline">Push</span>
+            </Button>
           )}
 
           {currentSessionId && messagesCount > 0 && (

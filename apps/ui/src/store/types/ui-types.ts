@@ -76,7 +76,7 @@ export type ThemeMode =
 export type BoardViewMode = 'kanban' | 'graph';
 
 /** Which content the right panel shows in Agent View */
-export type RightPanelMode = 'files' | 'terminal' | 'dashboard';
+export type RightPanelMode = 'files' | 'terminal' | 'dashboard' | 'git';
 
 /** Font size limits for right-panel content areas */
 export const RIGHT_PANEL_FONT_SIZE_MIN = 10;

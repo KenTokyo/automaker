@@ -297,7 +297,13 @@ export class GeminiProvider extends CliProvider {
     // This ensures Gemini CLI allows file operations in the project directory,
     // even if it has a different workspace cached from a previous session
     if (options.cwd) {
-      cliArgs.push('--include-directories', options.cwd);
+      // Windows + shell invocation (npx/.cmd) can split unquoted paths with spaces.
+      // Quote include-directories explicitly so Gemini CLI receives the full path.
+      const includeDirectory =
+        process.platform === 'win32' && /\s/.test(options.cwd)
+          ? `"${options.cwd.replace(/"/g, '\\"')}"`
+          : options.cwd;
+      cliArgs.push('--include-directories', includeDirectory);
     }
 
     // Note: Gemini CLI doesn't have a --thinking-level flag.

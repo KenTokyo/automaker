@@ -561,7 +561,7 @@ function persistBrowserPanelState(
 // - defaultTerminalState (./defaults/terminal-defaults.ts)
 
 const storedBrowserPanelState = getStoredBrowserPanelState();
-const RIGHT_PANEL_MODES: readonly RightPanelMode[] = ['files', 'terminal', 'dashboard'];
+const RIGHT_PANEL_MODES: readonly RightPanelMode[] = ['files', 'terminal', 'dashboard', 'git'];
 
 function isRightPanelMode(value: string): value is RightPanelMode {
   return RIGHT_PANEL_MODES.includes(value as RightPanelMode);
@@ -3318,13 +3318,11 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       set({ rightPanelSecondaryMode: null });
       removeItem('automaker:rightPanelSecondaryMode');
     } else {
-      // Open split with a sensible default: if primary is terminal, show files; otherwise show terminal
+      // Open split with a sensible default:
+      // - terminal -> files
+      // - files/dashboard/git -> terminal
       const defaultSecondary: RightPanelMode =
-        state.rightPanelMode === 'terminal'
-          ? 'files'
-          : state.rightPanelMode === 'files'
-            ? 'terminal'
-            : 'terminal';
+        state.rightPanelMode === 'terminal' ? 'files' : 'terminal';
       set({ rightPanelSecondaryMode: defaultSecondary });
       setItem('automaker:rightPanelSecondaryMode', defaultSecondary);
     }
