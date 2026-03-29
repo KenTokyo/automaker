@@ -15,11 +15,14 @@ import {
   AArrowDown,
   AArrowUp,
   AlertCircle,
+  ArrowUpFromLine,
   CheckCircle2,
+  CheckSquare,
   Loader2,
   RefreshCw,
   SearchX,
   Trash2,
+  X,
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import type {
@@ -35,11 +38,15 @@ import {
   deleteCompletedTask,
   bulkDeleteCompletedTasks,
 } from '@/hooks/use-completed-tasks';
+import { isSupabaseConfigured } from '@/lib/supabase';
+import { useSupabaseAuthStore } from '@/store/supabase-auth-store';
+import { useTasksSource } from '@/hooks/use-tasks-source';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { CompletedTasksSearch } from './completed-tasks-search';
 import { CompletedTasksFilterBar } from './completed-tasks-filter-bar';
+import { CompletedTaskPushDialog } from './completed-task-push-dialog';
 import { HistoryViewerPanel } from './history-viewer-panel';
 import { getStatusLabel } from './completed-task-utils';
 import {
@@ -201,6 +208,16 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
   const [projectVisibleCounts, setProjectVisibleCounts] = useState<Record<string, number>>({});
 
+  // ── Supabase Push: Selection + Dialog state ──
+  const supabaseUser = useSupabaseAuthStore((s) => s.user);
+  const { supabaseProjectId } = useTasksSource(projectPath);
+  const canPush = isSupabaseConfigured() && !!supabaseProjectId && !!supabaseUser;
+
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  const [pushDialogOpen, setPushDialogOpen] = useState(false);
+  const [pushTasks, setPushTasks] = useState<CompletedTask[]>([]);
+
   // Build allProjects list for the hook (always fetch from all)
   const allProjects = useMemo(
     () => projects.map((p) => ({ path: p.path, name: p.name })),
@@ -343,6 +360,67 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
     }
   }, [cleanableProjects, removeFromStore]);
 
+  // ── Selection handlers ──
+  const handleSelectionChange = useCallback((filename: string, selected: boolean) => {
+    setSelectedTasks((prev) => {
+      const next = new Set(prev);
+      if (selected) {
+        next.add(filename);
+      } else {
+        next.delete(filename);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleSelectAllInGroup = useCallback(
+    (_projectPath: string, filenames: string[], selected: boolean) => {
+      setSelectedTasks((prev) => {
+        const next = new Set(prev);
+        for (const fn of filenames) {
+          if (selected) {
+            next.add(fn);
+          } else {
+            next.delete(fn);
+          }
+        }
+        return next;
+      });
+    },
+    []
+  );
+
+  const toggleSelectionMode = useCallback(() => {
+    setSelectionMode((prev) => {
+      if (prev) {
+        // Exiting selection mode: clear selection
+        setSelectedTasks(new Set());
+      }
+      return !prev;
+    });
+  }, []);
+
+  // ── Push handlers ──
+  const handlePushSelected = useCallback(() => {
+    // Resolve selected filenames to actual task objects
+    const selected = filteredTasks.filter((t) => selectedTasks.has(t.filename));
+    if (selected.length === 0) return;
+    setPushTasks(selected);
+    setPushDialogOpen(true);
+  }, [filteredTasks, selectedTasks]);
+
+  const handlePushAll = useCallback(() => {
+    if (filteredTasks.length === 0) return;
+    setPushTasks(filteredTasks);
+    setPushDialogOpen(true);
+  }, [filteredTasks]);
+
+  const handlePushComplete = useCallback(() => {
+    // After push: exit selection mode and clear
+    setSelectionMode(false);
+    setSelectedTasks(new Set());
+  }, []);
+
   // Full-page loading
   if (loading && tasks.length === 0) {
     return <LoadingState />;
@@ -366,8 +444,33 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
           Erledigte Aufgaben ({filteredTasks.length})
         </h3>
         <div className="flex items-center gap-1">
+          {/* Push all to Supabase */}
+          {canPush && !selectionMode && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 gap-1 px-1.5 text-[10px] text-muted-foreground hover:text-violet-400"
+              onClick={handlePushAll}
+              title="Alle erledigten Aufgaben in die Supabase-Datenbank pushen"
+            >
+              <ArrowUpFromLine className="h-3 w-3" />
+              DB
+            </Button>
+          )}
+          {/* Selection mode toggle */}
+          {canPush && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn('h-6 w-6 p-0', selectionMode && 'text-violet-400 bg-violet-400/10')}
+              onClick={toggleSelectionMode}
+              title={selectionMode ? 'Auswahl beenden' : 'Aufgaben auswählen zum Pushen'}
+            >
+              {selectionMode ? <X className="h-3 w-3" /> : <CheckSquare className="h-3 w-3" />}
+            </Button>
+          )}
           {/* Cleanup all button */}
-          {totalCleanupCount > 0 && (
+          {totalCleanupCount > 0 && !selectionMode && (
             <Button
               variant="ghost"
               size="sm"
@@ -443,6 +546,22 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
         </div>
       )}
 
+      {/* Selection action bar */}
+      {selectionMode && (
+        <div className="flex items-center justify-between border-b border-violet-500/20 bg-violet-500/5 px-3 py-1.5">
+          <p className="text-[10px] text-violet-300">{selectedTasks.size} ausgewählt</p>
+          <Button
+            size="sm"
+            disabled={selectedTasks.size === 0}
+            className="h-6 gap-1 bg-violet-600 px-2 text-[10px] font-medium text-white hover:bg-violet-500 disabled:opacity-40"
+            onClick={handlePushSelected}
+          >
+            <ArrowUpFromLine className="h-3 w-3" />
+            Auswahl pushen
+          </Button>
+        </div>
+      )}
+
       {/* Project groups or empty filter result */}
       {filteredTasks.length === 0 && hasActiveFilters ? (
         <NoResultsState onClearFilters={handleClearFilters} />
@@ -461,6 +580,10 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
               fontSize={sessionFontSize}
               onDeleteTask={(fn) => void handleDelete(fn)}
               onCleanupProject={(path, toDelete) => void handleCleanupProject(path, toDelete)}
+              selectionMode={selectionMode}
+              selectedTasks={selectedTasks}
+              onSelectionChange={handleSelectionChange}
+              onSelectAllInGroup={handleSelectAllInGroup}
             />
           ))}
         </div>
@@ -479,6 +602,18 @@ export function CompletedTasksPanel({ projectPath }: CompletedTasksPanelProps) {
         projectPath={projectPath}
         onClose={() => setHistoryFile(null)}
       />
+
+      {/* Push to Supabase dialog */}
+      {canPush && (
+        <CompletedTaskPushDialog
+          open={pushDialogOpen}
+          onOpenChange={setPushDialogOpen}
+          tasks={pushTasks}
+          supabaseProjectId={supabaseProjectId!}
+          userId={supabaseUser!.id}
+          onComplete={handlePushComplete}
+        />
+      )}
     </div>
   );
 }

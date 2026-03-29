@@ -26,6 +26,7 @@ import {
 
 interface OrchestratorSettingsProps {
   disabled?: boolean;
+  activeSessionOrchestratorRunId?: string | null;
 }
 
 function getTriggerReasonText(reason: OrchestratorTriggerReason): string {
@@ -59,6 +60,7 @@ function getAutoSendStatusText(status: OrchestratorAutoSendStatus): string {
 
 export const OrchestratorSettings = memo(function OrchestratorSettings({
   disabled,
+  activeSessionOrchestratorRunId = null,
 }: OrchestratorSettingsProps) {
   const {
     isEnabled,
@@ -78,6 +80,13 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
   const [isOpen, setIsOpen] = useState(false);
   const [keywordInput, setKeywordInput] = useState(triggerKeyword);
   const [maxInput, setMaxInput] = useState(maxIterations.toString());
+  const isSessionInCurrentRun = Boolean(
+    orchestratorRunId &&
+    activeSessionOrchestratorRunId &&
+    orchestratorRunId === activeSessionOrchestratorRunId
+  );
+  const displayIteration = isSessionInCurrentRun ? currentIteration : 0;
+  const showRunId = Boolean(orchestratorRunId && isSessionInCurrentRun);
 
   // Sync input values with store
   useEffect(() => {
@@ -134,7 +143,7 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
                 ? 'Orchestrator: Warte auf neuen Chat...'
                 : autoSendStatus === 'sending'
                   ? 'Orchestrator: Sende automatisch...'
-                  : `Orchestrator: ${currentIteration}/${maxIterations} Schritte`
+                  : `Orchestrator: ${displayIteration}/${maxIterations} Schritte`
               : 'Orchestrator (aus)'
           }
         >
@@ -145,7 +154,7 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
           )}
           {isEnabled && (
             <span className="text-[11px] font-medium tabular-nums">
-              {currentIteration}/{maxIterations}
+              {displayIteration}/{maxIterations}
             </span>
           )}
         </Button>
@@ -240,86 +249,85 @@ export const OrchestratorSettings = memo(function OrchestratorSettings({
           </div>
 
           {/* Current Status */}
-          {isEnabled &&
-            (currentIteration > 0 || autoSendStatus !== 'idle' || orchestratorRunId) && (
-              <div className="pt-2 border-t border-border space-y-1.5">
-                {currentIteration > 0 && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Repeat className="w-4 h-4 text-muted-foreground" />
-                    <span>
-                      Schritt: <strong>{currentIteration}</strong> / {maxIterations}
+          {isEnabled && (displayIteration > 0 || autoSendStatus !== 'idle' || showRunId) && (
+            <div className="pt-2 border-t border-border space-y-1.5">
+              {displayIteration > 0 && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Repeat className="w-4 h-4 text-muted-foreground" />
+                  <span>
+                    Schritt: <strong>{displayIteration}</strong> / {maxIterations}
+                  </span>
+                </div>
+              )}
+              <div
+                className={cn(
+                  'flex items-center gap-2 text-sm',
+                  autoSendStatus !== 'idle' && 'text-foreground'
+                )}
+              >
+                {autoSendStatus !== 'idle' ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Repeat className="w-3.5 h-3.5 text-muted-foreground" />
+                )}
+                <span className="text-xs">{getAutoSendStatusText(autoSendStatus)}</span>
+              </div>
+              {showRunId && (
+                <p
+                  className="text-[10px] text-muted-foreground font-mono truncate"
+                  title={orchestratorRunId ?? undefined}
+                >
+                  Lauf-ID: {orchestratorRunId}
+                </p>
+              )}
+
+              {lastTriggerCheck && (
+                <div className="mt-2 rounded-md border border-border bg-muted/30 p-2 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium">Letzte Prüfung</p>
+                    <span
+                      className={cn(
+                        'text-[10px] px-1.5 py-0.5 rounded border',
+                        lastTriggerCheck.matched
+                          ? 'border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
+                          : 'border-border text-muted-foreground'
+                      )}
+                    >
+                      {lastTriggerCheck.matched ? 'Treffer' : 'Kein Treffer'}
                     </span>
                   </div>
-                )}
-                <div
-                  className={cn(
-                    'flex items-center gap-2 text-sm',
-                    autoSendStatus !== 'idle' && 'text-foreground'
-                  )}
-                >
-                  {autoSendStatus !== 'idle' ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Repeat className="w-3.5 h-3.5 text-muted-foreground" />
-                  )}
-                  <span className="text-xs">{getAutoSendStatusText(autoSendStatus)}</span>
-                </div>
-                {orchestratorRunId && (
-                  <p
-                    className="text-[10px] text-muted-foreground font-mono truncate"
-                    title={orchestratorRunId}
-                  >
-                    Lauf-ID: {orchestratorRunId}
-                  </p>
-                )}
-
-                {lastTriggerCheck && (
-                  <div className="mt-2 rounded-md border border-border bg-muted/30 p-2 space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-medium">Letzte Prüfung</p>
-                      <span
-                        className={cn(
-                          'text-[10px] px-1.5 py-0.5 rounded border',
-                          lastTriggerCheck.matched
-                            ? 'border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
-                            : 'border-border text-muted-foreground'
-                        )}
-                      >
-                        {lastTriggerCheck.matched ? 'Treffer' : 'Kein Treffer'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">
-                      {new Date(lastTriggerCheck.checkedAt).toLocaleTimeString('de-DE')}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {getTriggerReasonText(lastTriggerCheck.reason)}
-                    </p>
-                    <p className="text-[11px] font-mono text-muted-foreground break-all">
-                      Stichwort: {lastTriggerCheck.keyword || '(leer)'}
-                    </p>
-                    <p className="text-[11px] font-mono text-muted-foreground break-all">
-                      Letzte Zeile: {lastTriggerCheck.lastLine || '(leer)'}
-                    </p>
-                  </div>
-                )}
-
-                <div className="mt-2 rounded-md border border-border bg-muted/20 p-2 space-y-1">
-                  <p className="text-xs font-medium">Schnelltest</p>
                   <p className="text-[11px] text-muted-foreground">
-                    Nutze diese letzte Zeile für einen kurzen Live-Test:
+                    {new Date(lastTriggerCheck.checkedAt).toLocaleTimeString('de-DE')}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {getTriggerReasonText(lastTriggerCheck.reason)}
                   </p>
                   <p className="text-[11px] font-mono text-muted-foreground break-all">
-                    1) NEXT_PHASE_READY -&gt; Treffer
+                    Stichwort: {lastTriggerCheck.keyword || '(leer)'}
                   </p>
                   <p className="text-[11px] font-mono text-muted-foreground break-all">
-                    2) - NEXT_PHASE_READY. -&gt; Treffer (toleriert)
-                  </p>
-                  <p className="text-[11px] font-mono text-muted-foreground break-all">
-                    3) PHASE_READY -&gt; Kein Treffer
+                    Letzte Zeile: {lastTriggerCheck.lastLine || '(leer)'}
                   </p>
                 </div>
+              )}
+
+              <div className="mt-2 rounded-md border border-border bg-muted/20 p-2 space-y-1">
+                <p className="text-xs font-medium">Schnelltest</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Nutze diese letzte Zeile für einen kurzen Live-Test:
+                </p>
+                <p className="text-[11px] font-mono text-muted-foreground break-all">
+                  1) NEXT_PHASE_READY -&gt; Treffer
+                </p>
+                <p className="text-[11px] font-mono text-muted-foreground break-all">
+                  2) - NEXT_PHASE_READY. -&gt; Treffer (toleriert)
+                </p>
+                <p className="text-[11px] font-mono text-muted-foreground break-all">
+                  3) PHASE_READY -&gt; Kein Treffer
+                </p>
               </div>
-            )}
+            </div>
+          )}
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

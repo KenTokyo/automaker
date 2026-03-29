@@ -7,11 +7,13 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  CircleHelp,
   Copy,
   Edit2,
   FileCode2,
   FileText,
   MessageSquare,
+  PartyPopper,
   Sparkles,
   StopCircle,
   Timer,
@@ -54,6 +56,10 @@ interface SessionListItemRowProps {
   getProject: (projectPath: string | undefined) => Project | null;
   phaseIndex?: number;
   isSubagentChild?: boolean;
+  hasChildren?: boolean;
+  childCount?: number;
+  isChildrenCollapsed?: boolean;
+  onToggleChildren?: (sessionId: string) => void;
 }
 
 function SessionListItemRowImpl({
@@ -80,6 +86,10 @@ function SessionListItemRowImpl({
   getProject,
   phaseIndex,
   isSubagentChild = false,
+  hasChildren = false,
+  childCount = 0,
+  isChildrenCollapsed = false,
+  onToggleChildren,
 }: SessionListItemRowProps) {
   const formatTime = (timestamp: string | null | undefined): string => {
     if (!timestamp) return '--:--';
@@ -93,10 +103,16 @@ function SessionListItemRowImpl({
   };
 
   const isCurrentSession = currentSessionId === session.id;
-  const isRunning =
-    session.status === 'running' ||
-    (isCurrentSession && isCurrentSessionThinking) ||
-    runningSessions.has(session.id);
+  const isSubagentSource =
+    session.sourceType === 'subagent' || (!session.sourceType && Boolean(session.parentToolUseId));
+  const parentSessionIsRunning =
+    !session.parentSessionId ||
+    runningSessions.has(session.parentSessionId) ||
+    (currentSessionId === session.parentSessionId && isCurrentSessionThinking);
+  const rawIsRunning =
+    runningSessions.has(session.id) || (isCurrentSession && isCurrentSessionThinking);
+  // Defensive guard: sub-agent rows should not stay "running" when parent is already finished.
+  const isRunning = isSubagentSource ? rawIsRunning && parentSessionIsRunning : rawIsRunning;
   const hasFailed = session.status === 'failed' && !isRunning;
   const wasStopped = session.status === 'stopped' && !isRunning;
   const isDirty = session.isDirty && !isRunning && !hasFailed && !wasStopped;
@@ -113,8 +129,6 @@ function SessionListItemRowImpl({
   const sessionBadgeColor = getBadgeColor(session.projectPath);
   const isEditing = editingSessionId === session.id;
   const isPhaseItem = typeof phaseIndex === 'number';
-  const isSubagentSource =
-    session.sourceType === 'subagent' || (!session.sourceType && Boolean(session.parentToolUseId));
   const isSubagent = isSubagentChild || isSubagentSource;
   const isEmptySubagent =
     isSubagentSource && (session.messageCount ?? 0) === 0 && !session.preview?.trim();
@@ -187,6 +201,21 @@ function SessionListItemRowImpl({
           isCurrentSession &&
           'border-primary bg-primary/10 shadow-[0_8px_20px_-16px_hsl(var(--primary))]',
         session.isArchived && 'opacity-60',
+        // Signal-based card styling: violet border for QUESTION signal
+        !isRunning &&
+          !wasStopped &&
+          !isDirty &&
+          !hasFailed &&
+          session.lastSignal === 'question' &&
+          !isCurrentSession &&
+          'border-violet-500/60 bg-violet-500/5 shadow-[0_8px_20px_-16px_theme(colors.violet.500)]',
+        !isRunning &&
+          !wasStopped &&
+          !isDirty &&
+          !hasFailed &&
+          session.lastSignal === 'question' &&
+          isCurrentSession &&
+          'border-violet-500 bg-violet-500/10 shadow-[0_8px_20px_-16px_theme(colors.violet.500)]',
         isMultiselectMode &&
           isSelected &&
           'border-primary bg-primary/20 shadow-[0_8px_18px_-16px_hsl(var(--primary))]',
@@ -261,8 +290,39 @@ function SessionListItemRowImpl({
             </div>
           ) : (
             <>
-              {/* Row 1: Status icon + Title (full width) */}
+              {/* Row 1: Collapse toggle + Status icon + Title (full width) */}
               <div className="mb-0.5 flex items-center gap-1.5">
+                {hasChildren && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onToggleChildren?.(session.id);
+                    }}
+                    className={cn(
+                      'flex shrink-0 items-center justify-center rounded-sm p-0',
+                      'text-muted-foreground transition-all duration-200',
+                      'hover:bg-accent hover:text-foreground'
+                    )}
+                    style={{
+                      width: `${sessionFontSize + 2}px`,
+                      height: `${sessionFontSize + 2}px`,
+                    }}
+                    title={isChildrenCollapsed ? 'Sub-Agents anzeigen' : 'Sub-Agents verbergen'}
+                  >
+                    <ChevronDown
+                      className={cn(
+                        'transition-transform duration-200',
+                        isChildrenCollapsed && '-rotate-90'
+                      )}
+                      style={{
+                        width: `${sessionFontSize - 2}px`,
+                        height: `${sessionFontSize - 2}px`,
+                      }}
+                    />
+                  </button>
+                )}
+
                 {isRunning ? (
                   <Spinner size="sm" className="shrink-0 text-amber-500" />
                 ) : wasStopped ? (
@@ -302,6 +362,16 @@ function SessionListItemRowImpl({
                 <h3 className="truncate font-medium" style={{ fontSize: 'inherit' }}>
                   {session.name || 'Unbenannte Session'}
                 </h3>
+
+                {isSubagentSource && (
+                  <span
+                    className="shrink-0 text-muted-foreground"
+                    style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
+                    title={`Updated ${formatTime(session.updatedAt)}`}
+                  >
+                    {formatTime(session.updatedAt)}
+                  </span>
+                )}
               </div>
 
               {/* Row 2: Badges (status, phase, sub-agent, model, timer) */}
@@ -343,6 +413,39 @@ function SessionListItemRowImpl({
                 {hasFailed && (
                   <span className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-destructive">
                     Fehler
+                  </span>
+                )}
+
+                {/* Signal badges: ALL_PHASES_COMPLETE (green) and QUESTION (violet) */}
+                {session.lastSignal === 'all_phases_complete' && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 font-medium text-emerald-400"
+                    title="Alle Phasen abgeschlossen"
+                  >
+                    <PartyPopper
+                      className="shrink-0"
+                      style={{
+                        width: `${Math.max(8, sessionFontSize - 5)}px`,
+                        height: `${Math.max(8, sessionFontSize - 5)}px`,
+                      }}
+                    />
+                    Alle Phasen fertig
+                  </span>
+                )}
+
+                {session.lastSignal === 'question' && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-violet-500/15 px-1.5 py-0.5 font-medium text-violet-400"
+                    title="Offene Frage - Antwort wird erwartet"
+                  >
+                    <CircleHelp
+                      className="shrink-0"
+                      style={{
+                        width: `${Math.max(8, sessionFontSize - 5)}px`,
+                        height: `${Math.max(8, sessionFontSize - 5)}px`,
+                      }}
+                    />
+                    Frage offen
                   </span>
                 )}
 
@@ -408,6 +511,26 @@ function SessionListItemRowImpl({
                     {elapsedTime}
                   </span>
                 )}
+
+                {hasChildren && isChildrenCollapsed && childCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onToggleChildren?.(session.id);
+                    }}
+                    className="inline-flex cursor-pointer items-center gap-0.5 rounded-full bg-sky-500/10 px-1.5 py-0.5 text-sky-400 transition-colors hover:bg-sky-500/20 hover:text-sky-300"
+                  >
+                    <Bot
+                      className="shrink-0"
+                      style={{
+                        width: `${Math.max(8, sessionFontSize - 5)}px`,
+                        height: `${Math.max(8, sessionFontSize - 5)}px`,
+                      }}
+                    />
+                    {childCount} eingeklappt
+                  </button>
+                )}
               </div>
 
               {!isEmptySubagent && (
@@ -447,38 +570,7 @@ function SessionListItemRowImpl({
                 </p>
               )}
 
-              {isSubagentSource ? (
-                <div
-                  className="mt-0.5 flex flex-wrap items-center gap-1.5"
-                  style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
-                >
-                  <span className="text-muted-foreground">
-                    {isEmptySubagent
-                      ? 'Kein eigener Verlauf'
-                      : `${session.messageCount ?? 0} messages`}
-                  </span>
-                  <span className="text-muted-foreground">|</span>
-                  <span className="text-muted-foreground">
-                    Updated {formatTime(session.updatedAt)}
-                  </span>
-
-                  {session.projectPath && (
-                    <>
-                      <span className="text-muted-foreground">|</span>
-                      <ProjectBadge
-                        projectName={getProjectName(session.projectPath)}
-                        projectPath={session.projectPath}
-                        badgeColor={sessionBadgeColor ?? undefined}
-                        backgroundColor={project?.backgroundColor}
-                        textColor={project?.textColor}
-                        iconColor={project?.iconColor}
-                        icon={project?.icon}
-                        customIconPath={project?.customIconPath}
-                      />
-                    </>
-                  )}
-                </div>
-              ) : (
+              {!isSubagentSource && (
                 <div
                   className="mt-1 flex flex-wrap items-center gap-2"
                   style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}

@@ -502,7 +502,6 @@ function FilesMainContent({
           projectPath={projectPath}
           selectedFilePath={selectedFilePath}
           onSelectFile={(fp) => void onSelectFile(fp)}
-          sinceHours={timeFilter > 0 ? timeFilter : undefined}
           filterFolders={searchFilters.folders}
           filterFiles={searchFilters.files}
         />

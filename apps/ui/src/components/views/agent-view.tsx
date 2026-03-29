@@ -686,6 +686,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     getMessageWrapper: getOrchestratorMessageWrapper,
     setAutoSendStatus: orchestratorSetAutoSendStatus,
     setLastTriggerCheck: orchestratorSetLastTriggerCheck,
+    startNewRun: orchestratorStartNewRun,
   } = useOrchestratorStore(
     useShallow((s) => ({
       isEnabled: s.isEnabled,
@@ -699,6 +700,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       getMessageWrapper: s.getMessageWrapper,
       setAutoSendStatus: s.setAutoSendStatus,
       setLastTriggerCheck: s.setLastTriggerCheck,
+      startNewRun: s.startNewRun,
     }))
   );
 
@@ -707,8 +709,86 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
   const assistantSnapshotAtProcessingStartRef = useRef<{ id: string; content: string } | null>(
     null
   );
+  const sessionIdAtProcessingStartRef = useRef<string | null>(null);
   const orchestratorSourceSessionIdRef = useRef<string | null>(null);
+  const orchestratorHandledMessageKeysRef = useRef(new Set<string>());
   const sessionsWithInjectedSystemPromptsRef = useRef(new Set<string>());
+
+  const triggerOrchestratorPhaseContinuation = useCallback(
+    (
+      sourceSessionId: string,
+      assistantMessage: {
+        id: string;
+        content: string;
+      }
+    ): boolean => {
+      const messageKey = `${sourceSessionId}:${assistantMessage.id}`;
+      if (orchestratorHandledMessageKeysRef.current.has(messageKey)) {
+        return false;
+      }
+
+      if (!orchestratorShouldTrigger(assistantMessage.content)) {
+        return false;
+      }
+
+      const canContinue = orchestratorIncrementIteration();
+      if (!canContinue) {
+        return false;
+      }
+
+      orchestratorHandledMessageKeysRef.current.add(messageKey);
+      orchestratorSourceSessionIdRef.current = sourceSessionId;
+      setOrchestratorPendingContent(assistantMessage.content);
+      if (orchestratorAutoSend) {
+        orchestratorSetAutoSendStatus('waiting');
+      }
+
+      const quickCreate = quickCreateSessionRef.current;
+      if (!quickCreate) {
+        logger.warn('[Orchestrator] Session creation unavailable (SessionManager not mounted)');
+        orchestratorHandledMessageKeysRef.current.delete(messageKey);
+        clearOrchestratorPendingContent();
+        orchestratorSourceSessionIdRef.current = null;
+        orchestratorSetAutoSendStatus('idle');
+        toast.error('Orchestrator konnte keinen neuen Chat starten.');
+        return false;
+      }
+
+      void quickCreate({
+        attachOrchestratorRunId: true,
+        forceCreate: true,
+        sourceType: 'orchestrator',
+      })
+        .then((created) => {
+          if (!created) {
+            logger.error('[Orchestrator] Session creation failed');
+            orchestratorHandledMessageKeysRef.current.delete(messageKey);
+            clearOrchestratorPendingContent();
+            orchestratorSourceSessionIdRef.current = null;
+            orchestratorSetAutoSendStatus('idle');
+            toast.error('Orchestrator konnte keinen neuen Chat starten.');
+          }
+        })
+        .catch((error) => {
+          logger.error('[Orchestrator] Session creation crashed', error);
+          orchestratorHandledMessageKeysRef.current.delete(messageKey);
+          clearOrchestratorPendingContent();
+          orchestratorSourceSessionIdRef.current = null;
+          orchestratorSetAutoSendStatus('idle');
+          toast.error('Orchestrator konnte keinen neuen Chat starten.');
+        });
+
+      return true;
+    },
+    [
+      orchestratorShouldTrigger,
+      orchestratorIncrementIteration,
+      setOrchestratorPendingContent,
+      orchestratorAutoSend,
+      orchestratorSetAutoSendStatus,
+      clearOrchestratorPendingContent,
+    ]
+  );
 
   // Detect when processing finishes and check for orchestrator trigger
   useEffect(() => {
@@ -724,6 +804,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
             content: lastAssistantMessage.content,
           }
         : null;
+      sessionIdAtProcessingStartRef.current = currentSessionId;
     }
 
     wasProcessingRef.current = isProcessing;
@@ -731,6 +812,16 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     // Only trigger when processing transitions from true → false
     if (!wasProcessing || isProcessing) return;
     if (!orchestratorEnabled || !currentSessionId || !isConnected) return;
+
+    const sessionIdAtStart = sessionIdAtProcessingStartRef.current;
+    sessionIdAtProcessingStartRef.current = null;
+    if (sessionIdAtStart && sessionIdAtStart !== currentSessionId) {
+      logger.info('[Orchestrator] Ignoring completion after session switch', {
+        sessionAtStart: sessionIdAtStart,
+        currentSessionId,
+      });
+      return;
+    }
 
     // Ignore stale completion events that did not produce a new assistant message.
     if (!lastAssistantMessage) {
@@ -757,39 +848,16 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       return;
     }
 
-    // Check if the trigger keyword is present
-    if (!orchestratorShouldTrigger(lastAssistantMessage.content)) return;
-
-    // Increment iteration (returns false if max reached)
-    const canContinue = orchestratorIncrementIteration();
-    if (!canContinue) return;
-
-    // Remember source session so content is only injected/sent after switching sessions.
-    orchestratorSourceSessionIdRef.current = currentSessionId;
-
-    // Store the last AI message as pending content for the new chat
-    setOrchestratorPendingContent(lastAssistantMessage.content);
-    if (orchestratorAutoSend) {
-      orchestratorSetAutoSendStatus('waiting');
-    }
-
-    // Create a new session (orchestrator-triggered: attach run ID)
-    if (quickCreateSessionRef.current) {
-      quickCreateSessionRef.current(true);
-    }
+    triggerOrchestratorPhaseContinuation(currentSessionId, lastAssistantMessage);
   }, [
     isProcessing,
     orchestratorEnabled,
     currentSessionId,
     isConnected,
     messages,
-    orchestratorShouldTrigger,
-    orchestratorIncrementIteration,
-    setOrchestratorPendingContent,
-    orchestratorAutoSend,
-    orchestratorSetAutoSendStatus,
     orchestratorSetLastTriggerCheck,
     orchestratorTriggerKeyword,
+    triggerOrchestratorPhaseContinuation,
   ]);
 
   // Guard ref to prevent double auto-sends
@@ -831,7 +899,19 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     orchestratorSetAutoSendStatus('sending');
     clearOrchestratorPendingContent();
 
-    sendMessage(content)
+    const agentPromptsText = getSelectedPromptsText();
+    const orchestratorWrapper = getOrchestratorMessageWrapper();
+    const messageToSend = embedSystemPrompts(content, {
+      agentPromptsText,
+      orchestratorPreMessage: orchestratorWrapper?.preMessage,
+      orchestratorPostMessage: orchestratorWrapper?.postMessage,
+    });
+
+    if (currentSessionId) {
+      sessionsWithInjectedSystemPromptsRef.current.add(currentSessionId);
+    }
+
+    sendMessage(messageToSend)
       .catch((error) => {
         logger.error('[Orchestrator] Auto-send failed, falling back to textarea', error);
         setInput(content);
@@ -850,6 +930,8 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     orchestratorAutoSend,
     sendMessage,
     orchestratorSetAutoSendStatus,
+    getSelectedPromptsText,
+    getOrchestratorMessageWrapper,
   ]);
 
   useEffect(() => {
@@ -885,6 +967,16 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
         !!currentSessionId && !sessionsWithInjectedSystemPromptsRef.current.has(currentSessionId);
 
       if (shouldInjectSystemPrompts) {
+        const shouldStartFreshRun =
+          orchestratorEnabled &&
+          !currentSession?.orchestratorRunId &&
+          !pendingOrchestratorContent &&
+          !orchestratorSourceSessionIdRef.current;
+
+        if (shouldStartFreshRun) {
+          orchestratorStartNewRun();
+        }
+
         const agentPromptsText = getSelectedPromptsText();
         const orchestratorWrapper = getOrchestratorMessageWrapper();
 
@@ -932,6 +1024,10 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       isProcessing,
       sendMessage,
       addToServerQueue,
+      orchestratorEnabled,
+      currentSession?.orchestratorRunId,
+      pendingOrchestratorContent,
+      orchestratorStartNewRun,
       getSelectedPromptsText,
       getOrchestratorMessageWrapper,
     ]
@@ -1691,6 +1787,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
                   onInputHeightChange={handleInputHeightChange}
                   onNewSession={handleNewSession}
                   chatActivityState={chatActivityState}
+                  activeSessionOrchestratorRunId={currentSession?.orchestratorRunId ?? null}
                 />
               )}
             </div>
@@ -1802,6 +1899,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
               onInputHeightChange={handleInputHeightChange}
               onNewSession={handleNewSession}
               chatActivityState={chatActivityState}
+              activeSessionOrchestratorRunId={currentSession?.orchestratorRunId ?? null}
             />
           )}
         </div>

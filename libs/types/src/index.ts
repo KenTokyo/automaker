@@ -80,6 +80,10 @@ export type {
   UpdateSessionParams,
 } from './session.js';
 
+// Session signal types (status badges: ALL_PHASES_COMPLETE, QUESTION)
+export type { SessionSignal } from './session-signal.js';
+export { SESSION_SIGNAL_KEYWORDS, detectSessionSignal } from './session-signal.js';
+
 // Error types
 export type { ErrorType, ErrorInfo } from './error.js';
 

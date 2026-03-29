@@ -135,6 +135,7 @@ export function TerminalPanel({
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastShortcutTimeRef = useRef<number>(0);
   const resizeDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSentDimsRef = useRef<{ cols: number; rows: number }>({ cols: 0, rows: 0 });
   const focusHandlerRef = useRef<{ dispose: () => void } | null>(null);
   const linkProviderRef = useRef<{ dispose: () => void } | null>(null);
   const [isTerminalReady, setIsTerminalReady] = useState(false);
@@ -821,11 +822,19 @@ export function TerminalPanel({
       fitAddonRef.current = fitAddon;
       setIsTerminalReady(true);
 
-      // Handle focus - use ref to avoid re-running effect
-      // Store disposer to prevent memory leak
-      focusHandlerRef.current = terminal.onData(() => {
-        onFocusRef.current();
-      });
+      // Handle focus via terminal's native focus event instead of onData.
+      // IMPORTANT: Using onData for focus caused setActiveTerminalSession() to fire
+      // on EVERY keystroke → Zustand store update → React re-render → ResizeObserver
+      // noise → unnecessary PTY resize → PowerShell prompt redraw (line duplication bug).
+      // The terminal element's 'focus' event fires only when focus actually changes.
+      const textareaEl = terminalRef.current?.querySelector('textarea.xterm-helper-textarea');
+      if (textareaEl) {
+        const handleTerminalFocus = () => onFocusRef.current();
+        textareaEl.addEventListener('focus', handleTerminalFocus);
+        focusHandlerRef.current = {
+          dispose: () => textareaEl.removeEventListener('focus', handleTerminalFocus),
+        };
+      }
 
       // Custom key handler to intercept terminal shortcuts
       // Return false to prevent xterm from handling the key
@@ -1249,6 +1258,9 @@ export function TerminalPanel({
   }, [sessionId, authToken, wsUrl, isTerminalReady, fetchWsToken]);
 
   // Handle resize with debouncing
+  // IMPORTANT: Only sends resize to server when cols/rows actually change.
+  // Without this check, ResizeObserver noise (sub-pixel changes from re-renders)
+  // would spam resize events, causing PowerShell to redraw prompts (line duplication bug).
   const handleResize = useCallback(() => {
     // Clear any pending resize
     if (resizeDebounceRef.current) {
@@ -1271,9 +1283,14 @@ export function TerminalPanel({
         fitAddonRef.current.fit();
         const { cols, rows } = xtermRef.current;
 
-        // Send resize to server
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({ type: 'resize', cols, rows }));
+        // Only send resize to server if dimensions actually changed
+        // This prevents unnecessary PTY resizes from ResizeObserver noise
+        // (e.g., sub-pixel changes from React re-renders, CSS transitions)
+        if (cols !== lastSentDimsRef.current.cols || rows !== lastSentDimsRef.current.rows) {
+          lastSentDimsRef.current = { cols, rows };
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: 'resize', cols, rows }));
+          }
         }
       } catch (err) {
         logger.error('Resize error:', err);
@@ -1301,12 +1318,8 @@ export function TerminalPanel({
     };
   }, [handleResize]);
 
-  useEffect(() => {
-    if (xtermRef.current && isTerminalReady) {
-      xtermRef.current.options.fontSize = fontSize;
-      fitAddonRef.current?.fit();
-    }
-  }, [fontSize, isTerminalReady]);
+  // NOTE: fontSize is handled by the "Update terminal font size" effect below (with server resize notify).
+  // Do NOT add a separate fontSize effect here - it would cause double fit() calls.
 
   useEffect(() => {
     if (xtermRef.current && isTerminalReady) {
@@ -1375,9 +1388,13 @@ export function TerminalPanel({
         // Only fit if container has any size
         if (rect.width > 0 && rect.height > 0) {
           fitAddonRef.current.fit();
-          // Notify server of new dimensions
+          // Notify server of new dimensions only if they changed
           const { cols, rows } = xtermRef.current;
-          if (wsRef.current?.readyState === WebSocket.OPEN) {
+          if (
+            (cols !== lastSentDimsRef.current.cols || rows !== lastSentDimsRef.current.rows) &&
+            wsRef.current?.readyState === WebSocket.OPEN
+          ) {
+            lastSentDimsRef.current = { cols, rows };
             wsRef.current.send(JSON.stringify({ type: 'resize', cols, rows }));
           }
         }

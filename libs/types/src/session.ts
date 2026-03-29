@@ -4,6 +4,7 @@
 
 import type { ThinkingLevel } from './settings.js';
 import type { ReasoningEffort } from './provider.js';
+import type { SessionSignal } from './session-signal.js';
 
 export interface AgentSession {
   id: string;
@@ -23,6 +24,7 @@ export interface AgentSession {
   model?: string; // Model alias or ID used for this session (e.g. 'sonnet', 'opus')
   thinkingLevel?: ThinkingLevel; // Thinking level for Claude models
   reasoningEffort?: ReasoningEffort; // Reasoning effort for Codex models
+  lastSignal?: SessionSignal; // Detected signal from last AI message (e.g. 'all_phases_complete', 'question')
 }
 
 export interface SessionListItem extends AgentSession {

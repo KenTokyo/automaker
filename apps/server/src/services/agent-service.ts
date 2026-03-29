@@ -12,8 +12,9 @@ import type {
   ReasoningEffort,
   ProviderMessage,
   ProviderTokenUsage,
+  SessionSignal,
 } from '@automaker/types';
-import { stripProviderPrefix } from '@automaker/types';
+import { stripProviderPrefix, detectSessionSignal } from '@automaker/types';
 import {
   initLogger as initEvlogLogger,
   createRequestLogger as createEvlogRequestLogger,
@@ -26,6 +27,10 @@ import {
   createLogger,
   classifyError,
   getUserFriendlyErrorMessage,
+  atomicWriteJson,
+  readJsonWithRecovery,
+  logRecoveryWarning,
+  DEFAULT_BACKUP_COUNT,
 } from '@automaker/utils';
 import { isFirstMessage, prependTitleInstruction, parseSessionInfo } from '../lib/session-title.js';
 import { ProviderFactory } from '../providers/provider-factory.js';
@@ -108,6 +113,7 @@ interface SessionMetadata {
   messageCount?: number; // Cached count for fast session list rendering
   preview?: string; // Cached preview for fast session list rendering
   lastError?: string; // Cached last error preview for fast session list rendering
+  lastSignal?: SessionSignal; // Cached signal from last AI message (ALL_PHASES_COMPLETE, QUESTION)
 }
 
 interface ActiveSubagentSessionState {
@@ -149,16 +155,87 @@ function getLastErrorPreview(content: string | undefined): string | undefined {
 }
 
 function buildSessionSummary(
-  messages: Message[]
-): Pick<SessionMetadata, 'messageCount' | 'preview' | 'lastError'> {
+  messages: Message[],
+  isOrchestratorSession = false
+): Pick<SessionMetadata, 'messageCount' | 'preview' | 'lastError' | 'lastSignal'> {
   const lastMessage = messages[messages.length - 1];
   const lastError = lastMessage?.isError ? getLastErrorPreview(lastMessage.content) : undefined;
+
+  // Detect signal from the last assistant message
+  const lastAssistantMessage = [...messages].reverse().find((m) => m.role === 'assistant');
+  const lastSignal = detectSessionSignal(lastAssistantMessage?.content, isOrchestratorSession);
 
   return {
     messageCount: messages.length,
     preview: lastMessage?.content?.slice(0, 100) || '',
     lastError,
+    lastSignal,
   };
+}
+
+/**
+ * Recover a JSON object when the file has valid JSON at the beginning plus
+ * trailing garbage content (e.g. interrupted/overlapping writes).
+ */
+function recoverMetadataFromCorruptedContent(
+  rawContent: string
+): Record<string, SessionMetadata> | null {
+  let inString = false;
+  let escaped = false;
+  let depth = 0;
+  let started = false;
+
+  for (let index = 0; index < rawContent.length; index += 1) {
+    const character = rawContent[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (character === '\\' && inString) {
+      escaped = true;
+      continue;
+    }
+
+    if (character === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) {
+      continue;
+    }
+
+    if (character === '{') {
+      depth += 1;
+      started = true;
+      continue;
+    }
+
+    if (character !== '}') {
+      continue;
+    }
+
+    depth -= 1;
+
+    if (!started || depth !== 0) {
+      continue;
+    }
+
+    const candidate = rawContent.slice(0, index + 1).trim();
+    try {
+      const parsed = JSON.parse(candidate) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, SessionMetadata>;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
 }
 
 const INPUT_TOKEN_KEYS = ['inputTokens', 'input_tokens', 'promptTokens', 'prompt_tokens'] as const;
@@ -1036,6 +1113,8 @@ export class AgentService {
           session.isRunning = false;
           session.abortController = null;
           await this.accumulateElapsedTime(sessionId);
+          await this.finalizeForegroundSubagents(sessionId);
+          await this.finalizeBackgroundSubagentsAfterParentStop(sessionId);
 
           const errorMessage: Message = {
             id: this.generateId(),
@@ -1255,6 +1334,8 @@ export class AgentService {
   }
 
   getRunningSubagentSessionIds(): Set<string> {
+    // Safety net: clean up stale subagent entries before returning
+    this.cleanupStaleSubagentSessions();
     return new Set(
       Array.from(this.activeSubagentSessions.values()).map((active) => active.childSessionId)
     );
@@ -1267,6 +1348,54 @@ export class AgentService {
       }
     }
     return false;
+  }
+
+  /**
+   * Safety net: Remove subagent entries whose parent session is no longer running.
+   * This catches any edge case where the normal cleanup path was missed
+   * (e.g. unexpected errors, race conditions, provider crashes).
+   * Also removes entries older than 30 minutes as an absolute safety net.
+   */
+  private cleanupStaleSubagentSessions(): void {
+    const MAX_SUBAGENT_AGE_MS = 30 * 60 * 1000; // 30 minutes
+    const nowMs = Date.now();
+    const staleIds: string[] = [];
+
+    for (const [toolUseId, active] of this.activeSubagentSessions.entries()) {
+      const parentSession = this.sessions.get(active.parentSessionId);
+      const parentIsRunning = parentSession?.isRunning ?? false;
+
+      // If parent is no longer running, this subagent entry is stale
+      if (!parentIsRunning) {
+        staleIds.push(toolUseId);
+        continue;
+      }
+
+      // Absolute timeout: no subagent should be tracked for more than 30 minutes
+      const startedAtMs = new Date(active.startedAt).getTime();
+      if (Number.isFinite(startedAtMs) && nowMs - startedAtMs > MAX_SUBAGENT_AGE_MS) {
+        staleIds.push(toolUseId);
+      }
+    }
+
+    if (staleIds.length > 0) {
+      this.logger.warn(
+        `Cleaning up ${staleIds.length} stale subagent session(s) from activeSubagentSessions`
+      );
+      for (const toolUseId of staleIds) {
+        const active = this.activeSubagentSessions.get(toolUseId);
+        this.activeSubagentSessions.delete(toolUseId);
+
+        // Emit stopped event so the UI updates immediately
+        if (active) {
+          this.emitAgentEvent(active.parentSessionId, {
+            type: 'subagent_stopped',
+            agentId: toolUseId,
+            childSessionId: active.childSessionId,
+          });
+        }
+      }
+    }
   }
 
   isSessionStopped(sessionId: string): boolean {
@@ -1346,9 +1475,10 @@ export class AgentService {
       await secureFs.writeFile(sessionFile, JSON.stringify(messages, null, 2), 'utf-8');
       const metadata = await this.loadMetadata();
       if (metadata[sessionId]) {
+        const isOrchestratorSession = Boolean(metadata[sessionId].orchestratorRunId);
         metadata[sessionId] = {
           ...metadata[sessionId],
-          ...buildSessionSummary(messages),
+          ...buildSessionSummary(messages, isOrchestratorSession),
           updatedAt: new Date().toISOString(),
         };
         await this.saveMetadata(metadata);
@@ -1359,16 +1489,47 @@ export class AgentService {
   }
 
   async loadMetadata(): Promise<Record<string, SessionMetadata>> {
-    try {
-      const data = (await secureFs.readFile(this.metadataFile, 'utf-8')) as string;
-      return JSON.parse(data);
-    } catch {
-      return {};
+    const recovery = await readJsonWithRecovery<Record<string, SessionMetadata>>(
+      this.metadataFile,
+      {},
+      { maxBackups: DEFAULT_BACKUP_COUNT }
+    );
+
+    if (!recovery.recovered) {
+      return recovery.data;
     }
+
+    if (recovery.source !== 'default') {
+      logRecoveryWarning(recovery, 'Session metadata', this.logger);
+      return recovery.data;
+    }
+
+    // Last-resort salvage: try trimming trailing garbage after a complete root JSON object.
+    try {
+      const raw = (await secureFs.readFile(this.metadataFile, 'utf-8')) as string;
+      const repaired = recoverMetadataFromCorruptedContent(raw);
+      if (repaired) {
+        this.logger.warn(
+          '[SessionMetadata] Recovered metadata by trimming corrupted trailing content'
+        );
+        await this.saveMetadata(repaired);
+        return repaired;
+      }
+    } catch {
+      // Ignore and fall back to recovery default below.
+    }
+
+    this.logger.warn(
+      `[SessionMetadata] Recovery failed, using empty metadata. Reason: ${recovery.error ?? 'unknown'}`
+    );
+    return recovery.data;
   }
 
   async saveMetadata(metadata: Record<string, SessionMetadata>): Promise<void> {
-    await secureFs.writeFile(this.metadataFile, JSON.stringify(metadata, null, 2), 'utf-8');
+    await atomicWriteJson(this.metadataFile, metadata, {
+      createDirs: true,
+      backupCount: DEFAULT_BACKUP_COUNT,
+    });
   }
 
   /**
@@ -1521,8 +1682,23 @@ export class AgentService {
     const metadata = await this.loadMetadata();
     if (!metadata[sessionId]) return false;
 
-    delete metadata[sessionId];
-    await this.saveMetadata(metadata);
+    // Cascade: find all child sessions (sessions whose parentSessionId === sessionId)
+    // and delete them recursively before deleting the parent.
+    const childIds = Object.values(metadata)
+      .filter((s) => s.parentSessionId === sessionId)
+      .map((s) => s.id);
+
+    for (const childId of childIds) {
+      // Recursive delete so grandchildren are also removed
+      await this.deleteSession(childId);
+    }
+
+    // Re-load metadata after potential child deletions
+    const freshMetadata = childIds.length > 0 ? await this.loadMetadata() : metadata;
+    if (!freshMetadata[sessionId]) return false;
+
+    delete freshMetadata[sessionId];
+    await this.saveMetadata(freshMetadata);
 
     // Delete session file
     try {

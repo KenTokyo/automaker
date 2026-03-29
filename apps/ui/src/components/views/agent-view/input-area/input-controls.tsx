@@ -72,6 +72,8 @@ interface InputControlsProps {
   onInputHeightChange?: () => void;
   /** Callback to create a new session */
   onNewSession?: () => void;
+  /** Run-ID of the currently opened session (if orchestrator session). */
+  activeSessionOrchestratorRunId?: string | null;
 }
 
 /**
@@ -112,6 +114,7 @@ export function InputControls({
   accentColor,
   onInputHeightChange,
   onNewSession,
+  activeSessionOrchestratorRunId = null,
 }: InputControlsProps) {
   const internalInputRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = externalInputRef || internalInputRef;
@@ -632,7 +635,10 @@ export function InputControls({
           </Popover>
 
           {/* Orchestrator Settings */}
-          <OrchestratorSettings disabled={!isConnected} />
+          <OrchestratorSettings
+            disabled={!isConnected}
+            activeSessionOrchestratorRunId={activeSessionOrchestratorRunId}
+          />
 
           {/* Completed Tasks Toggle */}
           <CompletedTasksToggle disabled={!isConnected} />

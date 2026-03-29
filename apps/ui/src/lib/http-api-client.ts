@@ -1252,6 +1252,9 @@ export class HttpApiClient implements ElectronAPI {
       isDirectory: boolean;
       matchLine?: number;
       snippet?: string;
+      modified?: number;
+      created?: number;
+      size?: number;
     }>;
     totalCount: number;
     error?: string;

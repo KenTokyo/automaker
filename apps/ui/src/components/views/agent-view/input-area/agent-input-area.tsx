@@ -69,6 +69,8 @@ interface AgentInputAreaProps {
   onNewSession?: () => void;
   /** Activity state of the currently opened chat session */
   chatActivityState?: 'idle' | 'running' | 'stopped';
+  /** Run-ID of the currently opened session (if orchestrator session). */
+  activeSessionOrchestratorRunId?: string | null;
 }
 
 export function AgentInputArea({
@@ -110,6 +112,7 @@ export function AgentInputArea({
   onInputHeightChange,
   onNewSession,
   chatActivityState = 'idle',
+  activeSessionOrchestratorRunId = null,
 }: AgentInputAreaProps) {
   const hasFiles = selectedImages.length > 0 || selectedTextFiles.length > 0;
 
@@ -183,6 +186,7 @@ export function AgentInputArea({
         accentColor={accentColor}
         onInputHeightChange={onInputHeightChange}
         onNewSession={onNewSession}
+        activeSessionOrchestratorRunId={activeSessionOrchestratorRunId}
       />
     </div>
   );

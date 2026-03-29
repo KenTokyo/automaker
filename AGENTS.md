@@ -4,22 +4,25 @@
 
 # ════════════════════════════════════════════════════════════════
 
-Kontext:
+## Kontext:
 
+**Was ich dir sende**
 ich sende dir meistens eine Sprachnachricht, diese kann im Chat oder in einer `.md` Datei vorkommen. Speech-to-Text ist nicht immer exakt, also bitte aktiv mitdenken (z.B. "Cloud Code" kann eigentlich "Claude Code" bedeuten).
 
+**Ich bin nur ein "junior developer" also kunde, der Probleme grob beschreibt...**
 es kann auch sein, dass ich den Fehler nicht ganz korrekt beschreibe. wenn meine Annahme nicht passt, korrigiere mich klar und freundlich. ich bin Junior-Developer und will lernen.
 
-unsere App ist groß. eine kleine Änderung kann Nebenwirkungen haben. deshalb erst Überblick holen (Suche, betroffene Dateien, Duplikate), dann umsetzen.
+unsere App ist groß. eine kleine Änderung kann Nebenwirkungen haben. deshalb erst Überblick holen (Suche, betroffene Dateien, Duplikate) falls mit subagents möglich, dann umsetzen.
 
 ich kann dir oft nur Frontend-Komponenten zeigen (React Grab), aber nicht automatisch die Backend-Teile. bitte den Rest selbst recherchieren.
 
+**Schreibweise**
 bitte motiviert, einfach und menschlich schreiben, mit alltagstauglichen Worten, klarer Struktur und gut lesbarer Formatierung.
 
 ## 🎯 Rollen-Trennung (Pflicht)
 
 - **`AGENTS.md` = Arbeitsregeln** (wie wir arbeiten, kommunizieren, planen und liefern)
-- **`CLAUDE.md` = Architekturwissen** (wie Automaker oder das Projekt technisch aufgebaut ist)
+- **`CLAUDE.md` = Architekturwissen** (wie das Projekt technisch aufgebaut ist)
 - Wenn du Architektur brauchst: **in `CLAUDE.md` nachsehen**
 - Wenn du Coding-Verhalten brauchst: **in `AGENTS.md` bleiben**
 
@@ -39,7 +42,7 @@ bitte motiviert, einfach und menschlich schreiben, mit alltagstauglichen Worten,
 
 ## Verstehen statt Umdeuten (Pflicht)
 
-1. Wenn der User A sagt, muss die Lösung A verbessern und nicht still zu B wechseln.
+1. Wenn der User A sagt, soll die Lösung A verbessern und nicht still zu B wechseln.
 2. Fachwörter nie eigenmächtig übersetzen, wenn dadurch die Richtung kippt.
 3. **Vor Umsetzung immer kurz prüfen**: "Löst mein Schritt wirklich das genannte Problem?"
 4. **Keine versteckten Nebenwirkungen einbauen** (z.B. harte Limits), ausser der User hat es klar gewünscht.
@@ -56,13 +59,30 @@ Bei **KI-Änderungen** (Chat, Prompts, Tools, Provider, Live Preview, Humanify, 
 
 - IMMER ZUERST den `ki-architekt` Sub-Agent aufrufen
 - Der prüft ob Help-Content und Architektur-Docs aktuell sind und aktualisiert sie
-- sollte der nicht vorhanden sein, dann ließ `D:\CODING\React Projects\uniai-chat\automaker\.claude\agents\ki-architekt.md` als Template und erzeuge einen, aber speziell für das Projekt worin du dich gerade befindest
+- sollte der nicht vorhanden sein, dann ließ `D:\CODING\React Projects\notedrill\notedrill-backend-nextjs\.claude\agents\ki-architekt.md` als Template und erzeuge einen, aber speziell für das Projekt worin du dich gerade befindest
 
 ## Generelle Regeln
 
 **Wenn der User explizit dir eine Programmieraufgabe, keine Recherche Aufgabe gibt, dann:** vom aktuellen Stand bis zur letzten Phase in Phasen umsetzen, aber in einer Task-Datei tracken mit Kontextinformationen und Phasenabläufe. Nach jeder Phase die Planung updaten und die nächste Phase durchgehen ohne STOPP!!
 
-- falls ORCHESTRATOR MODUS AN IST: falls enabled, musst du nach jeder Phase den Plan updaten und dann NEXT_PHASE_READY am ende schreiben inklusive der TASK.md als Referenz mitgeben in deinem letzten Chat mit einer kleinen Summary was du gemacht hast, weil genau deine letzte Nachricht wird im nächsten Chat dann für dich mit neuem Kontext erscheinen
+- falls ORCHESTRATOR MODUS AN IST: falls enabled, musst du nach jeder Phase den Plan updaten und dann `NEXT_PHASE_READY` am ende schreiben inklusive der ...TASK.md als Referenz mitgeben in deinem letzten Chat mit einer kleinen Summary was du gemacht hast, weil genau deine letzte Nachricht wird im nächsten Chat dann für dich mit neuem Kontext erscheinen
+
+## Signalwörter für Session-Status-Badges (Pflicht)
+
+Die folgenden Signalwörter werden automatisch erkannt und als farbige Badges in der Session-Historie angezeigt:
+
+| Signal                | Wann schreiben?                                                                             | Badge                                |
+| --------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `ALL_PHASES_COMPLETE` | Wenn alle Orchestrator-Phasen fertig sind (am Ende der letzten Nachricht)                   | 🟢 Grünes Badge "Alle Phasen fertig" |
+| `QUESTION`            | Wenn du eine Frage an den User hast und auf eine Antwort wartest (am Ende deiner Nachricht) | 🟣 Violettes Badge "Frage offen"     |
+
+**Regeln:**
+
+- `ALL_PHASES_COMPLETE` wird NUR im Orchestrator-Modus erkannt
+- `QUESTION` wird IMMER erkannt (in allen Sessions)
+- Schreibe das Signal-Wort am Ende deiner Nachricht, alleinstehend auf einer Zeile
+- Sobald der User antwortet und du erneut schreibst, wird das Signal automatisch zurückgesetzt
+- Das Signal-Wort hilft dem User, in der Session-Historie sofort zu sehen, wo eine Frage offen ist
 
 ### 🔴 Nutze Nur Search/Abschließer Subagents
 
@@ -202,9 +222,9 @@ Wenn mehrere Architekten gebraucht werden, laufen sie **linear**, nicht parallel
 
 **Inspiriert von ASMR (Agentic Search & Memory Retrieval):** Bevor Code geschrieben wird,
 MÜSSEN 2-3 Erkunder-Agents (Haiku) parallel gespawnt werden um den vollen Kontext zu sammeln.
-Das verhindert Duplikate, findet relevante Dateien und erkennt Konflikte BEVOR der Programmierer startet.
+Das verhindert Duplikate, findet relevante Dateien und erkennt Konflikte BEVOR die Programmierung oder Planung startet.
 
-### Ablauf (IMMER parallel spawnen!):
+### Ablauf (IMMER linear spawnen!):
 
 ```
 User-Task → Orchestrator
@@ -215,7 +235,7 @@ User-Task → Orchestrator
   │
   ▼ Synthese → duplikat-checker (Haiku, bei neuen Dateien)
   │
-  ├─ programmiere (Opus/Sonnet) → Coding mit vollem Kontext
+  ├─ programmiere/plane (Opus) → Coding mit vollem Kontext
   │
   ▼ NACH dem Coding:
   └─ abschliesser (Haiku) → .completed/ erstellen + CLAUDE.md Relevanz-Check
@@ -274,7 +294,7 @@ Format laut:
 
 # ════════════════════════════════════════════════════════════════
 
-# TEIL 2: AUTOMAKER-CODING-REGELN (ohne Architektur)
+# TEIL 2: NOTEDRILL-CODING-REGELN (ohne Architektur)
 
 # ════════════════════════════════════════════════════════════════
 
@@ -291,7 +311,7 @@ Sprache:
 
 - Alle UI-Texte auf Deutsch
 - Keine unnötigen Entwicklerbegriffe in Buttons/Tooltips
-- Lieber einfache Worte wie "Neue Aufgabe", "Suchen", "Alle anzeigen"
+- Lieber einfache Worte wie "Neue Notiz", "Suchen", "Alle anzeigen"
 
 Visuelle Hinweise:
 
@@ -301,17 +321,14 @@ Visuelle Hinweise:
 
 Verboten:
 
-- Englische UI-Begriffe (außer Markenname "Automaker")
+- Englische UI-Begriffe (außer Markenname "NoteDrill")
 - Überladene Toolbars mit vielen unbeschrifteten Icons
 - Fachbegriffe ohne kurze Erklärung
 
 ## 🔴 Solide Hintergrundfarben für Dialoge (Pflicht)
 
-Alle Dialoge, Sheets, Drawers und modalen Overlays müssen eine **solide Hex-Hintergrundfarbe** haben (z.B. `!bg-[#0c0f1a]`).
-**Keine** halbtransparenten Hintergründe wie `bg-black/40` als Hauptfläche.
-
 Vor Frontend-Anpassungen lesen:
-`shared-docs/agents/COMPONENT-STYLING-PROMPT-NEXT-JS.md`
+`docs/graphics-performance/COMPONENT-STYLING-PROMPT.md` falls existiert, aber auch `\shared-docs\agents\shared-docs\modernize-frontend.md`
 
 ## Test-Regel
 

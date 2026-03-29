@@ -82,9 +82,16 @@ function markAllRunningSubAgentsCompleted(
 /** How long (ms) to keep completed-only sub-agent entries in the cache. */
 const COMPLETED_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+/** Max age (ms) for a "running" sub-agent in the cache before we consider it stale.
+ *  If a sub-agent has been "running" for longer than this without updates, it was likely
+ *  orphaned (e.g. parent crashed, network hiccup, etc.) and should not be shown. */
+const RUNNING_CACHE_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
+
 function readCachedSubAgents(sessionId: string): ActiveSubAgent[] {
   const cached = subAgentStateCache.get(sessionId);
   if (!cached || cached.length === 0) return [];
+
+  const now = Date.now();
 
   // If ALL entries are completed and the most recent one finished more than TTL ago,
   // the cache is stale — discard it so the user doesn't see old sub-agents.
@@ -93,13 +100,31 @@ function readCachedSubAgents(sessionId: string): ActiveSubAgent[] {
     const latestCompletedAt = Math.max(
       ...cached.map((a) => a.completedAt?.getTime() ?? a.startedAt.getTime())
     );
-    if (Date.now() - latestCompletedAt > COMPLETED_CACHE_TTL_MS) {
+    if (now - latestCompletedAt > COMPLETED_CACHE_TTL_MS) {
       subAgentStateCache.delete(sessionId);
       return [];
     }
   }
 
-  return cached.map(cloneSubAgent);
+  // Safety net: filter out "running" entries that are unreasonably old.
+  // These are likely orphaned sub-agents whose stop event was never received.
+  const cleaned = cached.filter((a) => {
+    if (a.status !== 'running') return true;
+    const age = now - a.startedAt.getTime();
+    return age < RUNNING_CACHE_MAX_AGE_MS;
+  });
+
+  if (cleaned.length === 0) {
+    subAgentStateCache.delete(sessionId);
+    return [];
+  }
+
+  // Update cache if we filtered anything out
+  if (cleaned.length !== cached.length) {
+    subAgentStateCache.set(sessionId, cleaned.map(cloneSubAgent));
+  }
+
+  return cleaned.map(cloneSubAgent);
 }
 
 function writeCachedSubAgents(sessionId: string, subAgents: ActiveSubAgent[]): void {
@@ -222,12 +247,23 @@ export function useElectronAgent({
   // IMPORTANT: Only write to cache when we have a real sessionId to prevent
   // leaking sub-agent state from one session to another.
   const sessionIdRef = useRef(sessionId);
+  // Track the *previous* sessionId to detect session switches and prevent
+  // writing stale sub-agent data from session A under session B's cache key.
+  const prevSessionIdRef = useRef(sessionId);
   useEffect(() => {
     sessionIdRef.current = sessionId;
   }, [sessionId]);
 
   useEffect(() => {
     if (!sessionId) return;
+    // CRITICAL: When the sessionId just changed, the activeSubAgents state still
+    // contains data from the PREVIOUS session. Writing that to the NEW session's
+    // cache key would leak sub-agent indicators across sessions. Only persist
+    // when the sessionId hasn't changed since the last write (= normal in-session update).
+    if (prevSessionIdRef.current !== sessionId) {
+      prevSessionIdRef.current = sessionId;
+      return; // Skip this write – the init effect will set the correct sub-agents.
+    }
     writeCachedSubAgents(sessionId, activeSubAgents);
   }, [sessionId, activeSubAgents]);
 
@@ -435,8 +471,11 @@ export function useElectronAgent({
     // drop messages in session B).
     setIsConnected(false);
     setIsProcessing(false);
-    // Restore cached sub-agents for the target session (or empty array for new sessions)
-    setActiveSubAgents(readCachedSubAgents(sessionId));
+    // Restore cached sub-agents for the target session (or empty array for new sessions).
+    // IMPORTANT: readCachedSubAgents returns [] for unknown sessions, so new chats start clean.
+    const cachedForSession = readCachedSubAgents(sessionId);
+    logger.debug('Restoring sub-agents for session:', sessionId, 'count:', cachedForSession.length);
+    setActiveSubAgents(cachedForSession);
     setLastTerminalEvent(null);
 
     const initialize = async () => {

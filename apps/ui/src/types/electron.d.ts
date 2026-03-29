@@ -151,6 +151,7 @@ export interface SessionListItem {
   model?: string; // Model alias or ID used for this session
   thinkingLevel?: 'none' | 'low' | 'medium' | 'high' | 'ultrathink';
   reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+  lastSignal?: 'all_phases_complete' | 'question' | null;
 }
 
 export interface AgentAPI {

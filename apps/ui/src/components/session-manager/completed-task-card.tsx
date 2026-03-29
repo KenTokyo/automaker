@@ -21,6 +21,7 @@ import {
 import type { CompletedTask } from '@automaker/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Markdown } from '@/components/ui/markdown';
 import { cn } from '@/lib/utils';
 import {
@@ -81,9 +82,22 @@ interface CompletedTaskCardProps {
   task: CompletedTask;
   onDelete?: (filename: string) => void;
   fontSize?: number;
+  /** Selection mode: show checkbox when true */
+  selectionMode?: boolean;
+  /** Whether this card is currently selected */
+  isSelected?: boolean;
+  /** Called when selection changes */
+  onSelectionChange?: (filename: string, selected: boolean) => void;
 }
 
-export function CompletedTaskCard({ task, onDelete, fontSize = 14 }: CompletedTaskCardProps) {
+export function CompletedTaskCard({
+  task,
+  onDelete,
+  fontSize = 14,
+  selectionMode = false,
+  isSelected = false,
+  onSelectionChange,
+}: CompletedTaskCardProps) {
   const [deleting, setDeleting] = useState(false);
   const [filesExpanded, setFilesExpanded] = useState(false);
   const [contentExpanded, setContentExpanded] = useState(false);
@@ -120,9 +134,17 @@ export function CompletedTaskCard({ task, onDelete, fontSize = 14 }: CompletedTa
         'cursor-default'
       )}
     >
-      {/* Header: Status dot + Title + Actions */}
+      {/* Header: Checkbox + Status dot + Title + Actions */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
+          {selectionMode && (
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={(checked) => onSelectionChange?.(task.filename, checked === true)}
+              className="h-3.5 w-3.5 shrink-0"
+              aria-label={`${task.title} auswählen`}
+            />
+          )}
           <span
             className={cn('h-2 w-2 shrink-0 rounded-full', getStatusDotColor(task.status))}
             title={getStatusLabel(task.status)}

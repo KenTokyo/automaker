@@ -3,6 +3,7 @@
  */
 
 import type { Request, Response } from 'express';
+import { detectSessionSignal } from '@automaker/types';
 import { AgentService } from '../../../services/agent-service.js';
 import { getErrorMessage, logError } from '../common.js';
 
@@ -20,6 +21,7 @@ export function createIndexHandler(agentService: AgentService) {
       const runningSessionIds = agentService.getRunningSessionIds();
       const runningSubagentSessionIds = agentService.getRunningSubagentSessionIds();
       const stoppedSessionIds = agentService.getStoppedSessionIds();
+      const activeSessionIds = new Set([...runningSessionIds, ...runningSubagentSessionIds]);
 
       // Transform to match frontend SessionListItem interface
       const sessions = await Promise.all(
@@ -27,6 +29,7 @@ export function createIndexHandler(agentService: AgentService) {
           let messageCount = typeof s.messageCount === 'number' ? s.messageCount : undefined;
           let preview = typeof s.preview === 'string' ? s.preview : undefined;
           let lastError = typeof s.lastError === 'string' ? s.lastError : undefined;
+          let lastSignal = s.lastSignal ?? null;
 
           // Backward-compatibility for older metadata without cached summary fields.
           if (messageCount === undefined || preview === undefined) {
@@ -35,9 +38,19 @@ export function createIndexHandler(agentService: AgentService) {
             messageCount = messages.length;
             preview = lastMessage?.content?.slice(0, 100) || '';
             lastError = lastMessage?.isError ? getLastErrorPreview(lastMessage.content) : undefined;
+
+            // Also detect signal for legacy sessions without cached lastSignal
+            const isOrchestratorSession = Boolean(s.orchestratorRunId);
+            const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
+            lastSignal = detectSessionSignal(lastAssistant?.content, isOrchestratorSession);
           }
 
-          const isRunning = runningSessionIds.has(s.id) || runningSubagentSessionIds.has(s.id);
+          const isSubagentSession =
+            s.sourceType === 'subagent' || (!s.sourceType && Boolean(s.parentToolUseId));
+          const isParentActive = !s.parentSessionId || activeSessionIds.has(s.parentSessionId);
+          const isRunning = isSubagentSession
+            ? isParentActive && activeSessionIds.has(s.id)
+            : activeSessionIds.has(s.id);
           const isStopped = stoppedSessionIds.has(s.id);
 
           return {
@@ -59,6 +72,7 @@ export function createIndexHandler(agentService: AgentService) {
             preview,
             status: isRunning ? 'running' : isStopped ? 'stopped' : lastError ? 'failed' : 'idle',
             lastError,
+            lastSignal,
             totalElapsedMs: s.totalElapsedMs || 0,
             lastStartedAt: s.lastStartedAt,
             model: s.model,

@@ -10,8 +10,13 @@ export interface ProjectGroup {
   projectPath: string;
   /** All sessions belonging to this project, sorted newest first */
   allSessions: SessionListItem[];
-  /** Total number of sessions in this project */
+  /** Total number of ALL sessions (parents + children) in this project */
   totalCount: number;
+  /**
+   * Number of top-level parent sessions (sessions without parentSessionId).
+   * Used for "show more" pagination – only parent sessions count towards the limit.
+   */
+  parentCount: number;
 }
 
 interface UseProjectGroupingOptions {
@@ -59,11 +64,15 @@ export function useProjectGrouping({
         (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
       );
 
+      // Count only parent sessions (those without parentSessionId)
+      const parentSessions = sorted.filter((s) => !s.parentSessionId);
+
       groups.push({
         projectName: name,
         projectPath,
         allSessions: sorted,
         totalCount: sorted.length,
+        parentCount: parentSessions.length,
       });
     }
 

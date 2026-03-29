@@ -2,9 +2,14 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Loader2, FolderX, SearchX } from 'lucide-react';
 import type { FileTreeNode, SearchFilters } from '@/store/explorer-store';
-import { useExplorerStore } from '@/store/explorer-store';
+import { useExplorerStore, buildTreeFromFiles } from '@/store/explorer-store';
 import { FileTreeItem } from './file-tree-item';
-import { filterTreeByName, collectMatchingFolderPaths } from './tree-utils';
+import {
+  filterTreeByName,
+  collectMatchingFolderPaths,
+  sortTreeChildren,
+  annotateFolderMeta,
+} from './tree-utils';
 
 const EMPTY_FAVORITES: string[] = [];
 
@@ -25,32 +30,57 @@ export function FileTree({
   onToggleFolder,
   onToggleFavorite,
 }: FileTreeProps) {
-  const { rootNodes, expandedPaths, selectedFilePath, isLoadingRoot, favorites, highlightWindow } =
-    useExplorerStore(
-      useShallow((state) => ({
-        rootNodes: state.rootNodes,
-        expandedPaths: state.expandedPaths,
-        selectedFilePath: state.selectedFilePath,
-        isLoadingRoot: state.isLoadingRoot,
-        favorites: state.favorites[projectPath] ?? EMPTY_FAVORITES,
-        highlightWindow: state.highlightWindow,
-      }))
-    );
+  const {
+    rootNodes,
+    expandedPaths,
+    selectedFilePath,
+    isLoadingRoot,
+    favorites,
+    highlightWindow,
+    allFiles,
+    storeProjectPath,
+    sortBy,
+  } = useExplorerStore(
+    useShallow((state) => ({
+      rootNodes: state.rootNodes,
+      expandedPaths: state.expandedPaths,
+      selectedFilePath: state.selectedFilePath,
+      isLoadingRoot: state.isLoadingRoot,
+      favorites: state.favorites[projectPath] ?? EMPTY_FAVORITES,
+      highlightWindow: state.highlightWindow,
+      allFiles: state.allFiles,
+      storeProjectPath: state.projectPath,
+      sortBy: state.sortBy,
+    }))
+  );
 
   const isFavoriteCheck = useCallback(
     (filePath: string) => favorites.includes(filePath),
     [favorites]
   );
 
-  // Client-side name filtering
+  // Bei aktiver Suche: Baum aus ALLEN Dateien (ohne Zeitfilter/Limit) erstellen
   const hasNameSearch = searchQuery.trim().length > 0;
+
+  const unfilteredTree = useMemo(() => {
+    if (!hasNameSearch || !storeProjectPath || allFiles.length === 0) return null;
+    const rawNodes = buildTreeFromFiles(allFiles, storeProjectPath);
+    const sorted = sortTreeChildren(rawNodes, sortBy);
+    annotateFolderMeta(sorted);
+    return sorted;
+  }, [hasNameSearch, allFiles, storeProjectPath, sortBy]);
+
+  // Basis-Baum: bei Suche den ungefilterteten, sonst den normalen (mit Zeitfilter/Limit)
+  const baseNodes = hasNameSearch && unfilteredTree ? unfilteredTree : rootNodes;
+
+  // Client-side name filtering
   const filteredNodes = useMemo(() => {
-    if (!hasNameSearch) return rootNodes;
-    return filterTreeByName(rootNodes, searchQuery, {
+    if (!hasNameSearch) return baseNodes;
+    return filterTreeByName(baseNodes, searchQuery, {
       folders: searchFilters.folders,
       files: searchFilters.files,
     });
-  }, [rootNodes, searchQuery, hasNameSearch, searchFilters.folders, searchFilters.files]);
+  }, [baseNodes, searchQuery, hasNameSearch, searchFilters.folders, searchFilters.files]);
 
   // Auto-expand folders that contain search matches
   const prevQueryRef = useRef('');
@@ -62,7 +92,7 @@ export function FileTree({
     if (searchQuery === prevQueryRef.current) return;
     prevQueryRef.current = searchQuery;
 
-    const matchingPaths = collectMatchingFolderPaths(rootNodes, searchQuery, {
+    const matchingPaths = collectMatchingFolderPaths(baseNodes, searchQuery, {
       folders: searchFilters.folders,
       files: searchFilters.files,
     });
@@ -81,7 +111,7 @@ export function FileTree({
         useExplorerStore.setState({ expandedPaths: merged });
       }
     }
-  }, [searchQuery, hasNameSearch, rootNodes, searchFilters.folders, searchFilters.files]);
+  }, [searchQuery, hasNameSearch, baseNodes, searchFilters.folders, searchFilters.files]);
 
   if (isLoadingRoot) {
     return (

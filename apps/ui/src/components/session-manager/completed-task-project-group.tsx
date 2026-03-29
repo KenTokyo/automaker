@@ -10,6 +10,7 @@ import { useMemo } from 'react';
 import { ChevronRight, FolderOpen, Folder, Trash2 } from 'lucide-react';
 import type { CompletedTask } from '@automaker/types';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { CompletedTaskCard } from './completed-task-card';
 
@@ -40,6 +41,14 @@ interface CompletedTaskProjectGroupProps {
   onDeleteTask: (filename: string) => void;
   /** Bulk-delete old tasks (keep only newest MAX_TASKS_KEEP) */
   onCleanupProject: (projectPath: string, tasksToDelete: string[]) => void;
+  /** Selection mode: show checkboxes */
+  selectionMode?: boolean;
+  /** Set of selected task filenames */
+  selectedTasks?: Set<string>;
+  /** Called when a task's selection changes */
+  onSelectionChange?: (filename: string, selected: boolean) => void;
+  /** Called when "select all" for this group is toggled */
+  onSelectAllInGroup?: (projectPath: string, filenames: string[], selected: boolean) => void;
 }
 
 export function CompletedTaskProjectGroup({
@@ -53,12 +62,25 @@ export function CompletedTaskProjectGroup({
   fontSize,
   onDeleteTask,
   onCleanupProject,
+  selectionMode = false,
+  selectedTasks,
+  onSelectionChange,
+  onSelectAllInGroup,
 }: CompletedTaskProjectGroupProps) {
   const visibleTasks = useMemo(() => tasks.slice(0, visibleCount), [tasks, visibleCount]);
   const hasMore = visibleCount < tasks.length;
   const remainingCount = tasks.length - visibleCount;
   const canCleanup = tasks.length > MAX_TASKS_KEEP;
   const cleanupCount = tasks.length - MAX_TASKS_KEEP;
+
+  // Selection helpers
+  const allFilenames = useMemo(() => tasks.map((t) => t.filename), [tasks]);
+  const selectedInGroup = useMemo(
+    () => (selectedTasks ? tasks.filter((t) => selectedTasks.has(t.filename)).length : 0),
+    [tasks, selectedTasks]
+  );
+  const allSelected = selectionMode && selectedInGroup === tasks.length && tasks.length > 0;
+  const someSelected = selectionMode && selectedInGroup > 0 && !allSelected;
 
   const handleCleanup = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -90,6 +112,17 @@ export function CompletedTaskProjectGroup({
         onClick={onToggleExpanded}
         onKeyDown={handleHeaderKeyDown}
       >
+        {selectionMode && (
+          <Checkbox
+            checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+            onCheckedChange={(checked) => {
+              onSelectAllInGroup?.(projectPath, allFilenames, checked === true);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="h-3.5 w-3.5 shrink-0"
+            aria-label={`Alle Aufgaben in ${projectName} auswählen`}
+          />
+        )}
         <ChevronRight
           className={cn(
             'h-3 w-3 shrink-0 text-muted-foreground transition-transform duration-200',
@@ -141,6 +174,9 @@ export function CompletedTaskProjectGroup({
                 task={task}
                 fontSize={fontSize}
                 onDelete={onDeleteTask}
+                selectionMode={selectionMode}
+                isSelected={selectedTasks?.has(task.filename) ?? false}
+                onSelectionChange={onSelectionChange}
               />
             ))}
 

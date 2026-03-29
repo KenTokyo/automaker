@@ -23,6 +23,12 @@ export interface SearchResult {
   matchLine?: number;
   /** Short excerpt around the match */
   snippet?: string;
+  /** Last modified timestamp (ms since epoch) */
+  modified?: number;
+  /** Created timestamp (ms since epoch) */
+  created?: number;
+  /** File size in bytes */
+  size?: number;
 }
 
 export interface SearchOptions {
@@ -171,22 +177,50 @@ export async function searchProject(options: SearchOptions): Promise<SearchResul
       }
 
       // Time filter: skip files older than the cutoff
+      let fileStat: Awaited<ReturnType<typeof secureFs.stat>> | null = null;
       if (cutoffMs > 0) {
         try {
-          const stat = await secureFs.stat(entryPath);
-          if (Number(stat.mtimeMs) < cutoffMs) continue;
+          fileStat = await secureFs.stat(entryPath);
+          if (Number(fileStat.mtimeMs) < cutoffMs) continue;
         } catch {
           continue;
         }
       }
 
+      // Helper: get stat once (lazy, reuse if already fetched for time filter)
+      async function getFileStat() {
+        if (!fileStat) {
+          fileStat = await secureFs.stat(entryPath);
+        }
+        return fileStat;
+      }
+
+      // Helper: build result with file metadata
+      function buildResult(extra?: Partial<SearchResult>): SearchResult {
+        const s = fileStat;
+        return {
+          name: entry.name,
+          path: entryPath,
+          isDirectory: false,
+          modified: s ? Number(s.mtimeMs) : undefined,
+          created: s ? Number(s.birthtimeMs) : undefined,
+          size: s ? Number(s.size) : undefined,
+          ...extra,
+        };
+      }
+
       // Filename match
       if (entry.name.toLowerCase().includes(lowerQuery)) {
-        results.push({ name: entry.name, path: entryPath, isDirectory: false });
+        try {
+          await getFileStat();
+        } catch {
+          // Proceed without stat data
+        }
+        results.push(buildResult());
       } else if (searchContent && isTextFile(entry.name)) {
         // Content search (only if not already matched by filename)
         try {
-          const stat = await secureFs.stat(entryPath);
+          const stat = await getFileStat();
           if (Number(stat.size) > MAX_CONTENT_SEARCH_FILE_SIZE) continue;
 
           const raw = await secureFs.readFile(entryPath, 'utf-8');
@@ -196,13 +230,12 @@ export async function searchProject(options: SearchOptions): Promise<SearchResul
           for (let i = 0; i < lines.length; i++) {
             const idx = lines[i].toLowerCase().indexOf(lowerQuery);
             if (idx !== -1) {
-              results.push({
-                name: entry.name,
-                path: entryPath,
-                isDirectory: false,
-                matchLine: i + 1,
-                snippet: buildSnippet(lines[i], idx),
-              });
+              results.push(
+                buildResult({
+                  matchLine: i + 1,
+                  snippet: buildSnippet(lines[i], idx),
+                })
+              );
               break; // One result per file
             }
           }

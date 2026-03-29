@@ -46,6 +46,7 @@ import { SessionListSkeleton } from '@/components/session-manager/session-list-s
 import { SessionListError } from '@/components/session-manager/session-list-error';
 
 const logger = createLogger('SessionManager');
+const RUNNING_SESSION_REFRESH_MS = 5000;
 
 interface SessionManagerProps {
   currentSessionId: string | null;
@@ -89,6 +90,20 @@ function SessionManagerImpl({
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   const [timeFilterHours, setTimeFilterHours] = useState<number | null>(null);
   const [isDeleteOldSessionsDialogOpen, setIsDeleteOldSessionsDialogOpen] = useState(false);
+
+  // Collapsible children: tracks which parent sessions have their children hidden
+  const [collapsedSessions, setCollapsedSessions] = useState<Set<string>>(new Set());
+  const handleToggleChildrenCollapsed = useCallback((sessionId: string) => {
+    setCollapsedSessions((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) {
+        next.delete(sessionId);
+      } else {
+        next.add(sessionId);
+      }
+      return next;
+    });
+  }, []);
 
   // Project tree: which projects are expanded + how many sessions are visible per project
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
@@ -360,15 +375,60 @@ function SessionManagerImpl({
     setSessionToDelete(null);
   };
 
+  const isSubagentSession = useCallback(
+    (session: SessionListItem): boolean =>
+      session.sourceType === 'subagent' ||
+      (!session.sourceType && Boolean(session.parentToolUseId)),
+    []
+  );
+
   const activeSessions = sessions.filter((session) => !session.isArchived);
   const archivedSessions = sessions.filter((session) => session.isArchived);
-  const runningSessions = useMemo(
-    () =>
-      new Set(
-        sessions.filter((session) => session.status === 'running').map((session) => session.id)
-      ),
-    [sessions]
-  );
+  const runningSessions = useMemo(() => {
+    const rawRunningIds = new Set(
+      sessions.filter((session) => session.status === 'running').map((session) => session.id)
+    );
+
+    const normalizedRunningIds = new Set<string>();
+    for (const session of sessions) {
+      if (!rawRunningIds.has(session.id)) continue;
+
+      if (!isSubagentSession(session)) {
+        normalizedRunningIds.add(session.id);
+        continue;
+      }
+
+      if (!session.parentSessionId) {
+        normalizedRunningIds.add(session.id);
+        continue;
+      }
+
+      const parentIsRunning =
+        rawRunningIds.has(session.parentSessionId) ||
+        (currentSessionId === session.parentSessionId && isCurrentSessionThinking);
+
+      if (parentIsRunning) {
+        normalizedRunningIds.add(session.id);
+      } else {
+        logger.debug('Ignore stale running sub-agent in session list', {
+          subagentSessionId: session.id,
+          parentSessionId: session.parentSessionId,
+        });
+      }
+    }
+
+    return normalizedRunningIds;
+  }, [sessions, currentSessionId, isCurrentSessionThinking, isSubagentSession]);
+
+  useEffect(() => {
+    if (runningSessions.size === 0) return;
+
+    const intervalId = setInterval(() => {
+      void refetchSessions();
+    }, RUNNING_SESSION_REFRESH_MS);
+
+    return () => clearInterval(intervalId);
+  }, [runningSessions.size, refetchSessions]);
 
   const handleDeleteAllArchivedSessions = async () => {
     const api = getElectronAPI();
@@ -679,8 +739,6 @@ function SessionManagerImpl({
 
   const isChildSessionHiddenAtTopLevel = (session: SessionListItem): boolean =>
     Boolean(session.parentSessionId && displayedSessionById.has(session.parentSessionId));
-  const isSubagentSessionItem = (session: SessionListItem): boolean =>
-    session.sourceType === 'subagent' || (!session.sourceType && Boolean(session.parentToolUseId));
 
   const renderSessionNode = (
     session: SessionListItem,
@@ -707,6 +765,8 @@ function SessionManagerImpl({
     const childSessions = (childSessionsByParentId.get(session.id) || []).filter(
       (child) => !nextVisited.has(child.id)
     );
+    const hasChildren = childSessions.length > 0;
+    const isChildrenCollapsed = collapsedSessions.has(session.id);
 
     return (
       <div key={`${keyPrefix}-${session.id}`} className="space-y-1">
@@ -738,20 +798,34 @@ function SessionManagerImpl({
             getBadgeColor={getBadgeColor}
             getProject={getProject}
             phaseIndex={depth === 0 ? phaseIndex : undefined}
-            isSubagentChild={isSubagentSessionItem(session)}
+            isSubagentChild={isSubagentSession(session)}
+            hasChildren={hasChildren}
+            childCount={childSessions.length}
+            isChildrenCollapsed={isChildrenCollapsed}
+            onToggleChildren={handleToggleChildrenCollapsed}
           />
         </SessionItemErrorBoundary>
 
-        {childSessions.length > 0 && (
-          <div className="ml-3 space-y-1 border-l border-dashed border-sky-500/30 pl-2">
-            {childSessions.map((childSession) =>
-              renderSessionNode(childSession, {
-                rowFontSize: Math.max(10, rowFontSize - 1),
-                depth: depth + 1,
-                keyPrefix: `${keyPrefix}-${session.id}`,
-                visited: nextVisited,
-              })
+        {hasChildren && (
+          <div
+            className={cn(
+              'ml-3 space-y-1 border-l border-dashed border-sky-500/30 pl-2',
+              'grid transition-[grid-template-rows,opacity] duration-300 ease-out',
+              isChildrenCollapsed
+                ? 'pointer-events-none mt-0 grid-rows-[0fr] opacity-0'
+                : 'mt-0 grid-rows-[1fr] opacity-100'
             )}
+          >
+            <div className="overflow-hidden">
+              {childSessions.map((childSession) =>
+                renderSessionNode(childSession, {
+                  rowFontSize: Math.max(10, rowFontSize - 1),
+                  depth: depth + 1,
+                  keyPrefix: `${keyPrefix}-${session.id}`,
+                  visited: nextVisited,
+                })
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -879,6 +953,7 @@ function SessionManagerImpl({
                 key={group.projectPath}
                 group={group}
                 expandedRunIds={expandedOrchestratorRuns}
+                runningSessions={runningSessions}
                 isExpanded={!!expandedProjects[group.projectPath]}
                 onToggleExpanded={() => toggleProjectExpanded(group.projectPath)}
                 visibleCount={projectVisibleCounts[group.projectPath] || INITIAL_VISIBLE}
