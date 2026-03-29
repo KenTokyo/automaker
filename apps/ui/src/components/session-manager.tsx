@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from 'react';
 import { MessageSquare, BarChart3, CheckCircle, ListTodo } from 'lucide-react';
 import { createLogger } from '@automaker/utils/logger';
 import { useQueryClient } from '@tanstack/react-query';
@@ -22,7 +30,6 @@ import { useProjectGrouping } from '@/hooks/use-project-grouping';
 import { useAppStore } from '@/store/app-store';
 import { useOrchestratorStore } from '@/store/orchestrator-store';
 import { cn } from '@/lib/utils';
-import type { StreamEvent } from '@/types/electron';
 import { SessionManagerHeader } from '@/components/session-manager/session-manager-header';
 import { SessionListControls } from '@/components/session-manager/session-list-controls';
 import { SessionListItemRow } from '@/components/session-manager/session-list-item';
@@ -60,7 +67,7 @@ export interface QuickCreateSessionOptions {
 
 export type QuickCreateSessionArgs = boolean | QuickCreateSessionOptions;
 
-export function SessionManager({
+function SessionManagerImpl({
   currentSessionId,
   onSelectSession,
   projectPath,
@@ -127,27 +134,6 @@ export function SessionManager({
     await queryClient.invalidateQueries({ queryKey: queryKeys.sessions.all(true) });
     await refetchSessions();
   }, [queryClient, refetchSessions]);
-
-  useEffect(() => {
-    const api = getElectronAPI();
-    if (!api?.agent) return;
-
-    const unsubscribe = api.agent.onStream((rawEvent) => {
-      const event = rawEvent as StreamEvent;
-      if (
-        event.type === 'started' ||
-        event.type === 'complete' ||
-        event.type === 'error' ||
-        event.type === 'session_metadata_updated' ||
-        event.type === 'subagent_started' ||
-        event.type === 'subagent_stopped'
-      ) {
-        void invalidateSessions();
-      }
-    });
-
-    return unsubscribe;
-  }, [invalidateSessions]);
 
   const resolveOrchestratorRunIdForSessionCreation = (): string | undefined => {
     const orchestratorState = useOrchestratorStore.getState();
@@ -289,63 +275,72 @@ export function SessionManager({
     };
   }, [onQuickCreateRef, handleQuickCreateSession]);
 
-  const handleRenameSession = async (sessionId: string) => {
-    const api = getElectronAPI();
-    if (!editingName.trim() || !api?.sessions) return;
+  const handleRenameSession = useCallback(
+    async (sessionId: string) => {
+      const api = getElectronAPI();
+      if (!editingName.trim() || !api?.sessions) return;
 
-    const result = await api.sessions.update(sessionId, editingName, undefined);
-    if (result.success) {
-      setEditingSessionId(null);
-      setEditingName('');
-      await invalidateSessions();
-    }
-  };
-
-  const handleArchiveSession = async (sessionId: string) => {
-    const api = getElectronAPI();
-    if (!api?.sessions) {
-      logger.error('[SessionManager] Sessions API not available');
-      return;
-    }
-
-    try {
-      const result = await api.sessions.archive(sessionId);
+      const result = await api.sessions.update(sessionId, editingName, undefined);
       if (result.success) {
-        if (currentSessionId === sessionId) {
-          onSelectSession(null);
+        setEditingSessionId(null);
+        setEditingName('');
+        await invalidateSessions();
+      }
+    },
+    [editingName, invalidateSessions]
+  );
+
+  const handleArchiveSession = useCallback(
+    async (sessionId: string) => {
+      const api = getElectronAPI();
+      if (!api?.sessions) {
+        logger.error('[SessionManager] Sessions API not available');
+        return;
+      }
+
+      try {
+        const result = await api.sessions.archive(sessionId);
+        if (result.success) {
+          if (currentSessionId === sessionId) {
+            onSelectSession(null);
+          }
+          await invalidateSessions();
+        } else {
+          logger.error('[SessionManager] Archive failed:', result.error);
         }
-        await invalidateSessions();
-      } else {
-        logger.error('[SessionManager] Archive failed:', result.error);
+      } catch (error) {
+        logger.error('[SessionManager] Archive error:', error);
       }
-    } catch (error) {
-      logger.error('[SessionManager] Archive error:', error);
-    }
-  };
+    },
+    [currentSessionId, onSelectSession, invalidateSessions]
+  );
 
-  const handleUnarchiveSession = async (sessionId: string) => {
-    const api = getElectronAPI();
-    if (!api?.sessions) {
-      logger.error('[SessionManager] Sessions API not available');
-      return;
-    }
-
-    try {
-      const result = await api.sessions.unarchive(sessionId);
-      if (result.success) {
-        await invalidateSessions();
-      } else {
-        logger.error('[SessionManager] Unarchive failed:', result.error);
+  const handleUnarchiveSession = useCallback(
+    async (sessionId: string) => {
+      const api = getElectronAPI();
+      if (!api?.sessions) {
+        logger.error('[SessionManager] Sessions API not available');
+        return;
       }
-    } catch (error) {
-      logger.error('[SessionManager] Unarchive error:', error);
-    }
-  };
 
-  const handleDeleteSession = (session: SessionListItem) => {
+      try {
+        const result = await api.sessions.unarchive(sessionId);
+        if (result.success) {
+          await invalidateSessions();
+        } else {
+          logger.error('[SessionManager] Unarchive failed:', result.error);
+        }
+      } catch (error) {
+        logger.error('[SessionManager] Unarchive error:', error);
+      }
+    },
+    [invalidateSessions]
+  );
+
+  const handleDeleteSession = useCallback((session: SessionListItem) => {
     setSessionToDelete(session);
     setIsDeleteDialogOpen(true);
-  };
+  }, []);
 
   const confirmDeleteSession = async (sessionId: string) => {
     const api = getElectronAPI();
@@ -427,7 +422,7 @@ export function SessionManager({
     })();
   }, [sessions, maxSessionsPerProject, projectPath, currentSessionId, invalidateSessions]);
 
-  const toggleSessionSelection = (sessionId: string) => {
+  const toggleSessionSelection = useCallback((sessionId: string) => {
     setSelectedSessionIds((previous) => {
       const next = new Set(previous);
       if (next.has(sessionId)) {
@@ -437,7 +432,7 @@ export function SessionManager({
       }
       return next;
     });
-  };
+  }, []);
 
   const toggleGroupSelection = (sessionIds: string[]) => {
     setSelectedSessionIds((previous) => {
@@ -596,10 +591,9 @@ export function SessionManager({
   };
 
   const handleSelectSession = useCallback(
-    (sessionId: string, sessionProjectPath?: string) => {
+    (sessionId: string, sessionProjectPath?: string, isDirty?: boolean) => {
       // Mark session as clean (read) when user clicks on it
-      const session = sessions.find((s) => s.id === sessionId);
-      if (session?.isDirty) {
+      if (isDirty) {
         const api = getElectronAPI();
         if (api?.sessions?.markClean) {
           void api.sessions.markClean(sessionId).then(() => void invalidateSessions());
@@ -607,8 +601,18 @@ export function SessionManager({
       }
       onSelectSession(sessionId, sessionProjectPath);
     },
-    [sessions, onSelectSession, invalidateSessions]
+    [onSelectSession, invalidateSessions]
   );
+
+  const handleStartEditing = useCallback((sessionId: string, currentName: string) => {
+    setEditingSessionId(sessionId);
+    setEditingName(currentName);
+  }, []);
+
+  const handleStopEditing = useCallback(() => {
+    setEditingSessionId(null);
+    setEditingName('');
+  }, []);
 
   const handleDeleteOldSessions = async (olderThanDays: number) => {
     const api = getElectronAPI();
@@ -675,6 +679,8 @@ export function SessionManager({
 
   const isChildSessionHiddenAtTopLevel = (session: SessionListItem): boolean =>
     Boolean(session.parentSessionId && displayedSessionById.has(session.parentSessionId));
+  const isSubagentSessionItem = (session: SessionListItem): boolean =>
+    session.sourceType === 'subagent' || (!session.sourceType && Boolean(session.parentToolUseId));
 
   const renderSessionNode = (
     session: SessionListItem,
@@ -720,17 +726,11 @@ export function SessionManager({
             editingSessionId={editingSessionId}
             editingName={editingName}
             onEditingNameChange={setEditingName}
-            onStartEditing={(sessionId, currentName) => {
-              setEditingSessionId(sessionId);
-              setEditingName(currentName);
-            }}
-            onStopEditing={() => {
-              setEditingSessionId(null);
-              setEditingName('');
-            }}
-            onRenameSession={(sessionId) => void handleRenameSession(sessionId)}
-            onArchiveSession={(sessionId) => void handleArchiveSession(sessionId)}
-            onUnarchiveSession={(sessionId) => void handleUnarchiveSession(sessionId)}
+            onStartEditing={handleStartEditing}
+            onStopEditing={handleStopEditing}
+            onRenameSession={handleRenameSession}
+            onArchiveSession={handleArchiveSession}
+            onUnarchiveSession={handleUnarchiveSession}
             onDeleteSession={handleDeleteSession}
             onSelectSession={handleSelectSession}
             onToggleSelection={toggleSessionSelection}
@@ -738,7 +738,7 @@ export function SessionManager({
             getBadgeColor={getBadgeColor}
             getProject={getProject}
             phaseIndex={depth === 0 ? phaseIndex : undefined}
-            isSubagentChild={depth > 0 || session.sourceType === 'subagent'}
+            isSubagentChild={isSubagentSessionItem(session)}
           />
         </SessionItemErrorBoundary>
 
@@ -1004,3 +1004,6 @@ export function SessionManager({
     </Card>
   );
 }
+
+export const SessionManager = memo(SessionManagerImpl);
+SessionManager.displayName = 'SessionManager';

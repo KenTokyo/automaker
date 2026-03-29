@@ -123,6 +123,7 @@ export const XtermLogViewer = forwardRef<XtermLogViewerRef, XtermLogViewerProps>
           disableStdin: true, // Read-only mode
           scrollback: 10000,
           convertEol: true,
+          rescaleOverlappingGlyphs: true,
         });
 
         const fitAddon = new FitAddon();

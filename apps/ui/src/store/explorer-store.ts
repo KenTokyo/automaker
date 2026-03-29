@@ -103,6 +103,24 @@ export const HIGHLIGHT_WINDOW_OPTIONS: HighlightWindowOption[] = [
   { value: 24, label: '24 Stunden' },
 ];
 
+/** 0 = alle Dateien anzeigen, sonst max. N Dateien */
+export type ExplorerFileLimit = number;
+
+export interface FileLimitOption {
+  value: number;
+  label: string;
+}
+
+export const FILE_LIMIT_OPTIONS: FileLimitOption[] = [
+  { value: 10, label: 'Letzte 10' },
+  { value: 20, label: 'Letzte 20' },
+  { value: 50, label: 'Letzte 50' },
+  { value: 100, label: 'Letzte 100' },
+  { value: 150, label: 'Letzte 150' },
+  { value: 200, label: 'Letzte 200' },
+  { value: 0, label: 'Alle' },
+];
+
 export interface ExplorerStoreState {
   // Raw data from server
   allFiles: MarkdownFileEntry[];
@@ -130,6 +148,9 @@ export interface ExplorerStoreState {
 
   // Recency highlight window (hours, 0 = disabled, default 6)
   highlightWindow: number;
+
+  // Datei-Limit (0 = alle, sonst max. N Dateien)
+  fileLimit: ExplorerFileLimit;
 
   // Search filters (inline tree search)
   searchFilters: SearchFilters;
@@ -160,6 +181,7 @@ export interface ExplorerStoreState {
   setTimeFilter: (hours: ExplorerTimeFilter) => void;
   setSortBy: (sortBy: SortBy) => void;
   setHighlightWindow: (hours: number) => void;
+  setFileLimit: (limit: ExplorerFileLimit) => void;
   collapseAll: () => void;
   setSearchFilter: (key: keyof SearchFilters, value: boolean) => void;
   setSearchFiltersOpen: (open: boolean) => void;
@@ -177,6 +199,7 @@ export interface ExplorerStoreState {
 // Helpers
 // ---------------------------------------------------------------------------
 
+const FILE_LIMIT_STORAGE_KEY = 'automaker-explorer-file-limit';
 const SEARCH_FILTERS_STORAGE_KEY = 'automaker-explorer-search-filters';
 const FAVORITES_STORAGE_KEY = 'automaker-explorer-favorites';
 const TIME_FILTER_STORAGE_KEY = 'automaker-explorer-time-filter';
@@ -287,6 +310,25 @@ function saveTerminalSize(data: Record<string, number>): void {
   }
 }
 
+function loadFileLimit(): ExplorerFileLimit {
+  try {
+    const raw = localStorage.getItem(FILE_LIMIT_STORAGE_KEY);
+    if (!raw) return 0; // Standard: alle Dateien
+    const value = Number(raw);
+    return Number.isFinite(value) && value >= 0 ? value : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveFileLimit(limit: ExplorerFileLimit): void {
+  try {
+    localStorage.setItem(FILE_LIMIT_STORAGE_KEY, String(limit));
+  } catch {
+    // Speicherfehler ignorieren
+  }
+}
+
 function loadSearchFilters(): SearchFilters {
   try {
     const raw = localStorage.getItem(SEARCH_FILTERS_STORAGE_KEY);
@@ -325,19 +367,49 @@ function saveFavorites(favorites: Record<string, string[]>): void {
 }
 
 /**
- * Internal helper: filter → build → sort → annotate pipeline.
+ * Internal helper: filter → sort flat list → limit → build tree → sort tree → annotate pipeline.
+ *
+ * Wichtig: Das Limit wird VOR dem Baum-Bau angewendet,
+ * damit wirklich nur die Top-N zuletzt geänderten/erstellten Dateien übrig bleiben.
  */
 function rebuildTree(
   allFiles: MarkdownFileEntry[],
   projectPath: string,
   timeFilter: number,
-  sortBy: SortBy
+  sortBy: SortBy,
+  fileLimit: number
 ): { rootNodes: FileTreeNode[]; filteredFileCount: number } {
-  const filtered = filterFilesByTime(allFiles, timeFilter);
+  // 1) Zeitfilter anwenden
+  let filtered = filterFilesByTime(allFiles, timeFilter);
+
+  // 2) Flache Liste sortieren (nach gewähltem Kriterium), dann limitieren
+  if (fileLimit > 0 && filtered.length > fileLimit) {
+    const sorted = [...filtered].sort(getFlatFileComparator(sortBy));
+    filtered = sorted.slice(0, fileLimit);
+  }
+
+  // 3) Baum aus den limitierten Dateien bauen
   const rawNodes = buildTreeFromFiles(filtered, projectPath);
   const sortedNodes = sortTreeChildren(rawNodes, sortBy);
   annotateFolderMeta(sortedNodes);
   return { rootNodes: sortedNodes, filteredFileCount: filtered.length };
+}
+
+/**
+ * Vergleichsfunktion für die flache Dateiliste (zum Sortieren vor dem Limitieren).
+ * Sortiert absteigend — neueste zuerst.
+ */
+function getFlatFileComparator(
+  sortBy: SortBy
+): (a: MarkdownFileEntry, b: MarkdownFileEntry) => number {
+  switch (sortBy) {
+    case 'modified':
+      return (a, b) => b.modified - a.modified;
+    case 'created':
+      return (a, b) => b.created - a.created;
+    case 'name':
+      return (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  }
 }
 
 /**
@@ -496,6 +568,7 @@ export const useExplorerStore = create<ExplorerStoreState>()((set, get) => ({
   timeFilter: loadTimeFilter(),
   sortBy: loadSortBy(),
   highlightWindow: loadHighlightWindow(),
+  fileLimit: loadFileLimit(),
 
   searchFilters: loadSearchFilters(),
   searchFiltersOpen: false,
@@ -526,8 +599,14 @@ export const useExplorerStore = create<ExplorerStoreState>()((set, get) => ({
     }),
 
   setAllFiles: (files, projectPath) => {
-    const { timeFilter, sortBy } = get();
-    const { rootNodes, filteredFileCount } = rebuildTree(files, projectPath, timeFilter, sortBy);
+    const { timeFilter, sortBy, fileLimit } = get();
+    const { rootNodes, filteredFileCount } = rebuildTree(
+      files,
+      projectPath,
+      timeFilter,
+      sortBy,
+      fileLimit
+    );
     set({
       allFiles: files,
       rootNodes,
@@ -582,7 +661,8 @@ export const useExplorerStore = create<ExplorerStoreState>()((set, get) => ({
       state.allFiles,
       state.projectPath,
       hours,
-      state.sortBy
+      state.sortBy,
+      state.fileLimit
     );
     set({ timeFilter: hours, rootNodes, filteredFileCount });
   },
@@ -598,7 +678,8 @@ export const useExplorerStore = create<ExplorerStoreState>()((set, get) => ({
       state.allFiles,
       state.projectPath,
       state.timeFilter,
-      sortBy
+      sortBy,
+      state.fileLimit
     );
     set({ sortBy, rootNodes, filteredFileCount });
   },
@@ -606,6 +687,23 @@ export const useExplorerStore = create<ExplorerStoreState>()((set, get) => ({
   setHighlightWindow: (hours) => {
     saveHighlightWindow(hours);
     set({ highlightWindow: hours });
+  },
+
+  setFileLimit: (limit) => {
+    saveFileLimit(limit);
+    const state = get();
+    if (!state.projectPath || state.allFiles.length === 0) {
+      set({ fileLimit: limit });
+      return;
+    }
+    const { rootNodes, filteredFileCount } = rebuildTree(
+      state.allFiles,
+      state.projectPath,
+      state.timeFilter,
+      state.sortBy,
+      limit
+    );
+    set({ fileLimit: limit, rootNodes, filteredFileCount });
   },
 
   collapseAll: () => set({ expandedPaths: new Set() }),

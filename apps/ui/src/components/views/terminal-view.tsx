@@ -1423,7 +1423,7 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
   // Loading state
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center" style={terminalUiStyle}>
+      <div className="h-full min-h-0 flex items-center justify-center" style={terminalUiStyle}>
         <Spinner size="xl" />
       </div>
     );
@@ -1433,7 +1433,7 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
   if (error) {
     return (
       <div
-        className="flex-1 flex flex-col items-center justify-center text-center p-6"
+        className="h-full min-h-0 flex flex-col items-center justify-center text-center p-6"
         style={terminalUiStyle}
       >
         <div className="p-4 rounded-full bg-destructive/10 mb-4">
@@ -1453,7 +1453,7 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
   if (!status?.enabled) {
     return (
       <div
-        className="flex-1 flex flex-col items-center justify-center text-center p-6"
+        className="h-full min-h-0 flex flex-col items-center justify-center text-center p-6"
         style={terminalUiStyle}
       >
         <div className="p-4 rounded-full bg-muted/50 mb-4">
@@ -1473,7 +1473,7 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
   if (status.passwordRequired && !terminalState.isUnlocked) {
     return (
       <div
-        className="flex-1 flex flex-col items-center justify-center text-center p-6"
+        className="h-full min-h-0 flex flex-col items-center justify-center text-center p-6"
         style={terminalUiStyle}
       >
         <div className="p-4 rounded-full bg-muted/50 mb-4">
@@ -1519,7 +1519,7 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
   if (terminalState.tabs.length === 0) {
     return (
       <div
-        className="flex-1 flex flex-col items-center justify-center text-center p-6"
+        className="h-full min-h-0 flex flex-col items-center justify-center text-center p-6"
         style={terminalUiStyle}
       >
         <div className="p-4 rounded-full bg-brand-500/10 mb-4">
@@ -1562,7 +1562,7 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="h-full flex-1 min-h-0 flex flex-col overflow-hidden">
         {/* Tab bar */}
         <div className="flex items-center bg-card border-b border-border px-2">
           {/* Tabs */}
@@ -1769,7 +1769,7 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
         </div>
 
         {/* Active tab content */}
-        <div className="flex-1 overflow-hidden bg-background">
+        <div className="flex-1 min-h-0 overflow-hidden bg-background">
           {terminalState.maximizedSessionId ? (
             // When a terminal is maximized, render only that terminal
             <TerminalErrorBoundary
@@ -1815,7 +1815,7 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
             renderPanelContent(activeTab.layout)
           ) : (
             <div
-              className="flex-1 flex flex-col items-center justify-center text-center p-6"
+              className="h-full min-h-0 flex flex-col items-center justify-center text-center p-6"
               style={terminalUiStyle}
             >
               <p className="text-muted-foreground mb-4">This tab is empty</p>

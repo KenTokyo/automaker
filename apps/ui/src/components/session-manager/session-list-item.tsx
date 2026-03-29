@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import {
   AlertCircle,
   Archive,
@@ -47,7 +47,7 @@ interface SessionListItemRowProps {
   onArchiveSession: (sessionId: string) => void;
   onUnarchiveSession: (sessionId: string) => void;
   onDeleteSession: (session: SessionListItem) => void;
-  onSelectSession: (sessionId: string, sessionProjectPath?: string) => void;
+  onSelectSession: (sessionId: string, sessionProjectPath?: string, isDirty?: boolean) => void;
   onToggleSelection: (sessionId: string) => void;
   getProjectName: (projectPath: string | undefined) => string | null;
   getBadgeColor: (projectPath: string | undefined) => string | undefined;
@@ -56,7 +56,7 @@ interface SessionListItemRowProps {
   isSubagentChild?: boolean;
 }
 
-export function SessionListItemRow({
+function SessionListItemRowImpl({
   session,
   currentSessionId,
   isCurrentSessionThinking,
@@ -113,7 +113,13 @@ export function SessionListItemRow({
   const sessionBadgeColor = getBadgeColor(session.projectPath);
   const isEditing = editingSessionId === session.id;
   const isPhaseItem = typeof phaseIndex === 'number';
-  const isSubagent = isSubagentChild || session.sourceType === 'subagent';
+  const isSubagentSource =
+    session.sourceType === 'subagent' || (!session.sourceType && Boolean(session.parentToolUseId));
+  const isSubagent = isSubagentChild || isSubagentSource;
+  const isEmptySubagent =
+    isSubagentSource && (session.messageCount ?? 0) === 0 && !session.preview?.trim();
+  const isSelectableSession = !session.isArchived && !isEmptySubagent;
+  const isRowInteractive = isMultiselectMode || isSelectableSession;
 
   // File extraction for completed (dirty) sessions
   const [filesExpanded, setFilesExpanded] = useState(false);
@@ -151,10 +157,12 @@ export function SessionListItemRow({
   return (
     <div
       className={cn(
-        'group relative cursor-pointer rounded-lg border',
+        'group relative rounded-lg border',
         'animate-in fade-in slide-in-from-left-1 duration-200',
         'transition-[transform,box-shadow,background-color,border-color,opacity] duration-200 ease-out',
-        'hover:-translate-y-[1px] hover:bg-accent/60 hover:shadow-sm active:translate-y-0 active:scale-[0.99]',
+        isRowInteractive
+          ? 'cursor-pointer hover:-translate-y-[1px] hover:bg-accent/60 hover:shadow-sm active:translate-y-0 active:scale-[0.99]'
+          : 'cursor-default',
         isRunning &&
           !isCurrentSession &&
           'border-amber-500/70 bg-amber-500/5 shadow-[0_8px_20px_-16px_theme(colors.amber.500)]',
@@ -188,7 +196,9 @@ export function SessionListItemRow({
       )}
       style={{
         fontSize: `${sessionFontSize}px`,
-        padding: `${Math.max(4, sessionFontSize * 0.6)}px ${Math.max(6, sessionFontSize * 0.75)}px`,
+        padding: isSubagent
+          ? `${Math.max(3, sessionFontSize * 0.45)}px ${Math.max(6, sessionFontSize * 0.68)}px`
+          : `${Math.max(4, sessionFontSize * 0.6)}px ${Math.max(6, sessionFontSize * 0.75)}px`,
         borderLeftWidth: sessionBadgeColor ? '3px' : undefined,
         borderLeftColor: sessionBadgeColor || undefined,
       }}
@@ -196,8 +206,8 @@ export function SessionListItemRow({
       onClick={() => {
         if (isMultiselectMode) {
           onToggleSelection(session.id);
-        } else if (!session.isArchived) {
-          onSelectSession(session.id, session.projectPath);
+        } else if (isSelectableSession) {
+          onSelectSession(session.id, session.projectPath, session.isDirty);
         }
       }}
       data-testid={`session-item-${session.id}`}
@@ -296,7 +306,7 @@ export function SessionListItemRow({
 
               {/* Row 2: Badges (status, phase, sub-agent, model, timer) */}
               <div
-                className="mb-0.5 flex flex-wrap items-center gap-1"
+                className={cn('mb-0.5 flex flex-wrap items-center gap-1', isSubagent && 'mb-0')}
                 style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
               >
                 {isPhaseItem && (
@@ -400,28 +410,32 @@ export function SessionListItemRow({
                 )}
               </div>
 
-              {session.description && (
-                <p
-                  className={cn(
-                    'mt-0.5 overflow-hidden whitespace-pre-line text-muted-foreground',
-                    'transition-colors duration-300 ease-out',
-                    isCurrentSession
-                      ? 'line-clamp-none text-foreground/70'
-                      : 'line-clamp-2 group-hover:line-clamp-4 group-hover:text-foreground/60'
+              {!isEmptySubagent && (
+                <>
+                  {session.description && (
+                    <p
+                      className={cn(
+                        'mt-0.5 overflow-hidden whitespace-pre-line text-muted-foreground',
+                        'transition-colors duration-300 ease-out',
+                        isCurrentSession
+                          ? 'line-clamp-none text-foreground/70'
+                          : 'line-clamp-2 group-hover:line-clamp-4 group-hover:text-foreground/60'
+                      )}
+                      style={{ fontSize: `${Math.max(10, sessionFontSize - 2)}px` }}
+                    >
+                      {session.description}
+                    </p>
                   )}
-                  style={{ fontSize: `${Math.max(10, sessionFontSize - 2)}px` }}
-                >
-                  {session.description}
-                </p>
-              )}
 
-              {!session.description && session.preview && (
-                <p
-                  className="truncate text-muted-foreground transition-colors duration-200 group-hover:text-foreground/80"
-                  style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
-                >
-                  {session.preview}
-                </p>
+                  {!session.description && session.preview && (
+                    <p
+                      className="truncate text-muted-foreground transition-colors duration-200 group-hover:text-foreground/80"
+                      style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
+                    >
+                      {session.preview}
+                    </p>
+                  )}
+                </>
               )}
 
               {session.lastError && (
@@ -433,36 +447,71 @@ export function SessionListItemRow({
                 </p>
               )}
 
-              <div
-                className="mt-1 flex flex-wrap items-center gap-2"
-                style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
-              >
-                <span className="text-muted-foreground">{session.messageCount ?? 0} messages</span>
-                <span className="text-muted-foreground">|</span>
-                <span className="text-muted-foreground">
-                  Created {formatTime(session.createdAt)}
-                </span>
-                <span className="text-muted-foreground">|</span>
-                <span className="text-muted-foreground">
-                  Updated {formatTime(session.updatedAt)}
-                </span>
+              {isSubagentSource ? (
+                <div
+                  className="mt-0.5 flex flex-wrap items-center gap-1.5"
+                  style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
+                >
+                  <span className="text-muted-foreground">
+                    {isEmptySubagent
+                      ? 'Kein eigener Verlauf'
+                      : `${session.messageCount ?? 0} messages`}
+                  </span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="text-muted-foreground">
+                    Updated {formatTime(session.updatedAt)}
+                  </span>
 
-                {session.projectPath && (
-                  <>
-                    <span className="text-muted-foreground">|</span>
-                    <ProjectBadge
-                      projectName={getProjectName(session.projectPath)}
-                      projectPath={session.projectPath}
-                      badgeColor={sessionBadgeColor ?? undefined}
-                      backgroundColor={project?.backgroundColor}
-                      textColor={project?.textColor}
-                      iconColor={project?.iconColor}
-                      icon={project?.icon}
-                      customIconPath={project?.customIconPath}
-                    />
-                  </>
-                )}
-              </div>
+                  {session.projectPath && (
+                    <>
+                      <span className="text-muted-foreground">|</span>
+                      <ProjectBadge
+                        projectName={getProjectName(session.projectPath)}
+                        projectPath={session.projectPath}
+                        badgeColor={sessionBadgeColor ?? undefined}
+                        backgroundColor={project?.backgroundColor}
+                        textColor={project?.textColor}
+                        iconColor={project?.iconColor}
+                        icon={project?.icon}
+                        customIconPath={project?.customIconPath}
+                      />
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div
+                  className="mt-1 flex flex-wrap items-center gap-2"
+                  style={{ fontSize: `${Math.max(9, sessionFontSize - 4)}px` }}
+                >
+                  <span className="text-muted-foreground">
+                    {session.messageCount ?? 0} messages
+                  </span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="text-muted-foreground">
+                    Created {formatTime(session.createdAt)}
+                  </span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="text-muted-foreground">
+                    Updated {formatTime(session.updatedAt)}
+                  </span>
+
+                  {session.projectPath && (
+                    <>
+                      <span className="text-muted-foreground">|</span>
+                      <ProjectBadge
+                        projectName={getProjectName(session.projectPath)}
+                        projectPath={session.projectPath}
+                        badgeColor={sessionBadgeColor ?? undefined}
+                        backgroundColor={project?.backgroundColor}
+                        textColor={project?.textColor}
+                        iconColor={project?.iconColor}
+                        icon={project?.icon}
+                        customIconPath={project?.customIconPath}
+                      />
+                    </>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -761,6 +810,9 @@ export function SessionListItemRow({
     </div>
   );
 }
+
+export const SessionListItemRow = memo(SessionListItemRowImpl);
+SessionListItemRow.displayName = 'SessionListItemRow';
 
 // ---------------------------------------------------------------------------
 // Sub-component: FileCategory

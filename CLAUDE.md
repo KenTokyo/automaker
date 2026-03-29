@@ -1,197 +1,333 @@
-# CLAUDE.md
+﻿# ════════════════════════════════════════════════════════════════
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# TEIL 1: CLAUDE-KONTEXT = ARCHITEKTUR (keine Coding-Regeln)
 
-## Project Overview
+# ════════════════════════════════════════════════════════════════
 
-Automaker is an autonomous AI development studio built as an npm workspace monorepo. It provides a Kanban-based workflow where AI agents (powered by Claude Agent SDK) implement features in isolated git worktrees.
+## 📌 Zweck dieser Datei
 
-## Common Commands
+Diese Datei enthält **nur Architektur- und System-Kontext** für Automaker.
 
-```bash
-# Development
-npm run dev                 # Interactive launcher (choose web or electron)
-npm run dev:web             # Web browser mode (localhost:3007)
-npm run dev:electron        # Desktop app mode
-npm run dev:electron:debug  # Desktop with DevTools open
+- **`AGENTS.md`**: Arbeitsweise, Coding-Regeln, Kommunikationsstil
+- **`CLAUDE.md`**: Architektur, Datenfluss, Plattformen, wichtige Dateien
 
-# Building
-npm run build               # Build web application
-npm run build:packages      # Build all shared packages (required before other builds)
-npm run build:electron      # Build desktop app for current platform
-npm run build:server        # Build server only
+Wenn du Regeln zum Arbeiten suchst, lies `AGENTS.md`.
+Wenn du technische Zusammenhänge suchst, lies `CLAUDE.md`.
 
-# Testing
-npm run test                # E2E tests (Playwright, headless)
-npm run test:headed         # E2E tests with browser visible
-npm run test:server         # Server unit tests (Vitest)
-npm run test:packages       # All shared package tests
-npm run test:all            # All tests (packages + server)
+## 📖 Immer zuerst lesen
 
-# Single test file
-npm run test:server -- tests/unit/specific.test.ts
+- `AGENTS.md`
+- `shared-docs/CODING-RULES.md`
 
-# Linting and formatting
-npm run lint                # ESLint
-npm run format              # Prettier write
-npm run format:check        # Prettier check
-```
+# ════════════════════════════════════════════════════════════════
 
-## Architecture
+# TEIL 2: APP-KONTEXT & PRODUKTBILD
 
-### Monorepo Structure
+# ════════════════════════════════════════════════════════════════
+
+## 🎯 Produktkontext
+
+Automaker ist ein autonomes KI-Entwicklungsstudio als npm-Workspace-Monorepo.
+Kernidee: Features laufen in isolierten Git-Worktrees, gesteuert über Agenten-Workflows.
+
+Wichtige Laufmodi:
+
+- Web-App (`apps/ui`)
+- Electron Desktop-Modus (`apps/ui` + preload/main)
+- Server (`apps/server`)
+- Kanban-Standalone (`apps/kanban-web`)
+
+## 🧭 Monorepo-Struktur
 
 ```
 automaker/
 ├── apps/
-│   ├── ui/           # React + Vite + Electron frontend (port 3007)
-│   └── server/       # Express + WebSocket backend (port 3008)
-└── libs/             # Shared packages (@automaker/*)
-    ├── types/        # Core TypeScript definitions (no dependencies)
-    ├── utils/        # Logging, errors, image processing, context loading
-    ├── prompts/      # AI prompt templates
-    ├── platform/     # Path management, security, process spawning
-    ├── model-resolver/    # Claude model alias resolution
-    ├── dependency-resolver/  # Feature dependency ordering
-    └── git-utils/    # Git operations & worktree management
+│   ├── ui/           # React/Vite/Electron UI
+│   ├── server/       # Express/WebSocket Backend
+│   ├── kanban-web/   # Standalone Kanban SPA
+│   └── markdown-explorer-extension/
+├── libs/             # Shared Packages (@automaker/*)
+├── docs/
+├── shared-docs/
+├── .automaker/       # Projektbezogene Daten im Zielprojekt
+└── data/             # Globale App-Daten
 ```
 
-### Package Dependency Chain
+## 📦 Shared-Package-Kette
 
-Packages can only depend on packages above them:
+Abhängigkeitsreihenfolge (von unten nach oben):
 
-```
-@automaker/types (no dependencies)
-    ↓
-@automaker/utils, @automaker/prompts, @automaker/platform, @automaker/model-resolver, @automaker/dependency-resolver
-    ↓
-@automaker/git-utils
-    ↓
-@automaker/server, @automaker/ui
-```
+1. `@automaker/types`
+2. `@automaker/utils`, `@automaker/prompts`, `@automaker/platform`, `@automaker/model-resolver`, `@automaker/dependency-resolver`, `@automaker/spec-parser`
+3. `@automaker/git-utils`
+4. `apps/server` und `apps/ui`
 
-### Key Technologies
+# ════════════════════════════════════════════════════════════════
 
-- **Frontend**: React 19, Vite 7, Electron 39, TanStack Router, Zustand 5, Tailwind CSS 4
-- **Backend**: Express 5, WebSocket (ws), Claude Agent SDK, node-pty
-- **Testing**: Playwright (E2E), Vitest (unit)
+# TEIL 3: LAUFZEIT-ARCHITEKTUR (UI ↔ SERVER ↔ AGENT)
 
-### Server Architecture
+# ════════════════════════════════════════════════════════════════
 
-The server (`apps/server/src/`) follows a modular pattern:
+## 🔁 High-Level-Datenfluss
 
-- `routes/` - Express route handlers organized by feature (agent, features, auto-mode, worktree, etc.)
-- `services/` - Business logic (AgentService, AutoModeService, FeatureLoader, TerminalService)
-- `providers/` - AI provider abstraction (currently Claude via Claude Agent SDK)
-- `lib/` - Utilities (events, auth, worktree metadata)
+1. UI löst Aktion aus (Task, Agent-Run, Chat, Pipeline)
+2. Server verarbeitet Request in Route/Service
+3. Provider führt LLM/CLI-Schritt aus
+4. Events werden über WebSocket zurück in die UI gestreamt
+5. Ergebnisse werden pro Projekt in `.automaker/` gespeichert
 
-### Frontend Architecture
+## 🌐 UI-Architektur (`apps/ui/src`)
 
-The UI (`apps/ui/src/`) uses:
+Zentrale Bereiche:
 
-- `routes/` - TanStack Router file-based routing
-- `components/views/` - Main view components (board, settings, terminal, etc.)
-- `store/` - Zustand stores with persistence (app-store.ts, setup-store.ts)
-- `hooks/` - Custom React hooks
-- `lib/` - Utilities and API client
+- `routes/` (TanStack Router)
+- `components/views/` (Board, Agent, Terminal, Settings, Overview, etc.)
+- `store/` (Zustand Stores)
+- `hooks/`
+- `lib/` (API-Client, Supabase-Helpers, Serializer, Utilities)
 
-## Data Storage
+## 🖥️ Server-Architektur (`apps/server/src`)
 
-### Per-Project Data (`.automaker/`)
+Zentrale Bereiche:
+
+- `routes/` (Feature-basierte API-Endpunkte)
+- `services/` (Business-Logik)
+- `providers/` (AI-Provider-Abstraktion)
+- `middleware/`
+- `lib/`, `types/`
+
+Wichtige Route-Gruppen:
+
+- `routes/agent/`
+- `routes/worktree/`
+- `routes/features/`
+- `routes/auto-mode/`
+- `routes/tasks/`
+- `routes/pipeline/`
+- `routes/settings/`
+- `routes/overview/`
+
+Wichtige Services:
+
+- `services/agent-service.ts`
+- `services/auto-mode-service.ts`
+- `services/feature-loader.ts`
+- `services/pipeline-service.ts`
+- `services/terminal-service.ts`
+- `services/event-history-service.ts`
+- `services/overview-service.ts`
+
+## 📡 Event-Streaming
+
+Automaker arbeitet Event-getrieben:
+
+- Server erzeugt strukturierte Events
+- UI konsumiert Events live via WebSocket
+- Dadurch sind Agent-Fortschritt, Logs und Statusänderungen sofort sichtbar
+
+# ════════════════════════════════════════════════════════════════
+
+# TEIL 4: PROVIDER-ARCHITEKTUR
+
+# ════════════════════════════════════════════════════════════════
+
+## 🤖 Provider-System (`apps/server/src/providers`)
+
+Mehrere Provider werden zentral abstrahiert:
+
+- Claude
+- Codex
+- Gemini
+- OpenCode
+- Cursor
+- Copilot
+- CLI-Basisprovider
+
+Wichtige Dateien:
+
+- `providers/provider-factory.ts`
+- `providers/base-provider.ts`
+- `providers/types.ts`
+- `providers/tool-normalization.ts`
+- `providers/claude-provider.ts`
+- `providers/codex-provider.ts`
+- `providers/gemini-provider.ts`
+- `providers/opencode-provider.ts`
+- `providers/cursor-provider.ts`
+- `providers/copilot-provider.ts`
+
+## 🧩 Modell-Auflösung
+
+Modell-Aliase laufen über Shared Package:
+
+- `libs/model-resolver/`
+
+Prinzip:
+
+- `haiku` → konkretes Modell
+- `sonnet` → konkretes Modell
+- `opus` → konkretes Modell
+
+# ════════════════════════════════════════════════════════════════
+
+# TEIL 5: GIT-WORKTREE & TASK-ISOLATION
+
+# ════════════════════════════════════════════════════════════════
+
+## 🌿 Worktree-Prinzip
+
+Jedes Feature kann in einem separaten Git-Worktree laufen.
+Das schützt den Haupt-Branch und reduziert Seiteneffekte zwischen Tasks.
+
+Wichtige Stellen:
+
+- `libs/git-utils/`
+- `apps/server/src/routes/worktree/`
+- `apps/server/src/services/feature-loader.ts`
+
+## 🧠 Kontextdateien für Agenten
+
+Projektkontext wird aus `.automaker/context/` geladen und in Prompts eingebunden.
+So bleiben Projektregeln pro Projekt konsistent.
+
+# ════════════════════════════════════════════════════════════════
+
+# TEIL 6: DATENHALTUNG (PROJEKT vs GLOBAL)
+
+# ════════════════════════════════════════════════════════════════
+
+## 📁 Projektbezogene Daten (`.automaker/`)
+
+Im jeweiligen Zielprojekt:
 
 ```
 .automaker/
-├── features/              # Feature JSON files and images
+├── features/
 │   └── {featureId}/
 │       ├── feature.json
 │       ├── agent-output.md
 │       └── images/
-├── context/               # Context files for AI agents (CLAUDE.md, etc.)
-├── settings.json          # Project-specific settings
-├── spec.md               # Project specification
-└── analysis.json         # Project structure analysis
+├── context/
+├── settings.json
+├── spec.md
+└── analysis.json
 ```
 
-### Global Data (`DATA_DIR`, default `./data`)
+## 💾 Globale Daten (`data/` bzw. `DATA_DIR`)
+
+Automaker-übergreifende Daten:
 
 ```
 data/
-├── settings.json          # Global settings, profiles, shortcuts
-├── credentials.json       # API keys
-├── sessions-metadata.json # Chat session metadata
-└── agent-sessions/        # Conversation histories
+├── settings.json
+├── credentials.json
+├── sessions-metadata.json
+└── agent-sessions/
 ```
 
-## Import Conventions
+## 🔐 Wichtige Trennung
 
-Always import from shared packages, never from old paths:
+- `.automaker/` = pro Projekt
+- `data/` = global für die App
 
-```typescript
-// ✅ Correct
-import type { Feature, ExecuteOptions } from '@automaker/types';
-import { createLogger, classifyError } from '@automaker/utils';
-import { getEnhancementPrompt } from '@automaker/prompts';
-import { getFeatureDir, ensureAutomakerDir } from '@automaker/platform';
-import { resolveModelString } from '@automaker/model-resolver';
-import { resolveDependencies } from '@automaker/dependency-resolver';
-import { getGitRepositoryDiffs } from '@automaker/git-utils';
+Diese Trennung darf bei Architekturänderungen nicht vermischt werden.
 
-// ❌ Never import from old paths
-import { Feature } from '../services/feature-loader'; // Wrong
-import { createLogger } from '../lib/logger'; // Wrong
-```
+# ════════════════════════════════════════════════════════════════
 
-## Key Patterns
+# TEIL 7: KANBAN-WEB & CHAT-KONSOLIDIERUNG
 
-### Event-Driven Architecture
+# ════════════════════════════════════════════════════════════════
 
-All server operations emit events that stream to the frontend via WebSocket. Events are created using `createEventEmitter()` from `lib/events.ts`.
+## 🧱 Kanban-Web (Standalone)
 
-### Git Worktree Isolation
+Für Arbeiten an `apps/kanban-web/`:
 
-Each feature executes in an isolated git worktree, created via `@automaker/git-utils`. This protects the main branch during AI agent execution.
+- zuerst `apps/kanban-web/ARCHITEKTUR.md` lesen
 
-### Context Files
+Hinweis:
 
-Project-specific rules are stored in `.automaker/context/` and automatically loaded into agent prompts via `loadContextFiles()` from `@automaker/utils`.
+- Standalone SPA
+- spricht direkt mit Supabase
+- Shared UI/Logik aus `apps/ui` kann Auswirkungen auf beide Apps haben
 
-### Model Resolution
+## 💬 Chat-Konsolidierung
 
-Use `resolveModelString()` from `@automaker/model-resolver` to convert model aliases:
+- `apps/ui` ist Haupt-Chat
+- `apps/chat` ist nicht der Zielpfad für neue Features
+- Neue Chat-Funktionen in `apps/ui` umsetzen
+- Referenz: `plans/automaker-chat-unification/`
 
-- `haiku` → `claude-haiku-4-5`
-- `sonnet` → `claude-sonnet-4-6`
-- `opus` → `claude-opus-4-6`
+# ════════════════════════════════════════════════════════════════
 
-## Kanban-Web (Standalone Board)
+# TEIL 8: WICHTIGE DATEI-LANDKARTE
 
-Bei Arbeiten am Kanban-Board oder `apps/kanban-web/` → **LESE `apps/kanban-web/ARCHITEKTUR.md`** für vollständige Architektur, Datenfluss, Supabase-Schema, Deployment und Regeln.
+# ════════════════════════════════════════════════════════════════
 
-Kurzfassung: Eigenständige SPA auf Vercel (`https://automaker-kanban.vercel.app`), spricht direkt mit Supabase (kein Backend). Shared Code (Hooks, Stores, UI) kommt aus `apps/ui/src/` - Änderungen dort betreffen beide Apps.
+## Server-Einstieg
 
-## Chat-Zusammenführung
+- `apps/server/src/index.ts`
 
-`apps/ui` ist der Haupt-Chat. `apps/chat` ist nur noch eine Übergangs-Quelle.
+## UI-Einstieg
 
-- Keine neuen Features in `apps/chat` bauen
-- Neue Chat-Funktionen gehören nach `apps/ui`
-- Dashboard, Dateien und Übersicht sind bereits in `apps/ui` portiert
-- Siehe `plans/automaker-chat-unification/` für den vollständigen Plan
+- `apps/ui/src/main.ts`
+- `apps/ui/src/app.tsx`
+- `apps/ui/src/renderer.tsx`
 
-## Environment Variables
+## Electron
 
-- `ANTHROPIC_API_KEY` - Anthropic API key (or use Claude Code CLI auth)
-- `HOST` - Host to bind server to (default: 0.0.0.0)
-- `HOSTNAME` - Hostname for user-facing URLs (default: localhost)
-- `PORT` - Server port (default: 3008)
-- `DATA_DIR` - Data storage directory (default: ./data)
-- `ALLOWED_ROOT_DIRECTORY` - Restrict file operations to specific directory
-- `AUTOMAKER_MOCK_AGENT=true` - Enable mock agent mode for CI testing
-- `AUTOMAKER_AUTO_LOGIN=true` - Skip login prompt in development (disabled when NODE_ENV=production)
-- `VITE_HOSTNAME` - Hostname for frontend API URLs (default: localhost)
+- `apps/ui/src/preload.ts`
+- `apps/ui/src/electron/`
 
-bitte kein build durchlaufen lassen, sondern nur nach typescript fehlern suchen, statt kompletten build oder dev server zu starten!
+## Shared-Libs
 
-**Completed-Task Dokumentation**: Nach erfolgreichem Abschluss einer Aufgabe MUSS eine Datei in `.completed/<YYYY-MM-DD>_<slug>.md` erstellt werden. Format: YAML Frontmatter mit title, description, date, status, effort + Markdown Body. Siehe: `shared-docs/agents/completed-task-rule.md`
+- `libs/types/`
+- `libs/utils/`
+- `libs/prompts/`
+- `libs/platform/`
+- `libs/model-resolver/`
+- `libs/dependency-resolver/`
+- `libs/spec-parser/`
+- `libs/git-utils/`
 
-LESE jetzt Agents.md für weitere Coding-Regeln
+## API & Store (UI)
+
+- `apps/ui/src/lib/http-api-client.ts`
+- `apps/ui/src/store/`
+- `apps/ui/src/hooks/`
+
+# ════════════════════════════════════════════════════════════════
+
+# TEIL 9: UMGEBUNGSVARIABLEN (ARCHITEKTURRELEVANT)
+
+# ════════════════════════════════════════════════════════════════
+
+Wichtige Variablen:
+
+- `ANTHROPIC_API_KEY`
+- `HOST`
+- `HOSTNAME`
+- `PORT`
+- `DATA_DIR`
+- `ALLOWED_ROOT_DIRECTORY`
+- `AUTOMAKER_MOCK_AGENT`
+- `AUTOMAKER_AUTO_LOGIN`
+- `VITE_HOSTNAME`
+
+# ════════════════════════════════════════════════════════════════
+
+# TEIL 10: ENTSCHEIDUNGSLEITLINIEN
+
+# ════════════════════════════════════════════════════════════════
+
+## 🧭 Architektur-Checks vor Merge
+
+1. Betrifft die Änderung UI, Server, Provider oder mehrere Ebenen?
+2. Ist die Trennung `.automaker/` (Projekt) vs `data/` (global) sauber?
+3. Sind Worktree-/Git-Nebenwirkungen berücksichtigt?
+4. Sind Event-Streams und Frontend-Reaktion weiterhin konsistent?
+5. Wenn `apps/ui` Shared-Code ändert: wurde `apps/kanban-web` mitgedacht?
+
+## ✅ Kurzfazit
+
+`AGENTS.md` steuert das **Wie wir arbeiten**.
+`CLAUDE.md` beschreibt das **Wie Automaker gebaut ist**.

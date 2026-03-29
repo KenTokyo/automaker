@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import {
   ChevronsDownUp,
   Clock,
+  Hash,
   Highlighter,
   RefreshCw,
   Search,
@@ -31,6 +32,7 @@ import {
   TIME_FILTER_OPTIONS,
   SORT_OPTIONS,
   HIGHLIGHT_WINDOW_OPTIONS,
+  FILE_LIMIT_OPTIONS,
   DEFAULT_TERMINAL_SIZE,
 } from '@/store/explorer-store';
 import { FileTree } from './file-tree';
@@ -88,6 +90,7 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
     terminalSize,
     searchFilters,
     searchFiltersOpen,
+    fileLimit,
   } = useExplorerStore(
     useShallow((state) => ({
       activeTab: state.activeTab,
@@ -106,6 +109,7 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
       terminalSize: state.terminalSizeByProject[projectPath] ?? DEFAULT_TERMINAL_SIZE,
       searchFilters: state.searchFilters,
       searchFiltersOpen: state.searchFiltersOpen,
+      fileLimit: state.fileLimit,
     }))
   );
 
@@ -208,6 +212,10 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
     useExplorerStore.getState().setHighlightWindow(hours);
   }, []);
 
+  const handleFileLimitChange = useCallback((limit: number) => {
+    useExplorerStore.getState().setFileLimit(limit);
+  }, []);
+
   const handleCollapseAll = useCallback(() => {
     useExplorerStore.getState().collapseAll();
   }, []);
@@ -230,7 +238,7 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
   const filesFontSize = useAppStore((s) => s.filesPanelFontSize);
   const filesPanelZoom = filesFontSize / RIGHT_PANEL_FONT_SIZE_DEFAULT;
 
-  const isFiltered = timeFilter > 0;
+  const isFiltered = timeFilter > 0 || (fileLimit > 0 && filteredFileCount < totalFileCount);
   const showPreview = selectedFilePath !== null;
 
   return (
@@ -288,6 +296,13 @@ export function FilesPanel({ projectPath }: FilesPanelProps) {
               onChange={(v) => handleHighlightWindowChange(Number(v))}
               icon={<Highlighter className="h-3 w-3" />}
               ariaLabel="Hervorhebung"
+            />
+            <MiniSelect
+              value={fileLimit}
+              options={FILE_LIMIT_OPTIONS}
+              onChange={(v) => handleFileLimitChange(Number(v))}
+              icon={<Hash className="h-3 w-3" />}
+              ariaLabel="Anzahl Dateien"
             />
           </div>
 

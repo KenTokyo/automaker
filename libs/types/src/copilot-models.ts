@@ -123,9 +123,9 @@ export const COPILOT_MODEL_MAP = {
     contextWindow: 128000,
   },
   // Gemini models (Google via GitHub Copilot)
-  'copilot-gemini-3-pro-preview': {
-    label: 'Gemini 3 Pro Preview',
-    description: 'Google Gemini 3 Pro Preview via GitHub Copilot.',
+  'copilot-gemini-3.1-pro-preview': {
+    label: 'Gemini 3.1 Pro Preview',
+    description: 'Google Gemini 3.1 Pro Preview via GitHub Copilot.',
     supportsVision: true,
     supportsTools: true,
     contextWindow: 1000000,

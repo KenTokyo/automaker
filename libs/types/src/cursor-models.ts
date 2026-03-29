@@ -13,8 +13,8 @@ export type CursorModelId =
   | 'cursor-opus-4.6' // Claude Opus 4.6
   | 'cursor-opus-4.6-thinking' // Claude Opus 4.6 with extended thinking
   | 'cursor-opus-4.1' // Claude Opus 4.1
-  | 'cursor-gemini-3-pro' // Gemini 3 Pro
-  | 'cursor-gemini-3-flash' // Gemini 3 Flash
+  | 'cursor-gemini-3.1-pro' // Gemini 3.1 Pro
+  | 'cursor-gemini-3.1-flash' // Gemini 3.1 Flash
   | 'cursor-gpt-5.2' // GPT-5.2 via Cursor
   | 'cursor-gpt-5.1' // GPT-5.1 via Cursor
   | 'cursor-gpt-5.2-high' // GPT-5.2 High via Cursor
@@ -40,8 +40,8 @@ export type LegacyCursorModelId =
   | 'opus-4.6'
   | 'opus-4.6-thinking'
   | 'opus-4.1'
-  | 'gemini-3-pro'
-  | 'gemini-3-flash'
+  | 'gemini-3.1-pro'
+  | 'gemini-3.1-flash'
   | 'grok';
 
 /**
@@ -110,17 +110,17 @@ export const CURSOR_MODEL_MAP: Record<CursorModelId, CursorModelConfig> = {
     hasThinking: false,
     supportsVision: false,
   },
-  'cursor-gemini-3-pro': {
-    id: 'cursor-gemini-3-pro',
-    label: 'Gemini 3 Pro',
-    description: 'Google Gemini 3 Pro via Cursor',
+  'cursor-gemini-3.1-pro': {
+    id: 'cursor-gemini-3.1-pro',
+    label: 'Gemini 3.1 Pro',
+    description: 'Google Gemini 3.1 Pro via Cursor',
     hasThinking: false,
     supportsVision: false,
   },
-  'cursor-gemini-3-flash': {
-    id: 'cursor-gemini-3-flash',
-    label: 'Gemini 3 Flash',
-    description: 'Google Gemini 3 Flash (faster)',
+  'cursor-gemini-3.1-flash': {
+    id: 'cursor-gemini-3.1-flash',
+    label: 'Gemini 3.1 Flash',
+    description: 'Google Gemini 3.1 Flash (faster)',
     hasThinking: false,
     supportsVision: false,
   },
@@ -228,8 +228,8 @@ export const LEGACY_CURSOR_MODEL_MAP: Record<LegacyCursorModelId, CursorModelId>
   'opus-4.6': 'cursor-opus-4.6',
   'opus-4.6-thinking': 'cursor-opus-4.6-thinking',
   'opus-4.1': 'cursor-opus-4.1',
-  'gemini-3-pro': 'cursor-gemini-3-pro',
-  'gemini-3-flash': 'cursor-gemini-3-flash',
+  'gemini-3.1-pro': 'cursor-gemini-3.1-pro',
+  'gemini-3.1-flash': 'cursor-gemini-3.1-flash',
   grok: 'cursor-grok',
 };
 
@@ -420,8 +420,8 @@ export const STANDALONE_CURSOR_MODELS: CursorModelId[] = [
   'cursor-auto',
   'cursor-composer-1',
   'cursor-opus-4.1',
-  'cursor-gemini-3-pro',
-  'cursor-gemini-3-flash',
+  'cursor-gemini-3.1-pro',
+  'cursor-gemini-3.1-flash',
   'cursor-grok',
 ];
 

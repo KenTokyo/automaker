@@ -262,7 +262,7 @@ export function useSettingsSync(): SettingsSyncState {
       const api = getHttpApiClient();
       const appState = useAppStore.getState();
 
-      logger.info('[SYNC_START] Syncing to server:', {
+      logger.debug('[SYNC_START] Syncing to server:', {
         projectsCount: appState.projects?.length ?? 0,
       });
 
@@ -286,7 +286,7 @@ export function useSettingsSync(): SettingsSyncState {
         return;
       }
 
-      logger.info('[SYNC_SEND] Sending settings update to server:', {
+      logger.debug('[SYNC_SEND] Sending settings update to server:', {
         projects: Array.isArray(updates.projects) ? updates.projects.length : 0,
         trashedProjects: Array.isArray(updates.trashedProjects)
           ? updates.trashedProjects.length
@@ -294,7 +294,7 @@ export function useSettingsSync(): SettingsSyncState {
       });
 
       const result = await api.settings.updateGlobal(updates);
-      logger.info('[SYNC_RESPONSE] Server response:', { success: result.success });
+      logger.debug('[SYNC_RESPONSE] Server response:', { success: result.success });
       if (result.success) {
         lastSyncedRef.current = updateHash;
         logger.debug('Settings synced to server');
@@ -369,13 +369,13 @@ export function useSettingsSync(): SettingsSyncState {
         // have propagated through the React tree before we read state.
         await new Promise((resolve) => setTimeout(resolve, 50));
 
-        logger.info('Migration complete, initializing sync');
+        logger.debug('Migration complete, initializing sync');
 
         // Read state - at this point React has processed the store update
         const appState = useAppStore.getState();
         const setupState = useSetupStore.getState();
 
-        logger.info('Initial state read:', { projectsCount: appState.projects?.length ?? 0 });
+        logger.debug('Initial state read:', { projectsCount: appState.projects?.length ?? 0 });
 
         // Store the initial state hash to avoid immediate re-sync
         // (migration has already hydrated the store from server/localStorage)
@@ -436,11 +436,9 @@ export function useSettingsSync(): SettingsSyncState {
       // This is critical - projects list changes must sync right away to prevent loss
       // when switching between Electron and web modes or closing the app
       if (newState.projects !== prevState.projects) {
-        logger.info('[PROJECTS_CHANGED] Projects array changed, syncing immediately', {
+        logger.debug('[PROJECTS_CHANGED] Projects array changed, syncing immediately', {
           prevCount: prevState.projects?.length ?? 0,
           newCount: newState.projects?.length ?? 0,
-          prevProjects: prevState.projects?.map((p) => p.name) ?? [],
-          newProjects: newState.projects?.map((p) => p.name) ?? [],
         });
         syncNow();
         return;

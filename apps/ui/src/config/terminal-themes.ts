@@ -54,29 +54,30 @@ export type TerminalFontOption = UIFontOption;
 /**
  * Terminal font options - reuses UI_MONO_FONT_OPTIONS with terminal-specific default
  *
- * The 'default' value means "use the default terminal font" (Menlo/Monaco)
+ * The 'default' value means "use the default terminal font" (JetBrains Mono)
  */
 export const TERMINAL_FONT_OPTIONS: readonly UIFontOption[] = UI_MONO_FONT_OPTIONS.map((option) => {
   // Replace the UI default label with terminal-specific default
   if (option.value === DEFAULT_FONT_VALUE) {
-    return { value: option.value, label: 'Default (Menlo / Monaco)' };
+    return { value: option.value, label: 'Default (JetBrains Mono)' };
   }
   return option;
 });
 
 /**
  * Default terminal font family
- * Uses the DEFAULT_FONT_VALUE sentinel which maps to Menlo/Monaco
+ * Uses the DEFAULT_FONT_VALUE sentinel which maps to JetBrains Mono
  */
 export const DEFAULT_TERMINAL_FONT = DEFAULT_FONT_VALUE;
 
 /**
  * Get the actual font family CSS value for terminal
- * Converts DEFAULT_FONT_VALUE to the actual Menlo/Monaco font stack
+ * Converts DEFAULT_FONT_VALUE to JetBrains Mono (professional programming font with ligatures)
+ * Falls back to Menlo/Monaco if JetBrains Mono is not available
  */
 export function getTerminalFontFamily(fontValue: string | undefined): string {
   if (!fontValue || fontValue === DEFAULT_FONT_VALUE) {
-    return "Menlo, Monaco, 'Courier New', monospace";
+    return "'JetBrains Mono', Menlo, Monaco, 'Courier New', monospace";
   }
   return fontValue;
 }

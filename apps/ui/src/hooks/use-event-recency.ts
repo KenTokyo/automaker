@@ -15,6 +15,7 @@ import { create } from 'zustand';
  * and polling can be safely disabled.
  */
 export const EVENT_RECENCY_THRESHOLD = 5000; // 5 seconds
+const EVENT_RECENCY_UPDATE_THROTTLE_MS = 500;
 
 /**
  * Store for tracking event timestamps per query key
@@ -46,12 +47,21 @@ export const useEventRecencyStore = create<EventRecencyState>((set, get) => ({
         ...state.eventTimestamps,
         [queryKey]: now,
       },
-      lastGlobalEventTimestamp: now,
+      lastGlobalEventTimestamp:
+        now - state.lastGlobalEventTimestamp < EVENT_RECENCY_UPDATE_THROTTLE_MS
+          ? state.lastGlobalEventTimestamp
+          : now,
     }));
   },
 
   recordGlobalEvent: () => {
-    set({ lastGlobalEventTimestamp: Date.now() });
+    set((state) => {
+      const now = Date.now();
+      if (now - state.lastGlobalEventTimestamp < EVENT_RECENCY_UPDATE_THROTTLE_MS) {
+        return state;
+      }
+      return { lastGlobalEventTimestamp: now };
+    });
   },
 
   areEventsRecent: (queryKey: string) => {

@@ -946,9 +946,16 @@
   background: var(--muted-foreground);
 }
 
-/* Terminal padding for better readability */
+/* Terminal padding for better readability.
+   IMPORTANT: Use margin inside the terminal container div instead of padding
+   on .xterm itself. The FitAddon calculates available rows/cols from the
+   .xterm element's dimensions. Padding on .xterm causes the terminal to
+   not fill its container fully (visible as empty space at the bottom). */
 .xterm {
-  padding: 12px 16px;
+  padding: 4px 0 0 8px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* ========================================

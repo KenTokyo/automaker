@@ -71,6 +71,25 @@ const FEATURE_CLEANUP_EVENTS: AutoModeEvent['type'][] = [
 ];
 
 /**
+ * Agent stream events that can change what appears in the sessions list.
+ */
+const SESSION_LIST_INVALIDATION_EVENTS: StreamEvent['type'][] = [
+  'started',
+  'complete',
+  'error',
+  'stopped',
+  'session_metadata_updated',
+  'subagent_started',
+  'subagent_stopped',
+];
+
+/**
+ * Coalesce rapid session invalidations while streams are noisy.
+ */
+const SESSION_LIST_INVALIDATION_DEBOUNCE_WAIT_MS = 300;
+const SESSION_LIST_INVALIDATION_MAX_WAIT_MS = 1200;
+
+/**
  * Type guard to check if an event has a featureId property
  */
 function hasFeatureId(event: AutoModeEvent): event is AutoModeEvent & { featureId: string } {
@@ -319,41 +338,50 @@ export function useSessionQueryInvalidation(sessionId: string | undefined) {
   const recordGlobalEvent = useEventRecencyStore((state) => state.recordGlobalEvent);
 
   useEffect(() => {
-    if (!sessionId) return;
-
     const api = getElectronAPI();
     if (!api.agent) return;
+
+    const invalidateSessionList = debounce(
+      () => {
+        queryClient.invalidateQueries({
+          queryKey: ['sessions'],
+        });
+      },
+      SESSION_LIST_INVALIDATION_DEBOUNCE_WAIT_MS,
+      { maxWait: SESSION_LIST_INVALIDATION_MAX_WAIT_MS }
+    );
+
     const unsubscribe = api.agent.onStream((data: unknown) => {
       const event = data as StreamEvent;
-      // Only handle events for the current session
-      if ('sessionId' in event && event.sessionId !== sessionId) return;
-
       // Record that we received a WebSocket event
       recordGlobalEvent();
 
+      const eventSessionId =
+        'sessionId' in event && typeof event.sessionId === 'string' ? event.sessionId : undefined;
+      const isCurrentSessionEvent = Boolean(sessionId && eventSessionId === sessionId);
+
       // Invalidate session history when a message is complete
-      if (event.type === 'complete' || event.type === 'message') {
+      if (
+        sessionId &&
+        isCurrentSessionEvent &&
+        (event.type === 'complete' || event.type === 'message')
+      ) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.sessions.history(sessionId),
         });
       }
 
-      // Invalidate sessions list when any session changes
-      // Use ['sessions'] prefix to match all session queries regardless of includeArchived param
-      if (
-        event.type === 'complete' ||
-        event.type === 'session_metadata_updated' ||
-        event.type === 'stopped' ||
-        event.type === 'subagent_started' ||
-        event.type === 'subagent_stopped'
-      ) {
-        queryClient.invalidateQueries({
-          queryKey: ['sessions'],
-        });
+      // Invalidate sessions list when any session changes.
+      // Use ['sessions'] prefix to match all session queries regardless of includeArchived param.
+      if (SESSION_LIST_INVALIDATION_EVENTS.includes(event.type)) {
+        invalidateSessionList();
       }
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      invalidateSessionList.flush();
+    };
   }, [sessionId, queryClient, recordGlobalEvent]);
 }
 

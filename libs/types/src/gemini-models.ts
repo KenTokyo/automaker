@@ -18,23 +18,23 @@ export interface GeminiModelConfig {
 
 /**
  * Available Gemini models via the Gemini CLI
- * Models from Gemini 2.5 and 3.0 series
+ * Models from Gemini 2.5 and 3.1 series
  *
  * Model IDs use 'gemini-' prefix for consistent provider routing (like Cursor).
  * When passed to the CLI, the prefix is part of the actual model name.
  */
 export const GEMINI_MODEL_MAP = {
-  // Gemini 3 Series (latest)
-  'gemini-3-pro-preview': {
-    label: 'Gemini 3 Pro Preview',
+  // Gemini 3.1 Series (latest)
+  'gemini-3.1-pro-preview': {
+    label: 'Gemini 3.1 Pro Preview',
     description: 'Most advanced Gemini model with deep reasoning capabilities.',
     supportsVision: true,
     supportsThinking: true,
     contextWindow: 1000000,
   },
-  'gemini-3-flash-preview': {
-    label: 'Gemini 3 Flash Preview',
-    description: 'Fast Gemini 3 model for quick tasks.',
+  'gemini-3.1-flash-preview': {
+    label: 'Gemini 3.1 Flash Preview',
+    description: 'Fast Gemini 3.1 model for quick tasks.',
     supportsVision: true,
     supportsThinking: true,
     contextWindow: 1000000,

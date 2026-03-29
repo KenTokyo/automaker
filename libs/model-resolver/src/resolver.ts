@@ -12,7 +12,7 @@
  * With canonical model IDs:
  * - Cursor: cursor-auto, cursor-composer-1, cursor-gpt-5.2
  * - OpenCode: opencode-big-pickle, opencode-grok-code
- * - Copilot: copilot-gpt-5.1, copilot-claude-sonnet-4.5, copilot-gemini-3-pro-preview
+ * - Copilot: copilot-gpt-5.1, copilot-claude-sonnet-4.5, copilot-gemini-3.1-pro-preview
  * - Gemini: gemini-2.5-flash, gemini-2.5-pro
  * - Claude: claude-haiku, claude-sonnet, claude-opus (also supports legacy aliases)
  */

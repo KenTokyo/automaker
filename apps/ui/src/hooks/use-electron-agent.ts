@@ -19,6 +19,107 @@ export interface ActiveSubAgent {
   elapsedSeconds: number;
   runInBackground?: boolean;
   lastToolName?: string;
+  status: 'running' | 'completed';
+  completedAt?: Date;
+}
+
+const subAgentStateCache = new Map<string, ActiveSubAgent[]>();
+const MAX_COMPLETED_SUBAGENT_ENTRIES = 12;
+
+function cloneSubAgent(agent: ActiveSubAgent): ActiveSubAgent {
+  return {
+    ...agent,
+    startedAt: new Date(agent.startedAt),
+    completedAt: agent.completedAt ? new Date(agent.completedAt) : undefined,
+  };
+}
+
+function orderAndTrimSubAgents(subAgents: ActiveSubAgent[]): ActiveSubAgent[] {
+  if (subAgents.length === 0) return [];
+
+  const running = subAgents.filter((agent) => agent.status === 'running');
+  const completed = subAgents
+    .filter((agent) => agent.status === 'completed')
+    .sort((a, b) => {
+      const aTime = a.completedAt?.getTime() ?? a.startedAt.getTime();
+      const bTime = b.completedAt?.getTime() ?? b.startedAt.getTime();
+      return bTime - aTime;
+    })
+    .slice(0, MAX_COMPLETED_SUBAGENT_ENTRIES);
+
+  return [...running, ...completed];
+}
+
+function upsertSubAgent(subAgents: ActiveSubAgent[], nextAgent: ActiveSubAgent): ActiveSubAgent[] {
+  const nextIndex = subAgents.findIndex((agent) => agent.agentId === nextAgent.agentId);
+  if (nextIndex === -1) {
+    return [...subAgents, nextAgent];
+  }
+
+  const next = [...subAgents];
+  next[nextIndex] = nextAgent;
+  return next;
+}
+
+function markAllRunningSubAgentsCompleted(
+  subAgents: ActiveSubAgent[],
+  completedAt: Date = new Date()
+): ActiveSubAgent[] {
+  return subAgents.map((agent) => {
+    if (agent.status !== 'running') return agent;
+    // When the parent session finishes (complete/stop/error), ALL sub-agents
+    // are done – both foreground and background. The server sends individual
+    // subagent_stopped events, but this acts as a safety-net in case any
+    // event was missed (e.g. race condition, network hiccup).
+    return {
+      ...agent,
+      status: 'completed',
+      completedAt,
+    };
+  });
+}
+
+/** How long (ms) to keep completed-only sub-agent entries in the cache. */
+const COMPLETED_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function readCachedSubAgents(sessionId: string): ActiveSubAgent[] {
+  const cached = subAgentStateCache.get(sessionId);
+  if (!cached || cached.length === 0) return [];
+
+  // If ALL entries are completed and the most recent one finished more than TTL ago,
+  // the cache is stale — discard it so the user doesn't see old sub-agents.
+  const allCompleted = cached.every((a) => a.status === 'completed');
+  if (allCompleted) {
+    const latestCompletedAt = Math.max(
+      ...cached.map((a) => a.completedAt?.getTime() ?? a.startedAt.getTime())
+    );
+    if (Date.now() - latestCompletedAt > COMPLETED_CACHE_TTL_MS) {
+      subAgentStateCache.delete(sessionId);
+      return [];
+    }
+  }
+
+  return cached.map(cloneSubAgent);
+}
+
+function writeCachedSubAgents(sessionId: string, subAgents: ActiveSubAgent[]): void {
+  if (!sessionId) return;
+  if (subAgents.length === 0) {
+    subAgentStateCache.delete(sessionId);
+    return;
+  }
+  subAgentStateCache.set(sessionId, subAgents.map(cloneSubAgent));
+}
+
+function mergeSubAgents(
+  currentSubAgents: ActiveSubAgent[],
+  incomingSubAgents: ActiveSubAgent[]
+): ActiveSubAgent[] {
+  let merged = [...currentSubAgents];
+  for (const incoming of incomingSubAgents) {
+    merged = upsertSubAgent(merged, incoming);
+  }
+  return orderAndTrimSubAgents(merged);
 }
 
 interface UseElectronAgentOptions {
@@ -116,6 +217,19 @@ export function useElectronAgent({
   useEffect(() => {
     onToolUseRef.current = onToolUse;
   }, [onToolUse]);
+
+  // Persist sub-agent indicator state per session so quick chat close/open doesn't wipe it.
+  // IMPORTANT: Only write to cache when we have a real sessionId to prevent
+  // leaking sub-agent state from one session to another.
+  const sessionIdRef = useRef(sessionId);
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    writeCachedSubAgents(sessionId, activeSubAgents);
+  }, [sessionId, activeSubAgents]);
 
   const appendLocalErrorMessage = useCallback((errorText: string) => {
     const normalizedError = errorText.trim();
@@ -301,12 +415,15 @@ export function useElectronAgent({
     }
 
     if (!sessionId) {
-      // No session selected - reset state
+      // No session selected - reset ALL state including sub-agents.
+      // This is critical to prevent sub-agent indicators from a previous session
+      // leaking into a new/empty chat.
       setMessages([]);
       setIsConnected(false);
       setIsProcessing(false);
       setError(null);
       setLastTerminalEvent(null);
+      setActiveSubAgents([]);
       return;
     }
 
@@ -318,7 +435,8 @@ export function useElectronAgent({
     // drop messages in session B).
     setIsConnected(false);
     setIsProcessing(false);
-    setActiveSubAgents([]); // Clear sub-agents from previous session to prevent bleeding
+    // Restore cached sub-agents for the target session (or empty array for new sessions)
+    setActiveSubAgents(readCachedSubAgents(sessionId));
     setLastTerminalEvent(null);
 
     const initialize = async () => {
@@ -342,6 +460,22 @@ export function useElectronAgent({
             const isRunning = historyResult.isRunning || false;
             logger.info('Session running state:', isRunning);
             setIsProcessing(isRunning);
+
+            const historySubAgents = (historyResult.activeSubAgents || []).map((agent) => ({
+              agentId: agent.agentId,
+              agentType: agent.agentType,
+              description: agent.description,
+              childSessionId: agent.childSessionId,
+              model: agent.model,
+              startedAt: new Date(agent.startedAt),
+              elapsedSeconds: agent.elapsedSeconds,
+              runInBackground: agent.runInBackground,
+              status: 'running' as const,
+            }));
+
+            if (historySubAgents.length > 0) {
+              setActiveSubAgents((prev) => mergeSubAgents(prev, historySubAgents));
+            }
           }
         } else {
           setError(result.error || 'Failed to start session');
@@ -376,24 +510,28 @@ export function useElectronAgent({
     if (!api?.agent) return;
     if (!sessionId) return; // Don't subscribe if no session
 
-    logger.info('Subscribing to stream events for session:', sessionId);
+    logger.debug('Subscribing to stream events for session:', sessionId);
 
     const handleStream = (event: StreamEvent) => {
-      // CRITICAL: Only process events for our specific session
-      if (event.sessionId !== sessionId) {
-        logger.info('Ignoring event for different session:', event.sessionId);
+      // CRITICAL: Only process events for our specific session.
+      // Double-check against both the closure sessionId AND the ref to handle
+      // race conditions where the cleanup hasn't fired yet after a session switch.
+      if (event.sessionId !== sessionId || event.sessionId !== sessionIdRef.current) {
         return;
       }
 
-      logger.info('Stream event for', sessionId, ':', event.type);
+      logger.debug('Stream event for', sessionId, ':', event.type);
 
       switch (event.type) {
         case 'started':
           // Agent started processing (including from queue)
-          logger.info('Agent started processing for session:', sessionId);
+          logger.debug('Agent started processing for session:', sessionId);
           pendingToolCallsRef.current = [];
           setIsProcessing(true);
           setLastTerminalEvent(null);
+          setActiveSubAgents((prev) =>
+            orderAndTrimSubAgents(prev.filter((agent) => agent.status === 'running'))
+          );
           break;
 
         case 'message':
@@ -441,14 +579,14 @@ export function useElectronAgent({
 
         case 'tool_use':
           // Tool being used - accumulate for current message
-          logger.info('Tool use:', event.tool.name);
+          logger.debug('Tool use:', event.tool.name);
           pendingToolCallsRef.current.push({ name: event.tool.name, input: event.tool.input });
           onToolUseRef.current?.(event.tool.name, event.tool.input);
           break;
 
         case 'complete': {
           // Agent finished processing for THIS session
-          logger.info('Processing complete for session:', sessionId);
+          logger.debug('Processing complete for session:', sessionId);
           setIsProcessing(false);
           setLastTerminalEvent({
             type: 'complete',
@@ -456,9 +594,11 @@ export function useElectronAgent({
             at: Date.now(),
             messageId: event.messageId,
           });
-          // Keep background sub-agents visible until they emit subagent_stopped.
-          // This prevents them from disappearing when the parent agent completes first.
-          setActiveSubAgents((prev) => prev.filter((agent) => agent.runInBackground));
+          // Foreground sub-agents are done when parent completes.
+          // Background sub-agents keep running until subagent_stopped arrives.
+          setActiveSubAgents((prev) =>
+            orderAndTrimSubAgents(markAllRunningSubAgentsCompleted(prev))
+          );
           const completedToolCalls =
             pendingToolCallsRef.current.length > 0 ? [...pendingToolCallsRef.current] : undefined;
           pendingToolCallsRef.current = [];
@@ -506,6 +646,9 @@ export function useElectronAgent({
           logger.error('Agent error for session:', sessionId, event.error);
           setIsProcessing(false);
           setError(event.error);
+          setActiveSubAgents((prev) =>
+            orderAndTrimSubAgents(markAllRunningSubAgentsCompleted(prev))
+          );
           setLastTerminalEvent({
             type: 'error',
             sessionId,
@@ -531,7 +674,7 @@ export function useElectronAgent({
 
         case 'queue_updated':
           // Server queue was updated
-          logger.info('Queue updated:', event.queue);
+          logger.debug('Queue updated:', event.queue);
           setServerQueue(event.queue || []);
           break;
 
@@ -543,56 +686,98 @@ export function useElectronAgent({
 
         case 'stopped':
           // Session was manually stopped by the user
-          logger.info('Session stopped for:', sessionId);
+          logger.debug('Session stopped for:', sessionId);
           setIsProcessing(false);
           setLastTerminalEvent({
             type: 'stopped',
             sessionId,
             at: Date.now(),
           });
-          // Keep background sub-agents visible until explicit stop events arrive.
-          setActiveSubAgents((prev) => prev.filter((agent) => agent.runInBackground));
+          // Foreground sub-agents are complete after parent stop.
+          // Background sub-agents keep running until explicit stop events arrive.
+          setActiveSubAgents((prev) =>
+            orderAndTrimSubAgents(markAllRunningSubAgentsCompleted(prev))
+          );
           break;
 
         case 'session_metadata_updated':
           // Session title/description updated from first Claude response
           // Query invalidation hook handles the sessions list refresh
-          logger.info('Session metadata updated:', event.name);
+          logger.debug('Session metadata updated:', event.name);
           break;
 
         case 'subagent_started':
           // Sub-agent started processing
-          logger.info('Sub-agent started:', event.agentId, event.agentType);
-          setActiveSubAgents((prev) => [
-            ...prev.filter((a) => a.agentId !== event.agentId),
-            {
-              agentId: event.agentId,
-              agentType: event.agentType,
-              description: event.description,
-              childSessionId: event.childSessionId,
-              model: event.model,
-              startedAt: new Date(),
-              elapsedSeconds: 0,
-              runInBackground: event.runInBackground,
-            },
-          ]);
+          logger.debug('Sub-agent started:', event.agentId, event.agentType);
+          setActiveSubAgents((prev) =>
+            orderAndTrimSubAgents(
+              upsertSubAgent(prev, {
+                agentId: event.agentId,
+                agentType: event.agentType,
+                description: event.description,
+                childSessionId: event.childSessionId,
+                model: event.model,
+                startedAt: new Date(),
+                elapsedSeconds: 0,
+                runInBackground: event.runInBackground,
+                status: 'running',
+                completedAt: undefined,
+              })
+            )
+          );
           break;
 
         case 'subagent_progress':
           // Sub-agent progress update
           setActiveSubAgents((prev) =>
-            prev.map((a) =>
-              a.agentId === event.agentId
-                ? { ...a, elapsedSeconds: event.elapsedSeconds, lastToolName: event.toolName }
-                : a
+            orderAndTrimSubAgents(
+              prev.map((a) =>
+                a.agentId === event.agentId
+                  ? {
+                      ...a,
+                      elapsedSeconds: event.elapsedSeconds,
+                      lastToolName: event.toolName,
+                    }
+                  : a
+              )
             )
           );
           break;
 
         case 'subagent_stopped':
           // Sub-agent stopped
-          logger.info('Sub-agent stopped:', event.agentId);
-          setActiveSubAgents((prev) => prev.filter((a) => a.agentId !== event.agentId));
+          logger.debug('Sub-agent stopped:', event.agentId);
+          setActiveSubAgents((prev) => {
+            const stoppedAt = new Date();
+            const hasExisting = prev.some((agent) => agent.agentId === event.agentId);
+
+            const next = hasExisting
+              ? prev.map((agent) =>
+                  agent.agentId === event.agentId
+                    ? {
+                        ...agent,
+                        status: 'completed' as const,
+                        completedAt: stoppedAt,
+                        childSessionId: event.childSessionId ?? agent.childSessionId,
+                      }
+                    : agent
+                )
+              : [
+                  ...prev,
+                  {
+                    agentId: event.agentId,
+                    agentType: 'Sub-Agent',
+                    description: '',
+                    childSessionId: event.childSessionId,
+                    startedAt: stoppedAt,
+                    elapsedSeconds: 0,
+                    status: 'completed' as const,
+                    completedAt: stoppedAt,
+                  },
+                ];
+
+            return orderAndTrimSubAgents(next);
+          });
           break;
       }
     };
@@ -601,7 +786,7 @@ export function useElectronAgent({
 
     return () => {
       if (unsubscribeRef.current) {
-        logger.info('Unsubscribing from stream events for session:', sessionId);
+        logger.debug('Unsubscribing from stream events for session:', sessionId);
         unsubscribeRef.current();
         unsubscribeRef.current = null;
       }

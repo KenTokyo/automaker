@@ -12,12 +12,20 @@ import {
   Copy,
   ChevronDown,
   ChevronRight,
+  Cpu,
+  Zap,
+  ScrollText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getCopyableMessageContent } from '@/lib/message-copy';
 import { splitOrchestratorMessage } from '@/lib/orchestrator-message';
-import { stripEmbeddedSystemPrompts } from '@/lib/system-prompt-payload';
+import {
+  stripEmbeddedSystemPrompts,
+  extractEmbeddedSystemPrompts,
+  hasEmbeddedSystemPrompts,
+} from '@/lib/system-prompt-payload';
+import type { ExtractedSystemPrompts } from '@/lib/system-prompt-payload';
 import { Markdown } from '@/components/ui/markdown';
 import type { ImageAttachment } from '@/store/app-store';
 import { useAppStore } from '@/store/app-store';
@@ -56,6 +64,16 @@ export const MessageBubble = memo(function MessageBubble({
 }: MessageBubbleProps) {
   const isError = message.isError && message.role === 'assistant';
   const normalizedMessageContent = message.content.replace(/\\n/g, '\n');
+
+  // Extract raw system prompts before stripping (for collapsible display on user msgs)
+  const extractedPrompts = useMemo(
+    () =>
+      message.role === 'user' && hasEmbeddedSystemPrompts(normalizedMessageContent)
+        ? extractEmbeddedSystemPrompts(normalizedMessageContent)
+        : null,
+    [normalizedMessageContent, message.role]
+  );
+
   const visibleMessageContent = useMemo(
     () => stripEmbeddedSystemPrompts(normalizedMessageContent),
     [normalizedMessageContent]
@@ -154,6 +172,10 @@ export const MessageBubble = memo(function MessageBubble({
             } as CSSProperties
           }
         >
+          {/* Show embedded system prompts collapsible for user messages */}
+          {isUserMessage && extractedPrompts && (
+            <EmbeddedSystemPromptsCollapsible prompts={extractedPrompts} />
+          )}
           {preMessage && (
             <OrchestratorContentDropdown title="Orchestrator Text Preview" content={preMessage} />
           )}
@@ -237,6 +259,107 @@ export const MessageBubble = memo(function MessageBubble({
     </div>
   );
 });
+
+/** Collapsible panel showing embedded system prompts (orchestrator + agent) on user messages */
+function EmbeddedSystemPromptsCollapsible({ prompts }: { prompts: ExtractedSystemPrompts }) {
+  const [open, setOpen] = useState(false);
+
+  const sectionCount = [
+    prompts.orchestratorPre,
+    prompts.agentPrompts,
+    prompts.orchestratorPost,
+  ].filter(Boolean).length;
+
+  return (
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="mb-2 rounded-lg border border-violet-500/30 bg-violet-500/5 dark:bg-violet-500/10"
+    >
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-[11px] font-medium text-violet-600 dark:text-violet-400 transition-colors hover:text-violet-800 dark:hover:text-violet-300"
+        >
+          {open ? (
+            <ChevronDown className="h-3 w-3 shrink-0" />
+          ) : (
+            <ChevronRight className="h-3 w-3 shrink-0" />
+          )}
+          <Cpu className="h-3 w-3 shrink-0" />
+          <span>System Prompts ({sectionCount})</span>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="px-2.5 pb-2.5 space-y-2">
+        {prompts.orchestratorPre && (
+          <SystemPromptSection
+            icon={<Zap className="h-3 w-3 text-amber-500" />}
+            label="Orchestrator Pre"
+            content={prompts.orchestratorPre}
+          />
+        )}
+        {prompts.agentPrompts && (
+          <SystemPromptSection
+            icon={<ScrollText className="h-3 w-3 text-blue-500" />}
+            label="Agent Prompts"
+            content={prompts.agentPrompts}
+          />
+        )}
+        {prompts.orchestratorPost && (
+          <SystemPromptSection
+            icon={<Zap className="h-3 w-3 text-amber-500" />}
+            label="Orchestrator Post"
+            content={prompts.orchestratorPost}
+          />
+        )}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+/** Individual section within the system prompts collapsible */
+function SystemPromptSection({
+  icon,
+  label,
+  content,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  content: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Collapsible
+      open={expanded}
+      onOpenChange={setExpanded}
+      className="rounded-md border border-border/50 bg-background/50"
+    >
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-[10px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          {expanded ? (
+            <ChevronDown className="h-2.5 w-2.5 shrink-0" />
+          ) : (
+            <ChevronRight className="h-2.5 w-2.5 shrink-0" />
+          )}
+          {icon}
+          <span>{label}</span>
+          <span className="ml-auto text-[9px] text-muted-foreground/60 font-normal">
+            {content.length} chars
+          </span>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="px-2 pb-2">
+        <pre className="text-[10px] leading-relaxed text-muted-foreground whitespace-pre-wrap break-words font-mono bg-muted/60 rounded-md p-2 max-h-[300px] overflow-y-auto">
+          {content}
+        </pre>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
 
 function OrchestratorContentDropdown({ title, content }: { title: string; content: string }) {
   const [open, setOpen] = useState(false);

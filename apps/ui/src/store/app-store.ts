@@ -218,6 +218,9 @@ export { defaultBackgroundSettings, defaultTerminalState, MAX_INIT_OUTPUT_LINES 
 export const BROWSER_TABS_STORAGE_KEY = 'automaker:browser-tabs-by-project';
 export const ACTIVE_BROWSER_TAB_STORAGE_KEY = 'automaker:active-browser-tab-by-project';
 export const EXPANDED_ORCHESTRATOR_RUNS_STORAGE_KEY = 'automaker:expanded-orchestrator-runs';
+export const TERMINAL_LAYOUT_BY_PROJECT_STORAGE_KEY = 'automaker:terminal-layout-by-project';
+export const TERMINAL_LAST_ACTIVE_PROJECT_PATH_STORAGE_KEY =
+  'automaker:terminal-last-active-project-path';
 
 type BrowserTabsByProject = Record<string, BrowserTab[]>;
 type ActiveBrowserTabByProject = Record<string, string>;
@@ -319,6 +322,165 @@ function getStoredBrowserPanelState(): {
     getStoredBrowserTabsByProject(),
     getStoredActiveBrowserTabsByProject()
   );
+}
+
+function normalizeStoredTerminalPanel(panel: unknown): PersistedTerminalPanel | null {
+  if (!isObjectRecord(panel)) return null;
+  if (panel.type === 'terminal') {
+    const size =
+      typeof panel.size === 'number' && Number.isFinite(panel.size) ? panel.size : undefined;
+    const fontSize =
+      typeof panel.fontSize === 'number' && Number.isFinite(panel.fontSize)
+        ? panel.fontSize
+        : undefined;
+    const sessionId = typeof panel.sessionId === 'string' ? panel.sessionId : undefined;
+    const branchName = typeof panel.branchName === 'string' ? panel.branchName : undefined;
+    return {
+      type: 'terminal',
+      size,
+      fontSize,
+      sessionId,
+      branchName,
+    };
+  }
+
+  if (panel.type === 'testRunner') {
+    const size =
+      typeof panel.size === 'number' && Number.isFinite(panel.size) ? panel.size : undefined;
+    const sessionId = typeof panel.sessionId === 'string' ? panel.sessionId : undefined;
+    const worktreePath = typeof panel.worktreePath === 'string' ? panel.worktreePath : undefined;
+    return {
+      type: 'testRunner',
+      size,
+      sessionId,
+      worktreePath,
+    };
+  }
+
+  if (panel.type === 'split') {
+    const direction = panel.direction;
+    if (direction !== 'horizontal' && direction !== 'vertical') return null;
+    if (!Array.isArray(panel.panels)) return null;
+
+    const panels = panel.panels
+      .map((child) => normalizeStoredTerminalPanel(child))
+      .filter((child): child is PersistedTerminalPanel => child !== null);
+
+    if (panels.length === 0) return null;
+
+    const size =
+      typeof panel.size === 'number' && Number.isFinite(panel.size) ? panel.size : undefined;
+    const id = typeof panel.id === 'string' ? panel.id : undefined;
+
+    return {
+      type: 'split',
+      id,
+      direction,
+      panels,
+      size,
+    };
+  }
+
+  return null;
+}
+
+function normalizeStoredTerminalState(state: unknown): PersistedTerminalState | null {
+  if (!isObjectRecord(state)) return null;
+  if (!Array.isArray(state.tabs)) return null;
+
+  const tabs: PersistedTerminalTab[] = state.tabs
+    .map((tab, index): PersistedTerminalTab | null => {
+      if (!isObjectRecord(tab)) return null;
+      const id = typeof tab.id === 'string' && tab.id.length > 0 ? tab.id : `tab-${index + 1}`;
+      const name =
+        typeof tab.name === 'string' && tab.name.length > 0 ? tab.name : `Terminal ${index + 1}`;
+
+      const rawLayout =
+        tab.layout === null || tab.layout === undefined
+          ? null
+          : normalizeStoredTerminalPanel(tab.layout);
+
+      return {
+        id,
+        name,
+        layout: rawLayout,
+      };
+    })
+    .filter((tab): tab is PersistedTerminalTab => tab !== null);
+
+  const defaultFontSize =
+    typeof state.defaultFontSize === 'number' && Number.isFinite(state.defaultFontSize)
+      ? state.defaultFontSize
+      : defaultTerminalState.defaultFontSize;
+
+  const activeTabIndex =
+    typeof state.activeTabIndex === 'number' &&
+    Number.isInteger(state.activeTabIndex) &&
+    state.activeTabIndex >= 0 &&
+    state.activeTabIndex < tabs.length
+      ? state.activeTabIndex
+      : tabs.length > 0
+        ? 0
+        : -1;
+
+  const normalized: PersistedTerminalState = {
+    tabs,
+    activeTabIndex,
+    defaultFontSize,
+  };
+
+  if (typeof state.defaultRunScript === 'string') {
+    normalized.defaultRunScript = state.defaultRunScript;
+  }
+  if (typeof state.screenReaderMode === 'boolean') {
+    normalized.screenReaderMode = state.screenReaderMode;
+  }
+  if (typeof state.fontFamily === 'string') {
+    normalized.fontFamily = state.fontFamily;
+  }
+  if (typeof state.scrollbackLines === 'number' && Number.isFinite(state.scrollbackLines)) {
+    normalized.scrollbackLines = state.scrollbackLines;
+  }
+  if (typeof state.lineHeight === 'number' && Number.isFinite(state.lineHeight)) {
+    normalized.lineHeight = state.lineHeight;
+  }
+
+  return normalized;
+}
+
+function getStoredTerminalLayoutByProject(): Record<string, PersistedTerminalState> {
+  const stored = getJSON<unknown>(TERMINAL_LAYOUT_BY_PROJECT_STORAGE_KEY);
+  if (!isObjectRecord(stored)) return {};
+
+  const parsed: Record<string, PersistedTerminalState> = {};
+  for (const [projectPath, rawState] of Object.entries(stored)) {
+    if (typeof projectPath !== 'string' || projectPath.length === 0) continue;
+    const normalizedState = normalizeStoredTerminalState(rawState);
+    if (normalizedState) {
+      parsed[projectPath] = normalizedState;
+    }
+  }
+
+  return parsed;
+}
+
+function persistTerminalLayoutByProject(
+  layoutByProject: Record<string, PersistedTerminalState>
+): void {
+  setJSON(TERMINAL_LAYOUT_BY_PROJECT_STORAGE_KEY, layoutByProject);
+}
+
+function getStoredTerminalLastActiveProjectPath(): string | null {
+  const value = getItem(TERMINAL_LAST_ACTIVE_PROJECT_PATH_STORAGE_KEY);
+  return value && value.length > 0 ? value : null;
+}
+
+function persistTerminalLastActiveProjectPath(projectPath: string | null): void {
+  if (projectPath) {
+    setItem(TERMINAL_LAST_ACTIVE_PROJECT_PATH_STORAGE_KEY, projectPath);
+  } else {
+    removeItem(TERMINAL_LAST_ACTIVE_PROJECT_PATH_STORAGE_KEY);
+  }
 }
 
 function getStoredFavoriteModels(): string[] {
@@ -467,7 +629,7 @@ const initialState: AppState = {
   disableSplashScreen: false,
   serverLogLevel: 'info',
   enableRequestLogging: true,
-  showQueryDevtools: true,
+  showQueryDevtools: false,
   enhancementModel: 'claude-sonnet',
   validationModel: 'claude-opus',
   phaseModels: DEFAULT_PHASE_MODELS,
@@ -513,8 +675,11 @@ const initialState: AppState = {
   isAnalyzing: false,
   boardBackgroundByProject: {},
   previewTheme: null,
-  terminalState: defaultTerminalState,
-  terminalLayoutByProject: {},
+  terminalState: {
+    ...defaultTerminalState,
+    lastActiveProjectPath: getStoredTerminalLastActiveProjectPath(),
+  },
+  terminalLayoutByProject: getStoredTerminalLayoutByProject(),
   specCreatingForProject: null,
   defaultPlanningMode: 'skip' as PlanningMode,
   defaultRequirePlanApproval: false,
@@ -2278,10 +2443,12 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       terminalState: { ...state.terminalState, maxSessions },
     })),
 
-  setTerminalLastActiveProjectPath: (projectPath) =>
+  setTerminalLastActiveProjectPath: (projectPath) => {
+    persistTerminalLastActiveProjectPath(projectPath);
     set((state) => ({
       terminalState: { ...state.terminalState, lastActiveProjectPath: projectPath },
-    })),
+    }));
+  },
 
   setOpenTerminalMode: (mode) =>
     set((state) => ({
@@ -2652,22 +2819,23 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       lineHeight: terminalState.lineHeight,
     };
 
-    set((state) => ({
-      terminalLayoutByProject: {
-        ...state.terminalLayoutByProject,
-        [projectPath]: persistedState,
-      },
-    }));
+    const nextLayouts = {
+      ...state.terminalLayoutByProject,
+      [projectPath]: persistedState,
+    };
+
+    persistTerminalLayoutByProject(nextLayouts);
+    set({ terminalLayoutByProject: nextLayouts });
   },
 
   getPersistedTerminalLayout: (projectPath) => get().terminalLayoutByProject[projectPath] ?? null,
 
-  clearPersistedTerminalLayout: (projectPath) =>
-    set((state) => {
-      const newLayouts = { ...state.terminalLayoutByProject };
-      delete newLayouts[projectPath];
-      return { terminalLayoutByProject: newLayouts };
-    }),
+  clearPersistedTerminalLayout: (projectPath) => {
+    const newLayouts = { ...get().terminalLayoutByProject };
+    delete newLayouts[projectPath];
+    persistTerminalLayoutByProject(newLayouts);
+    set({ terminalLayoutByProject: newLayouts });
+  },
 
   // Spec Creation actions
   setSpecCreatingForProject: (projectPath) => set({ specCreatingForProject: projectPath }),

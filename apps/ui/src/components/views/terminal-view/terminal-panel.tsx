@@ -70,7 +70,7 @@ const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 // Large paste handling constants
 const LARGE_PASTE_WARNING_THRESHOLD = 1024 * 1024; // 1MB - show warning for pastes this size or larger
 const PASTE_CHUNK_SIZE = 8 * 1024; // 8KB chunks for large pastes
-const PASTE_CHUNK_DELAY_MS = 10; // Small delay between chunks to prevent overwhelming WebSocket
+const PASTE_CHUNK_DELAY_MS = 10; // Small delay between chunks to keep input responsive
 
 interface TerminalPanelProps {
   sessionId: string;
@@ -322,27 +322,32 @@ export function TerminalPanel({
   }, []);
   copySelectionRef.current = copySelection;
 
-  // Helper function to send text in chunks with delay
-  const sendTextInChunks = useCallback(async (text: string) => {
+  // Helper function to send text in chunks with delay via xterm paste path.
+  // This preserves bracketed-paste behavior for multiline input.
+  const sendTextInChunks = useCallback(async (text: string): Promise<boolean> => {
+    const terminal = xtermRef.current;
     const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!terminal || !ws || ws.readyState !== WebSocket.OPEN) return false;
 
     // For small pastes, send all at once
     if (text.length <= PASTE_CHUNK_SIZE) {
-      ws.send(JSON.stringify({ type: 'input', data: text }));
-      return;
+      terminal.paste(text);
+      return true;
     }
 
     // For large pastes, chunk it
     for (let i = 0; i < text.length; i += PASTE_CHUNK_SIZE) {
-      if (ws.readyState !== WebSocket.OPEN) break;
+      if (ws.readyState !== WebSocket.OPEN) {
+        return false;
+      }
       const chunk = text.slice(i, i + PASTE_CHUNK_SIZE);
-      ws.send(JSON.stringify({ type: 'input', data: chunk }));
-      // Small delay between chunks to prevent overwhelming the WebSocket
+      terminal.paste(chunk);
       if (i + PASTE_CHUNK_SIZE < text.length) {
         await new Promise((resolve) => setTimeout(resolve, PASTE_CHUNK_DELAY_MS));
       }
     }
+
+    return true;
   }, []);
 
   // Paste from clipboard
@@ -373,7 +378,10 @@ export function TerminalPanel({
         });
       }
 
-      await sendTextInChunks(text);
+      const pasted = await sendTextInChunks(text);
+      if (!pasted) {
+        toast.error('Terminal not connected');
+      }
     } catch (err) {
       logger.error('Paste failed:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -593,6 +601,7 @@ export function TerminalPanel({
         allowProposedApi: true,
         screenReaderMode: screenReaderEnabled,
         scrollback: terminalScrollback,
+        rescaleOverlappingGlyphs: true,
       });
 
       // Create fit addon
@@ -760,6 +769,17 @@ export function TerminalPanel({
         logger.warn('WebGL addon not available, falling back to canvas');
       }
 
+      // Try to load ligatures addon for pretty code symbols (=> becomes →, etc.)
+      // Only works in Electron (needs Node.js font access), silently skipped in browser
+      try {
+        const { LigaturesAddon } = await import('@xterm/addon-ligatures');
+        const ligaturesAddon = new LigaturesAddon();
+        terminal.loadAddon(ligaturesAddon);
+      } catch {
+        // Expected to fail in browser mode - that's okay
+        logger.info('Ligatures addon not available (browser mode), skipping');
+      }
+
       // Fit terminal to container - wait for stable dimensions
       // Use initial delay then multiple RAFs to let react-resizable-panels finish layout
       let fitAttempts = 0;
@@ -894,6 +914,19 @@ export function TerminalPanel({
 
         const modKey = isMacRef.current ? event.metaKey : event.ctrlKey;
         const otherModKey = isMacRef.current ? event.ctrlKey : event.metaKey;
+
+        // Shift+Enter inserts a literal line break (without immediate submit)
+        if (
+          event.shiftKey &&
+          !event.altKey &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          (code === 'Enter' || code === 'NumpadEnter')
+        ) {
+          event.preventDefault();
+          terminal.paste('\n');
+          return false;
+        }
 
         // Ctrl+Shift+C / Cmd+Shift+C - Always copy (Linux terminal convention)
         if (modKey && !otherModKey && event.shiftKey && !event.altKey && code === 'KeyC') {
@@ -2141,7 +2174,7 @@ export function TerminalPanel({
       {/* Terminal container - uses terminal theme */}
       <div
         ref={terminalRef}
-        className="flex-1 overflow-hidden relative"
+        className="flex-1 min-h-0 overflow-hidden relative"
         style={{ backgroundColor: currentTerminalTheme.background }}
         onContextMenu={handleContextMenu}
         onDragOver={handleImageDragOver}

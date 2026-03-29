@@ -181,6 +181,16 @@ export interface AgentAPI {
     success: boolean;
     messages?: Message[];
     isRunning?: boolean;
+    activeSubAgents?: Array<{
+      agentId: string;
+      agentType: string;
+      description: string;
+      childSessionId?: string;
+      model?: string;
+      runInBackground?: boolean;
+      startedAt: string;
+      elapsedSeconds: number;
+    }>;
     error?: string;
   }>;
 

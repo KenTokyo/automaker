@@ -159,8 +159,8 @@ describe('provider-factory.ts', () => {
         expect(provider).toBeInstanceOf(CursorProvider);
       });
 
-      it('should return CursorProvider for gemini-3-pro (valid Cursor model)', () => {
-        const provider = ProviderFactory.getProviderForModel('gemini-3-pro');
+      it('should return CursorProvider for gemini-3.1-pro (valid Cursor model)', () => {
+        const provider = ProviderFactory.getProviderForModel('gemini-3.1-pro');
         expect(provider).toBeInstanceOf(CursorProvider);
       });
     });

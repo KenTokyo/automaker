@@ -97,7 +97,7 @@ export function isCodexModel(model: string | undefined | null): boolean {
 /**
  * Check if a model string represents a Gemini model
  *
- * @param model - Model string to check (e.g., "gemini-2.5-pro", "gemini-3-pro-preview")
+ * @param model - Model string to check (e.g., "gemini-2.5-pro", "gemini-3.1-pro-preview")
  * @returns true if the model is a Gemini model
  */
 export function isGeminiModel(model: string | undefined | null): boolean {

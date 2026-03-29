@@ -24,12 +24,29 @@ interface SaveResult {
 }
 
 /**
- * Erzeugt einen eindeutigen Dateinamen: YYYY-MM-DD_HHmmss_notiz.md
+ * Extrahiert die ersten 5 Wörter aus dem Text als Slug für den Dateinamen.
+ * Entfernt Sonderzeichen, normalisiert auf Kleinbuchstaben, verbindet mit Bindestrichen.
+ * Fallback auf Datum+Uhrzeit wenn keine Wörter extrahiert werden können.
+ *
+ * Beispiel: "Heute habe ich einen neuen Button gebaut" → "heute-habe-ich-einen-neuen-notiz.md"
  */
-function generateFileName(): string {
+function generateFileName(text: string): string {
+  // Alle Wörter extrahieren (nur Buchstaben, Zahlen, Umlaute)
+  const words = text
+    .replace(/[^a-zA-ZäöüÄÖÜß0-9\s]/g, ' ')
+    .split(/\s+/)
+    .map((w) => w.toLowerCase().trim())
+    .filter((w) => w.length > 0);
+
+  if (words.length > 0) {
+    const slug = words.slice(0, 5).join('-');
+    return `${slug}-notiz.md`;
+  }
+
+  // Fallback: Datum + Uhrzeit
   const now = new Date();
-  const date = now.toISOString().split('T')[0]; // YYYY-MM-DD
-  const time = now.toTimeString().split(' ')[0].replace(/:/g, ''); // HHmmss
+  const date = now.toISOString().split('T')[0];
+  const time = now.toTimeString().split(' ')[0].replace(/:/g, '');
   return `${date}_${time}_notiz.md`;
 }
 
@@ -59,7 +76,7 @@ export function useSaveAsMarkdown({ projectPath, input, onInputChange }: SaveAsM
     setIsSaving(true);
 
     try {
-      const fileName = generateFileName();
+      const fileName = generateFileName(trimmedInput);
       const title = extractTitle(trimmedInput);
       const now = new Date();
 

@@ -17,18 +17,28 @@ export function createIndexHandler(agentService: AgentService) {
     try {
       const includeArchived = req.query.includeArchived === 'true';
       const sessionsRaw = await agentService.listSessions(includeArchived);
+      const runningSessionIds = agentService.getRunningSessionIds();
+      const runningSubagentSessionIds = agentService.getRunningSubagentSessionIds();
+      const stoppedSessionIds = agentService.getStoppedSessionIds();
 
       // Transform to match frontend SessionListItem interface
       const sessions = await Promise.all(
         sessionsRaw.map(async (s) => {
-          const messages = await agentService.loadSession(s.id);
-          const lastMessage = messages[messages.length - 1];
-          const lastError = lastMessage?.isError
-            ? getLastErrorPreview(lastMessage.content)
-            : undefined;
-          const isRunning =
-            agentService.isSessionRunning(s.id) || agentService.isSubagentSessionRunning(s.id);
-          const preview = lastMessage?.content?.slice(0, 100) || '';
+          let messageCount = typeof s.messageCount === 'number' ? s.messageCount : undefined;
+          let preview = typeof s.preview === 'string' ? s.preview : undefined;
+          let lastError = typeof s.lastError === 'string' ? s.lastError : undefined;
+
+          // Backward-compatibility for older metadata without cached summary fields.
+          if (messageCount === undefined || preview === undefined) {
+            const messages = await agentService.loadSession(s.id);
+            const lastMessage = messages[messages.length - 1];
+            messageCount = messages.length;
+            preview = lastMessage?.content?.slice(0, 100) || '';
+            lastError = lastMessage?.isError ? getLastErrorPreview(lastMessage.content) : undefined;
+          }
+
+          const isRunning = runningSessionIds.has(s.id) || runningSubagentSessionIds.has(s.id);
+          const isStopped = stoppedSessionIds.has(s.id);
 
           return {
             id: s.id,
@@ -45,15 +55,9 @@ export function createIndexHandler(agentService: AgentService) {
             sourceType: s.sourceType,
             parentSessionId: s.parentSessionId,
             parentToolUseId: s.parentToolUseId,
-            messageCount: messages.length,
+            messageCount: messageCount ?? 0,
             preview,
-            status: isRunning
-              ? 'running'
-              : agentService.isSessionStopped(s.id)
-                ? 'stopped'
-                : lastError
-                  ? 'failed'
-                  : 'idle',
+            status: isRunning ? 'running' : isStopped ? 'stopped' : lastError ? 'failed' : 'idle',
             lastError,
             totalElapsedMs: s.totalElapsedMs || 0,
             lastStartedAt: s.lastStartedAt,

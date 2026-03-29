@@ -105,6 +105,20 @@ interface SessionMetadata {
   sdkSessionId?: string; // Claude SDK session ID for conversation continuity
   totalElapsedMs?: number; // Accumulated running time in milliseconds
   lastStartedAt?: string; // ISO timestamp of when the session last started running
+  messageCount?: number; // Cached count for fast session list rendering
+  preview?: string; // Cached preview for fast session list rendering
+  lastError?: string; // Cached last error preview for fast session list rendering
+}
+
+interface ActiveSubagentSessionState {
+  childSessionId: string;
+  parentSessionId: string;
+  runInBackground: boolean;
+  agentType: string;
+  description: string;
+  model?: string;
+  startedAt: string;
+  elapsedSeconds: number;
 }
 
 type AiCallOutcome = 'success' | 'error' | 'aborted';
@@ -126,6 +140,25 @@ interface AiCallWideEventParams {
   outcome: AiCallOutcome;
   status: number;
   errorMessage?: string;
+}
+
+function getLastErrorPreview(content: string | undefined): string | undefined {
+  if (!content) return undefined;
+  const normalized = content.replace(/^Error:\s*/i, '').trim();
+  return normalized || undefined;
+}
+
+function buildSessionSummary(
+  messages: Message[]
+): Pick<SessionMetadata, 'messageCount' | 'preview' | 'lastError'> {
+  const lastMessage = messages[messages.length - 1];
+  const lastError = lastMessage?.isError ? getLastErrorPreview(lastMessage.content) : undefined;
+
+  return {
+    messageCount: messages.length,
+    preview: lastMessage?.content?.slice(0, 100) || '',
+    lastError,
+  };
 }
 
 const INPUT_TOKEN_KEYS = ['inputTokens', 'input_tokens', 'promptTokens', 'prompt_tokens'] as const;
@@ -312,10 +345,7 @@ function extractTokenUsageFromProviderMessage(message: ProviderMessage): Provide
 
 export class AgentService {
   private sessions = new Map<string, Session>();
-  private activeSubagentSessions = new Map<
-    string,
-    { childSessionId: string; parentSessionId: string; runInBackground: boolean }
-  >();
+  private activeSubagentSessions = new Map<string, ActiveSubagentSessionState>();
   private stateDir: string;
   private metadataFile: string;
   private events: EventEmitter;
@@ -866,21 +896,30 @@ export class AgentService {
                     taskInput,
                     blockWithId.id
                   );
+                  const agentType = (taskInput.subagent_type as string) || 'unknown';
+                  const description = (taskInput.description as string) || '';
+                  const model = taskInput.model as string | undefined;
                   const runInBackground = Boolean(taskInput.run_in_background);
+                  const startedAt = new Date().toISOString();
                   if (blockWithId.id && childSession?.id) {
                     this.activeSubagentSessions.set(blockWithId.id, {
                       childSessionId: childSession.id,
                       parentSessionId: sessionId,
                       runInBackground,
+                      agentType,
+                      description,
+                      model,
+                      startedAt,
+                      elapsedSeconds: 0,
                     });
                   }
 
                   this.emitAgentEvent(sessionId, {
                     type: 'subagent_started',
                     agentId: blockWithId.id,
-                    agentType: (taskInput.subagent_type as string) || 'unknown',
-                    description: (taskInput.description as string) || '',
-                    model: taskInput.model as string | undefined,
+                    agentType,
+                    description,
+                    model,
                     runInBackground,
                     childSessionId: childSession?.id,
                   });
@@ -953,6 +992,34 @@ export class AgentService {
             'Unexpected error from provider during agent execution.';
 
           const errorInfo = classifyError(new Error(rawErrorText));
+          const shouldTreatAsStoppedRun =
+            session.wasStopped || errorInfo.isAbort || errorInfo.isCancellation;
+
+          // User pressed stop: some providers still emit a non-zero exit error event.
+          // Treat that as an aborted run instead of a hard failure.
+          if (shouldTreatAsStoppedRun) {
+            this.logger.info('Ignoring provider error after user stop/cancel:', {
+              type: errorInfo.type,
+              message: errorInfo.message,
+              wasStopped: session.wasStopped,
+            });
+
+            session.isRunning = false;
+            session.abortController = null;
+            await this.accumulateElapsedTime(sessionId);
+            await this.finalizeForegroundSubagents(sessionId);
+            await this.finalizeBackgroundSubagentsAfterParentStop(sessionId);
+
+            // Continue queued prompts after a manual stop.
+            setImmediate(() => this.processNextInQueue(sessionId));
+            emitAiCallObservability?.(
+              'aborted',
+              DEFAULT_LOG_STATUS_ABORTED,
+              errorInfo.message || rawErrorText
+            );
+
+            return { success: false, aborted: true };
+          }
 
           // Keep the provider-supplied text intact (Codex already includes helpful tips),
           // only add a small rate-limit hint when we can detect it.
@@ -1001,9 +1068,19 @@ export class AgentService {
             elapsed_time_seconds?: number;
             parent_tool_use_id?: string;
           };
+          const trackedAgentId = progressMsg.parent_tool_use_id || progressMsg.tool_use_id;
+          if (trackedAgentId) {
+            const activeSubagent = this.activeSubagentSessions.get(trackedAgentId);
+            if (activeSubagent && typeof progressMsg.elapsed_time_seconds === 'number') {
+              this.activeSubagentSessions.set(trackedAgentId, {
+                ...activeSubagent,
+                elapsedSeconds: progressMsg.elapsed_time_seconds,
+              });
+            }
+          }
           this.emitAgentEvent(sessionId, {
             type: 'subagent_progress',
-            agentId: progressMsg.tool_use_id,
+            agentId: trackedAgentId,
             toolName: progressMsg.tool_name,
             elapsedSeconds: progressMsg.elapsed_time_seconds,
             parentToolUseId: progressMsg.parent_tool_use_id,
@@ -1042,6 +1119,7 @@ export class AgentService {
       session.abortController = null;
       await this.accumulateElapsedTime(sessionId);
       await this.finalizeForegroundSubagents(sessionId);
+      await this.finalizeBackgroundSubagentsAfterParentStop(sessionId);
 
       // Emit a single terminal completion event after the provider stream ends.
       // Some providers can emit multiple "result" events during one execution.
@@ -1065,20 +1143,20 @@ export class AgentService {
         message: currentAssistantMessage,
       };
     } catch (error) {
-      if (isAbortError(error)) {
+      const errorInfo = classifyError(error);
+
+      if (session.wasStopped || isAbortError(error) || errorInfo.isCancellation) {
         session.isRunning = false;
         session.abortController = null;
         await this.accumulateElapsedTime(sessionId);
+        await this.finalizeForegroundSubagents(sessionId);
+        await this.finalizeBackgroundSubagentsAfterParentStop(sessionId);
 
         // Process next queued prompt after user stop
         // This enables the "stop to send next" workflow:
         // User queues a prompt → clicks Stop → queued prompt sends immediately
         setImmediate(() => this.processNextInQueue(sessionId));
-        emitAiCallObservability?.(
-          'aborted',
-          DEFAULT_LOG_STATUS_ABORTED,
-          error instanceof Error ? error.message : undefined
-        );
+        emitAiCallObservability?.('aborted', DEFAULT_LOG_STATUS_ABORTED, errorInfo.message);
 
         return { success: false, aborted: true };
       }
@@ -1126,11 +1204,60 @@ export class AgentService {
       success: true,
       messages: session.messages,
       isRunning: session.isRunning,
+      activeSubAgents: this.getActiveSubagentsForParent(sessionId),
     };
+  }
+
+  private getActiveSubagentsForParent(parentSessionId: string): Array<{
+    agentId: string;
+    agentType: string;
+    description: string;
+    childSessionId: string;
+    model?: string;
+    runInBackground: boolean;
+    startedAt: string;
+    elapsedSeconds: number;
+  }> {
+    const nowMs = Date.now();
+
+    return Array.from(this.activeSubagentSessions.entries())
+      .filter(([, active]) => active.parentSessionId === parentSessionId)
+      .map(([agentId, active]) => {
+        const startedAtMs = new Date(active.startedAt).getTime();
+        const liveElapsedSeconds =
+          Number.isFinite(startedAtMs) && startedAtMs > 0
+            ? Math.max(0, Math.floor((nowMs - startedAtMs) / 1000))
+            : 0;
+
+        return {
+          agentId,
+          agentType: active.agentType,
+          description: active.description,
+          childSessionId: active.childSessionId,
+          model: active.model,
+          runInBackground: active.runInBackground,
+          startedAt: active.startedAt,
+          elapsedSeconds: Math.max(active.elapsedSeconds, liveElapsedSeconds),
+        };
+      });
   }
 
   isSessionRunning(sessionId: string): boolean {
     return this.sessions.get(sessionId)?.isRunning ?? false;
+  }
+
+  getRunningSessionIds(): Set<string> {
+    return new Set(
+      Array.from(this.sessions.entries())
+        .filter(([, session]) => session.isRunning)
+        .map(([sessionId]) => sessionId)
+    );
+  }
+
+  getRunningSubagentSessionIds(): Set<string> {
+    return new Set(
+      Array.from(this.activeSubagentSessions.values()).map((active) => active.childSessionId)
+    );
   }
 
   isSubagentSessionRunning(sessionId: string): boolean {
@@ -1144,6 +1271,14 @@ export class AgentService {
 
   isSessionStopped(sessionId: string): boolean {
     return this.sessions.get(sessionId)?.wasStopped ?? false;
+  }
+
+  getStoppedSessionIds(): Set<string> {
+    return new Set(
+      Array.from(this.sessions.entries())
+        .filter(([, session]) => session.wasStopped)
+        .map(([sessionId]) => sessionId)
+    );
   }
 
   async sessionExists(sessionId: string): Promise<boolean> {
@@ -1209,7 +1344,15 @@ export class AgentService {
 
     try {
       await secureFs.writeFile(sessionFile, JSON.stringify(messages, null, 2), 'utf-8');
-      await this.updateSessionTimestamp(sessionId);
+      const metadata = await this.loadMetadata();
+      if (metadata[sessionId]) {
+        metadata[sessionId] = {
+          ...metadata[sessionId],
+          ...buildSessionSummary(messages),
+          updatedAt: new Date().toISOString(),
+        };
+        await this.saveMetadata(metadata);
+      }
     } catch (error) {
       this.logger.error('Failed to save session:', error);
     }
@@ -1226,14 +1369,6 @@ export class AgentService {
 
   async saveMetadata(metadata: Record<string, SessionMetadata>): Promise<void> {
     await secureFs.writeFile(this.metadataFile, JSON.stringify(metadata, null, 2), 'utf-8');
-  }
-
-  async updateSessionTimestamp(sessionId: string): Promise<void> {
-    const metadata = await this.loadMetadata();
-    if (metadata[sessionId]) {
-      metadata[sessionId].updatedAt = new Date().toISOString();
-      await this.saveMetadata(metadata);
-    }
   }
 
   /**
@@ -1334,6 +1469,9 @@ export class AgentService {
       sourceType: resolvedSourceType,
       parentSessionId,
       parentToolUseId,
+      messageCount: 0,
+      preview: '',
+      lastError: undefined,
     };
 
     metadata[sessionId] = session;
@@ -1657,6 +1795,11 @@ export class AgentService {
     for (const [toolUseId, active] of entries) {
       this.activeSubagentSessions.delete(toolUseId);
       await this.accumulateElapsedTime(active.childSessionId);
+      this.emitAgentEvent(parentSessionId, {
+        type: 'subagent_stopped',
+        agentId: toolUseId,
+        childSessionId: active.childSessionId,
+      });
     }
   }
 

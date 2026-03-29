@@ -13,7 +13,7 @@ import { embedSystemPrompts } from '@/lib/system-prompt-payload';
 import type { ChatDisplaySettings } from '@/store/types/ui-types';
 import { DEFAULT_CHAT_DISPLAY_SETTINGS } from '@/store/types/ui-types';
 import { getHttpApiClient } from '@/lib/http-api-client';
-import { useSessions } from '@/hooks/queries/use-sessions';
+import { useSessionById } from '@/hooks/queries/use-sessions';
 import { useAvailableModels } from '@/hooks/queries/use-models';
 import { useSessionQueryInvalidation } from '@/hooks/use-query-invalidation';
 import { updateTask as updateFileTask } from '@/hooks/use-tasks';
@@ -217,12 +217,8 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
   // Invalidate session queries when WebSocket events arrive (e.g. session_metadata_updated, complete)
   useSessionQueryInvalidation(currentSessionId ?? undefined);
 
-  // Session name for Save-to-Docs feature
-  const { data: allSessions = [] } = useSessions(true);
-  const currentSession = useMemo(
-    () => allSessions.find((session) => session.id === currentSessionId) ?? null,
-    [allSessions, currentSessionId]
-  );
+  // Session metadata for Save-to-Docs feature and activity indicators
+  const { data: currentSession = null } = useSessionById(currentSessionId, true);
   const { data: availableModels = [], isFetched: availableModelsFetched } = useAvailableModels();
   const currentSessionName = currentSession?.name ?? null;
   const [copySuccess, setCopySuccess] = useState(false);
@@ -1426,10 +1422,9 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
   const handleOpenSubAgentSession = useCallback(
     (sessionId: string) => {
-      const targetSession = allSessions.find((session) => session.id === sessionId);
-      handleSelectSession(sessionId, targetSession?.projectPath);
+      handleSelectSession(sessionId);
     },
-    [allSessions, handleSelectSession]
+    [handleSelectSession]
   );
 
   const handleHideSessionManager = useCallback(() => {

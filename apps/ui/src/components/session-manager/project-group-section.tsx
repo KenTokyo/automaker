@@ -39,9 +39,7 @@ export function ProjectGroupSection({
     const byId = new Map(group.allSessions.map((session) => [session.id, session]));
     const visibleIds = new Set(baseVisible.map((session) => session.id));
 
-    // If a visible child session exists, ensure all its parents are also visible
-    // so we can render a stable parent -> child tree.
-    for (const session of baseVisible) {
+    const ensureParentChainVisible = (session: (typeof group.allSessions)[number]) => {
       let parentId = session.parentSessionId;
       while (parentId) {
         const parentSession = byId.get(parentId);
@@ -49,6 +47,20 @@ export function ProjectGroupSection({
         visibleIds.add(parentSession.id);
         parentId = parentSession.parentSessionId;
       }
+    };
+
+    // If a visible child session exists, ensure all its parents are also visible
+    // so we can render a stable parent -> child tree.
+    for (const session of baseVisible) {
+      ensureParentChainVisible(session);
+    }
+
+    // Keep currently running sessions visible even when they are outside the
+    // "show first N" slice. This avoids sub-agent rows disappearing mid-run.
+    for (const session of group.allSessions) {
+      if (session.status !== 'running') continue;
+      visibleIds.add(session.id);
+      ensureParentChainVisible(session);
     }
 
     return group.allSessions.filter((session) => visibleIds.has(session.id));

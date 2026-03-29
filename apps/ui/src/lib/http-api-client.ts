@@ -863,19 +863,15 @@ export class HttpApiClient implements ElectronAPI {
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          logger.info(
-            'WebSocket message:',
-            data.type,
-            'hasPayload:',
-            !!data.payload,
-            'callbacksRegistered:',
-            this.eventCallbacks.has(data.type)
-          );
           const callbacks = this.eventCallbacks.get(data.type);
-          if (callbacks) {
-            logger.info('Dispatching to', callbacks.size, 'callbacks');
-            callbacks.forEach((cb) => cb(data.payload));
-          }
+          if (!callbacks || callbacks.size === 0) return;
+
+          logger.debug('WebSocket event dispatch', {
+            type: data.type,
+            callbacks: callbacks.size,
+            hasPayload: !!data.payload,
+          });
+          callbacks.forEach((cb) => cb(data.payload));
         } catch (error) {
           logger.error('Failed to parse WebSocket message:', error);
         }
@@ -2439,6 +2435,16 @@ export class HttpApiClient implements ElectronAPI {
       success: boolean;
       messages?: Message[];
       isRunning?: boolean;
+      activeSubAgents?: Array<{
+        agentId: string;
+        agentType: string;
+        description: string;
+        childSessionId?: string;
+        model?: string;
+        runInBackground?: boolean;
+        startedAt: string;
+        elapsedSeconds: number;
+      }>;
       error?: string;
     }> => this.post('/api/agent/history', { sessionId }),
 
