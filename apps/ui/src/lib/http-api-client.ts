@@ -3164,6 +3164,15 @@ export class HttpApiClient implements ElectronAPI {
       this.httpDelete('/api/agent-prompts/delete', { id, scope, projectPath }),
   };
 
+  // Global System Prompt API
+  globalSystemPrompt = {
+    load: (): Promise<{ success: boolean; content: string }> =>
+      this.get('/api/global-system-prompt'),
+
+    save: (content: string): Promise<{ success: boolean }> =>
+      this.post('/api/global-system-prompt/save', { content }),
+  };
+
   // Chat Images API
   chatImages = {
     save: (

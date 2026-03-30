@@ -116,6 +116,7 @@ export function Sidebar() {
     handleCreateBlankProject,
     handleCreateFromTemplate,
     handleCreateFromCustomUrl,
+    handleOpenExistingFolder,
   } = useProjectCreation({
     upsertAndSetCurrentProject,
   });
@@ -505,6 +506,7 @@ export function Sidebar() {
           onCreateBlankProject={handleCreateBlankProject}
           onCreateFromTemplate={handleCreateFromTemplate}
           onCreateFromCustomUrl={handleCreateFromCustomUrl}
+          onOpenExistingFolder={handleOpenExistingFolder}
           isCreating={isCreatingProject}
         />
       </aside>

@@ -47,6 +47,7 @@ import {
   type AgentPromptScope,
 } from '@/store/agent-prompts-store';
 import { Badge } from '@/components/ui/badge';
+import { GlobalSystemPromptEditor } from './global-system-prompt-editor';
 
 interface AgentPromptsSelectorProps {
   projectPath: string | null;
@@ -337,6 +338,9 @@ export const AgentPromptsSelector = memo(function AgentPromptsSelector({
               />
             </div>
           </div>
+
+          {/* Global System Prompt (always active, not selectable) */}
+          <GlobalSystemPromptEditor onCloseDropdown={() => setIsOpen(false)} />
 
           {/* Clear All Option */}
           {!searchQuery && (

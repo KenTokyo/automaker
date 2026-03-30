@@ -353,9 +353,10 @@ export function AgentHeader({
               setShowEditDialog(true);
             }}
             className={cn(
-              'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
-              'transition-colors border border-transparent hover:border-border hover:bg-accent/40',
-              !projectBgColor && 'bg-primary/10'
+              'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
+              'transition-all duration-200 border border-transparent hover:border-border hover:bg-accent/40',
+              !projectBgColor &&
+                'bg-orange-400/10 shadow-[0_0_10px_-2px_theme(colors.orange.400/0.25)]'
             )}
             style={{ backgroundColor: projectBorderColor ? `${projectBorderColor}20` : undefined }}
             title="Projekt-Icon bearbeiten/hochladen"
@@ -387,7 +388,7 @@ export function AgentHeader({
                 )}
               >
                 <span
-                  className="max-w-[220px] truncate font-medium text-foreground"
+                  className="max-w-[260px] truncate text-base font-semibold text-foreground drop-shadow-[0_0_8px_theme(colors.orange.400/0.35)]"
                   style={{ color: projectTextColor || undefined }}
                 >
                   {currentProject.name}

@@ -82,6 +82,7 @@ export function ProjectSwitcher() {
     handleCreateBlankProject,
     handleCreateFromTemplate,
     handleCreateFromCustomUrl,
+    handleOpenExistingFolder,
   } = useProjectCreation({
     upsertAndSetCurrentProject,
   });
@@ -495,6 +496,7 @@ export function ProjectSwitcher() {
         onCreateBlankProject={handleCreateBlankProject}
         onCreateFromTemplate={handleCreateFromTemplate}
         onCreateFromCustomUrl={handleCreateFromCustomUrl}
+        onOpenExistingFolder={handleOpenExistingFolder}
         isCreating={isCreatingProject}
       />
 

@@ -694,6 +694,10 @@ export function WelcomeView() {
         onCreateBlankProject={handleCreateBlankProject}
         onCreateFromTemplate={handleCreateFromTemplate}
         onCreateFromCustomUrl={handleCreateFromCustomUrl}
+        onOpenExistingFolder={async (path, name) => {
+          setShowNewProjectModal(false);
+          await initializeAndOpenProject(path, name);
+        }}
         isCreating={isCreating}
       />
 

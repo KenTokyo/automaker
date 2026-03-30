@@ -674,25 +674,91 @@ function SessionManagerImpl({
     setEditingName('');
   }, []);
 
-  const handleDeleteOldSessions = async (olderThanDays: number) => {
-    const api = getElectronAPI();
-    if (!api?.sessions) return;
+  const sessionById = useMemo(
+    () => new Map(sessions.map((session) => [session.id, session])),
+    [sessions]
+  );
 
-    const cutoffMs = Date.now() - olderThanDays * 24 * 60 * 60 * 1000;
-    const sessionsToDelete = sessions.filter((session) => {
-      const updatedAtMs = new Date(session.updatedAt).getTime();
-      return (
-        Number.isFinite(updatedAtMs) && updatedAtMs < cutoffMs && session.id !== currentSessionId
-      );
-    });
+  const getSessionDepth = useCallback(
+    (sessionId: string): number => {
+      let depth = 0;
+      let cursor = sessionById.get(sessionId);
+      const visited = new Set<string>([sessionId]);
 
-    for (const session of sessionsToDelete) {
-      await api.sessions.delete(session.id);
-    }
+      while (cursor?.parentSessionId) {
+        const parentId = cursor.parentSessionId;
+        if (visited.has(parentId)) break;
+        visited.add(parentId);
 
-    await invalidateSessions();
-    setIsDeleteOldSessionsDialogOpen(false);
-  };
+        const parent = sessionById.get(parentId);
+        if (!parent) break;
+
+        depth += 1;
+        cursor = parent;
+      }
+
+      return depth;
+    },
+    [sessionById]
+  );
+
+  const sortSessionIdsForSafeDelete = useCallback(
+    (sessionIds: string[]): string[] => {
+      const uniqueIds = Array.from(new Set(sessionIds));
+
+      return uniqueIds.sort((a, b) => {
+        // Delete children first, then parents (prevents avoidable 404 after cascade deletes).
+        const depthDiff = getSessionDepth(b) - getSessionDepth(a);
+        if (depthDiff !== 0) return depthDiff;
+
+        // For equal depth: older sessions first for deterministic behavior.
+        const aTime = new Date(sessionById.get(a)?.updatedAt ?? 0).getTime();
+        const bTime = new Date(sessionById.get(b)?.updatedAt ?? 0).getTime();
+        const bothFinite = Number.isFinite(aTime) && Number.isFinite(bTime);
+        if (bothFinite && aTime !== bTime) {
+          return aTime - bTime;
+        }
+
+        return a.localeCompare(b);
+      });
+    },
+    [getSessionDepth, sessionById]
+  );
+
+  const handleDeleteSessionsByIds = useCallback(
+    async (sessionIds: string[]) => {
+      const api = getElectronAPI();
+      if (!api?.sessions || sessionIds.length === 0) return;
+
+      const orderedIds = sortSessionIdsForSafeDelete(sessionIds);
+      for (const id of orderedIds) {
+        try {
+          const result = await api.sessions.delete(id);
+          const errorMessage = result.error?.toLowerCase() || '';
+          if (!result.success && !errorMessage.includes('not found')) {
+            logger.error('[SessionManager] Failed to delete session in bulk cleanup:', {
+              sessionId: id,
+              error: result.error,
+            });
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message.toLowerCase() : '';
+          // Session may already be removed by parent cascade. Ignore and continue.
+          if (message.includes('not found')) {
+            continue;
+          }
+
+          logger.error('[SessionManager] Bulk session delete threw:', {
+            sessionId: id,
+            error,
+          });
+        }
+      }
+
+      await invalidateSessions();
+    },
+    [invalidateSessions, sortSessionIdsForSafeDelete]
+  );
 
   const handleQuickCreateFromHeader = () => {
     if (activeTab === 'archived') {
@@ -955,6 +1021,7 @@ function SessionManagerImpl({
                 expandedRunIds={expandedOrchestratorRuns}
                 runningSessions={runningSessions}
                 isExpanded={!!expandedProjects[group.projectPath]}
+                isActiveProject={group.projectPath === projectPath}
                 onToggleExpanded={() => toggleProjectExpanded(group.projectPath)}
                 visibleCount={projectVisibleCounts[group.projectPath] || INITIAL_VISIBLE}
                 onShowMore={() => showMoreForProject(group.projectPath)}
@@ -1071,8 +1138,10 @@ function SessionManagerImpl({
           <DeleteOldSessionsDialog
             open={isDeleteOldSessionsDialogOpen}
             onOpenChange={setIsDeleteOldSessionsDialogOpen}
-            totalSessionCount={sessions.length}
-            onConfirm={handleDeleteOldSessions}
+            sessions={sessions}
+            currentSessionId={currentSessionId}
+            getProjectName={getProjectName}
+            onDeleteSessions={handleDeleteSessionsByIds}
           />
         </>
       )}

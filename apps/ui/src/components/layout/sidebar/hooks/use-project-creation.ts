@@ -263,6 +263,36 @@ export function useProjectCreation({ upsertAndSetCurrentProject }: UseProjectCre
     [upsertAndSetCurrentProject]
   );
 
+  /**
+   * Open an existing folder as project (no name input needed)
+   */
+  const handleOpenExistingFolder = useCallback(
+    async (folderPath: string, folderName: string) => {
+      setIsCreatingProject(true);
+      try {
+        // Initialize .automaker directory structure (creates it if missing)
+        await initializeProject(folderPath);
+
+        // Register in project store
+        upsertAndSetCurrentProject(folderPath, folderName);
+
+        setShowNewProjectModal(false);
+
+        toast.success('Projekt geöffnet', {
+          description: `${folderName} wurde als Projekt hinzugefügt`,
+        });
+      } catch (error) {
+        logger.error('Failed to open existing folder:', error);
+        toast.error('Projekt konnte nicht geöffnet werden', {
+          description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+        });
+      } finally {
+        setIsCreatingProject(false);
+      }
+    },
+    [upsertAndSetCurrentProject]
+  );
+
   return {
     // Modal state
     showNewProjectModal,
@@ -281,5 +311,6 @@ export function useProjectCreation({ upsertAndSetCurrentProject }: UseProjectCre
     handleCreateBlankProject,
     handleCreateFromTemplate,
     handleCreateFromCustomUrl,
+    handleOpenExistingFolder,
   };
 }

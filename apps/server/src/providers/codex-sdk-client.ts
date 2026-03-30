@@ -74,6 +74,7 @@ const TOKEN_USAGE_CONTAINER_KEYS = [
   'totalTokenUsage',
   'total',
 ] as const;
+const LAST_TOKEN_USAGE_KEYS = ['last_token_usage', 'lastTokenUsage', 'last'] as const;
 const TOKEN_USAGE_PARENT_KEYS = [
   'result',
   'response',
@@ -281,11 +282,32 @@ function collectSdkUsageCandidates(
   return candidates;
 }
 
+function extractLastTokenUsageFromCandidate(
+  candidate: Record<string, unknown>
+): ProviderTokenUsage | undefined {
+  for (const key of LAST_TOKEN_USAGE_KEYS) {
+    const nested = asRecord(candidate[key]);
+    if (!nested) continue;
+    const usage = normalizeTokenUsage(nested);
+    if (usage) {
+      return usage;
+    }
+  }
+  return undefined;
+}
+
 function extractSdkTokenUsage(result: unknown): ProviderTokenUsage | undefined {
   const resultRecord = asRecord(result);
   if (!resultRecord) return undefined;
 
   const candidates = collectSdkUsageCandidates(resultRecord);
+
+  // Prefer explicit last-turn usage when both total + last are present.
+  for (const candidate of candidates) {
+    const normalizedLast = extractLastTokenUsageFromCandidate(candidate);
+    if (normalizedLast) return normalizedLast;
+  }
+
   for (const candidate of candidates) {
     const normalized = normalizeTokenUsage(candidate);
     if (normalized) return normalized;

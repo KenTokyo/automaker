@@ -1,6 +1,7 @@
 ﻿import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { useAgentPromptsStore } from '@/store/agent-prompts-store';
+import { useGlobalSystemPromptStore } from '@/store/global-system-prompt-store';
 import { useTimeLimiterStore } from '@/store/time-limiter-store';
 import { useOrchestratorStore } from '@/store/orchestrator-store';
 import { useTaskChatBridgeStore } from '@/store/task-chat-bridge-store';
@@ -12,8 +13,10 @@ import { copyToClipboard, generateChatSummary, generateContextSummary } from '@/
 import { embedSystemPrompts } from '@/lib/system-prompt-payload';
 import type { ChatDisplaySettings } from '@/store/types/ui-types';
 import { DEFAULT_CHAT_DISPLAY_SETTINGS } from '@/store/types/ui-types';
+import type { StreamEvent } from '@/types/electron';
 import { getHttpApiClient } from '@/lib/http-api-client';
-import { useSessionById } from '@/hooks/queries/use-sessions';
+import { getElectronAPI } from '@/lib/electron';
+import { useSessionById, useSessions } from '@/hooks/queries/use-sessions';
 import { useAvailableModels } from '@/hooks/queries/use-models';
 import { useSessionQueryInvalidation } from '@/hooks/use-query-invalidation';
 import { updateTask as updateFileTask } from '@/hooks/use-tasks';
@@ -215,6 +218,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
   // Session metadata for Save-to-Docs feature and activity indicators
   const { data: currentSession = null } = useSessionById(currentSessionId, true);
+  const { data: sessionsForOrchestratorScope = [] } = useSessions(true);
   const { data: availableModels = [], isFetched: availableModelsFetched } = useAvailableModels();
   const currentSessionName = currentSession?.name ?? null;
   const [copySuccess, setCopySuccess] = useState(false);
@@ -297,6 +301,15 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
   // Get agent prompts store
   const getSelectedPromptsText = useAgentPromptsStore((state) => state.getSelectedPromptsText);
+
+  // Global system prompt (always active)
+  const globalSystemPromptContent = useGlobalSystemPromptStore((state) => state.content);
+  const loadGlobalSystemPrompt = useGlobalSystemPromptStore((state) => state.loadPrompt);
+
+  // Load global system prompt on mount
+  useEffect(() => {
+    loadGlobalSystemPrompt();
+  }, [loadGlobalSystemPrompt]);
 
   // Time limiter store
   const {
@@ -710,6 +723,49 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
   const orchestratorHandledMessageKeysRef = useRef(new Set<string>());
   const sessionsWithInjectedSystemPromptsRef = useRef(new Set<string>());
 
+  const loadLatestAssistantMessageFromHistory = useCallback(
+    async (sessionId: string): Promise<{ id: string; content: string } | null> => {
+      const api = getElectronAPI();
+      if (!api?.agent?.getHistory) {
+        return null;
+      }
+
+      const maxAttempts = 3;
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        try {
+          const result = await api.agent.getHistory(sessionId);
+          if (result.success && result.messages) {
+            const assistantMessages = result.messages.filter(
+              (message: { role: string }) => message.role === 'assistant'
+            );
+            const lastAssistantMessage =
+              assistantMessages.length > 0 ? assistantMessages[assistantMessages.length - 1] : null;
+
+            if (lastAssistantMessage && lastAssistantMessage.content.trim().length > 0) {
+              return {
+                id: lastAssistantMessage.id,
+                content: lastAssistantMessage.content,
+              };
+            }
+          }
+        } catch (error) {
+          logger.warn('[Orchestrator] Failed to fetch session history for trigger check', {
+            sessionId,
+            attempt: attempt + 1,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+
+        if (attempt < maxAttempts - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 120));
+        }
+      }
+
+      return null;
+    },
+    []
+  );
+
   const triggerOrchestratorPhaseContinuation = useCallback(
     (
       sourceSessionId: string,
@@ -786,6 +842,60 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     ]
   );
 
+  const sessionIdsForCurrentProject = useMemo(() => {
+    if (!currentProject?.path) {
+      return new Set<string>();
+    }
+
+    return new Set(
+      sessionsForOrchestratorScope
+        .filter((session) => session.projectPath === currentProject.path)
+        .map((session) => session.id)
+    );
+  }, [sessionsForOrchestratorScope, currentProject?.path]);
+
+  // Listen globally for completion events so orchestrator chaining also works in the background.
+  useEffect(() => {
+    if (!orchestratorEnabled || !currentProject?.path) return;
+
+    const api = getElectronAPI();
+    if (!api?.agent?.onStream) return;
+
+    const unsubscribe = api.agent.onStream((rawEvent) => {
+      const event = rawEvent as StreamEvent;
+      if (event.type !== 'complete') return;
+
+      const belongsToCurrentProject =
+        sessionIdsForCurrentProject.has(event.sessionId) || event.sessionId === currentSessionId;
+      if (!belongsToCurrentProject) {
+        return;
+      }
+
+      // Avoid duplicate fallback IDs when the active session completion is already handled
+      // by the local completion effect.
+      if (!event.messageId && event.sessionId === currentSessionId) {
+        return;
+      }
+
+      const completionMessageId =
+        event.messageId ??
+        `complete-${event.sessionId}-${event.content.length}-${Math.round(event.content.length / 17)}`;
+
+      triggerOrchestratorPhaseContinuation(event.sessionId, {
+        id: completionMessageId,
+        content: event.content,
+      });
+    });
+
+    return unsubscribe;
+  }, [
+    orchestratorEnabled,
+    currentProject?.path,
+    currentSessionId,
+    sessionIdsForCurrentProject,
+    triggerOrchestratorPhaseContinuation,
+  ]);
+
   // Detect when processing finishes and check for orchestrator trigger
   useEffect(() => {
     const wasProcessing = wasProcessingRef.current;
@@ -807,10 +917,25 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
     // Only trigger when processing transitions from true → false
     if (!wasProcessing || isProcessing) return;
-    if (!orchestratorEnabled || !currentSessionId || !isConnected) return;
+    if (!orchestratorEnabled || !isConnected) return;
 
     const sessionIdAtStart = sessionIdAtProcessingStartRef.current;
     sessionIdAtProcessingStartRef.current = null;
+    const assistantSnapshot = assistantSnapshotAtProcessingStartRef.current;
+    assistantSnapshotAtProcessingStartRef.current = null;
+
+    if (!sessionIdAtStart) {
+      return;
+    }
+
+    // If the terminal finished with stop/error, do not trigger a follow-up phase.
+    if (
+      lastTerminalEvent?.sessionId === sessionIdAtStart &&
+      lastTerminalEvent.type !== 'complete'
+    ) {
+      return;
+    }
+
     if (sessionIdAtStart && sessionIdAtStart !== currentSessionId) {
       logger.info('[Orchestrator] Ignoring completion after session switch', {
         sessionAtStart: sessionIdAtStart,
@@ -819,38 +944,62 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       return;
     }
 
-    // Ignore stale completion events that did not produce a new assistant message.
-    if (!lastAssistantMessage) {
-      return;
-    }
+    const hasFreshLocalAssistantMessage =
+      !!lastAssistantMessage &&
+      (!assistantSnapshot ||
+        lastAssistantMessage.id !== assistantSnapshot.id ||
+        lastAssistantMessage.content !== assistantSnapshot.content);
 
-    const assistantSnapshot = assistantSnapshotAtProcessingStartRef.current;
-    const hasNewAssistantOutput =
-      !assistantSnapshot ||
-      lastAssistantMessage.id !== assistantSnapshot.id ||
-      lastAssistantMessage.content !== assistantSnapshot.content;
+    let cancelled = false;
 
-    if (!hasNewAssistantOutput) {
-      logger.info(
-        '[Orchestrator] Ignoring completion event because assistant output did not change'
-      );
-      orchestratorSetLastTriggerCheck({
-        checkedAt: Date.now(),
-        matched: false,
-        reason: 'no-new-assistant-output',
-        lastLine: '',
-        keyword: orchestratorTriggerKeyword.trim(),
-      });
-      return;
-    }
+    const evaluateCompletion = async () => {
+      const assistantMessage =
+        hasFreshLocalAssistantMessage && lastAssistantMessage
+          ? {
+              id: lastAssistantMessage.id,
+              content: lastAssistantMessage.content,
+            }
+          : await loadLatestAssistantMessageFromHistory(sessionIdAtStart);
 
-    triggerOrchestratorPhaseContinuation(currentSessionId, lastAssistantMessage);
+      if (cancelled || !assistantMessage) {
+        return;
+      }
+
+      const hasNewAssistantOutput =
+        !assistantSnapshot ||
+        assistantMessage.id !== assistantSnapshot.id ||
+        assistantMessage.content !== assistantSnapshot.content;
+
+      if (!hasNewAssistantOutput) {
+        logger.info(
+          '[Orchestrator] Ignoring completion event because assistant output did not change'
+        );
+        orchestratorSetLastTriggerCheck({
+          checkedAt: Date.now(),
+          matched: false,
+          reason: 'no-new-assistant-output',
+          lastLine: '',
+          keyword: orchestratorTriggerKeyword.trim(),
+        });
+        return;
+      }
+
+      triggerOrchestratorPhaseContinuation(sessionIdAtStart, assistantMessage);
+    };
+
+    void evaluateCompletion();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     isProcessing,
     orchestratorEnabled,
     currentSessionId,
     isConnected,
+    lastTerminalEvent,
     messages,
+    loadLatestAssistantMessageFromHistory,
     orchestratorSetLastTriggerCheck,
     orchestratorTriggerKeyword,
     triggerOrchestratorPhaseContinuation,
@@ -895,7 +1044,12 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     orchestratorSetAutoSendStatus('sending');
     clearOrchestratorPendingContent();
 
-    const agentPromptsText = getSelectedPromptsText();
+    const selectedPromptsText = getSelectedPromptsText();
+    const globalPrompt = globalSystemPromptContent.trim();
+    // Combine global system prompt + selected agent prompts
+    const agentPromptsText = [globalPrompt, selectedPromptsText]
+      .filter(Boolean)
+      .join('\n\n---\n\n');
     const orchestratorWrapper = getOrchestratorMessageWrapper();
     const messageToSend = embedSystemPrompts(content, {
       agentPromptsText,
@@ -927,6 +1081,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     sendMessage,
     orchestratorSetAutoSendStatus,
     getSelectedPromptsText,
+    globalSystemPromptContent,
     getOrchestratorMessageWrapper,
   ]);
 
@@ -973,7 +1128,12 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
           orchestratorStartNewRun();
         }
 
-        const agentPromptsText = getSelectedPromptsText();
+        const selectedPromptsText = getSelectedPromptsText();
+        const globalPrompt = globalSystemPromptContent.trim();
+        // Combine global system prompt + selected agent prompts
+        const agentPromptsText = [globalPrompt, selectedPromptsText]
+          .filter(Boolean)
+          .join('\n\n---\n\n');
         const orchestratorWrapper = getOrchestratorMessageWrapper();
 
         messageContent = embedSystemPrompts(messageInput, {
@@ -1025,6 +1185,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       pendingOrchestratorContent,
       orchestratorStartNewRun,
       getSelectedPromptsText,
+      globalSystemPromptContent,
       getOrchestratorMessageWrapper,
     ]
   );

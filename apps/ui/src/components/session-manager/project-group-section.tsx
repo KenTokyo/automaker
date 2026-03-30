@@ -20,6 +20,8 @@ interface ProjectGroupSectionProps {
   renderDisplayEntry: (entry: SessionDisplayEntry) => React.ReactNode;
   /** Creates a new chat in this project */
   onNewSession?: (projectPath: string) => void;
+  /** Whether this is the currently active project (the one selected in the agent header) */
+  isActiveProject?: boolean;
 }
 
 export { INITIAL_VISIBLE, LOAD_MORE_COUNT };
@@ -35,6 +37,7 @@ export function ProjectGroupSection({
   onShowLess,
   renderDisplayEntry,
   onNewSession,
+  isActiveProject = false,
 }: ProjectGroupSectionProps) {
   const visibleSessions = useMemo(() => {
     const byId = new Map(group.allSessions.map((session) => [session.id, session]));
@@ -101,23 +104,45 @@ export function ProjectGroupSection({
       <button
         className={cn(
           'flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left',
-          'transition-colors duration-150 hover:bg-accent/60',
-          'group/project-header cursor-pointer select-none'
+          'transition-all duration-200 hover:bg-accent/60',
+          'group/project-header cursor-pointer select-none',
+          isActiveProject && [
+            'bg-orange-400/10 border border-orange-400/30',
+            'shadow-[0_0_12px_-3px_theme(colors.orange.400/0.3)]',
+            'hover:bg-orange-400/15',
+          ],
+          !isActiveProject && 'border border-transparent'
         )}
         onClick={onToggleExpanded}
       >
         <ChevronRight
           className={cn(
             'h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200',
-            isExpanded && 'rotate-90'
+            isExpanded && 'rotate-90',
+            isActiveProject && 'text-orange-400'
           )}
         />
         {isExpanded ? (
-          <FolderOpen className="h-4.5 w-4.5 shrink-0 text-yellow-400 drop-shadow-[0_0_3px_rgba(250,204,21,0.4)]" />
+          <FolderOpen
+            className={cn(
+              'h-4.5 w-4.5 shrink-0 drop-shadow-[0_0_3px_rgba(250,204,21,0.4)]',
+              isActiveProject ? 'text-orange-400' : 'text-yellow-400'
+            )}
+          />
         ) : (
-          <Folder className="h-4.5 w-4.5 shrink-0 text-yellow-400 drop-shadow-[0_0_3px_rgba(250,204,21,0.4)]" />
+          <Folder
+            className={cn(
+              'h-4.5 w-4.5 shrink-0 drop-shadow-[0_0_3px_rgba(250,204,21,0.4)]',
+              isActiveProject ? 'text-orange-400' : 'text-yellow-400'
+            )}
+          />
         )}
-        <span className="min-w-0 flex-1 truncate text-xs font-bold text-foreground">
+        <span
+          className={cn(
+            'min-w-0 flex-1 truncate text-xs font-bold',
+            isActiveProject ? 'text-orange-400' : 'text-foreground'
+          )}
+        >
           {group.projectName}
         </span>
         <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">

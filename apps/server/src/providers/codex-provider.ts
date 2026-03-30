@@ -81,6 +81,7 @@ const CODEX_EVENT_TYPES = {
   itemCompleted: 'item.completed',
   itemStarted: 'item.started',
   itemUpdated: 'item.updated',
+  turnStarted: 'turn.started',
   turnCompleted: 'turn.completed',
   error: 'error',
 } as const;
@@ -189,6 +190,7 @@ const TOKEN_USAGE_CONTAINER_KEYS = [
   'totalTokenUsage',
   'total',
 ] as const;
+const LAST_TOKEN_USAGE_KEYS = ['last_token_usage', 'lastTokenUsage', 'last'] as const;
 const TOKEN_USAGE_PARENT_KEYS = [
   'result',
   'response',
@@ -473,17 +475,43 @@ function collectTokenUsageCandidates(event: Record<string, unknown>): Record<str
   return candidates;
 }
 
-function extractCodexTokenUsage(event: Record<string, unknown>): ProviderTokenUsage | undefined {
-  const candidates = collectTokenUsageCandidates(event);
-  for (const candidate of candidates) {
-    const usage = normalizeTokenUsageFromRecord(candidate);
+function extractLastTokenUsageFromCandidate(
+  candidate: Record<string, unknown>
+): ProviderTokenUsage | undefined {
+  for (const key of LAST_TOKEN_USAGE_KEYS) {
+    const nestedRecord = asRecord(candidate[key]);
+    if (!nestedRecord) continue;
+    const usage = normalizeTokenUsageFromRecord(nestedRecord);
     if (usage) {
       return usage;
     }
   }
+  return undefined;
+}
+
+function extractCodexTokenUsage(
+  event: Record<string, unknown>
+): { usage: ProviderTokenUsage; source: 'last' | 'generic' } | undefined {
+  const candidates = collectTokenUsageCandidates(event);
+
+  // Prefer explicit "last token usage" containers when present.
+  for (const candidate of candidates) {
+    const usage = extractLastTokenUsageFromCandidate(candidate);
+    if (usage) {
+      return { usage, source: 'last' };
+    }
+  }
+
+  for (const candidate of candidates) {
+    const usage = normalizeTokenUsageFromRecord(candidate);
+    if (usage) {
+      return { usage, source: 'generic' };
+    }
+  }
 
   // Fallback: some event payloads expose token fields directly on the root event.
-  return normalizeTokenUsageFromRecord(event);
+  const fallback = normalizeTokenUsageFromRecord(event);
+  return fallback ? { usage: fallback, source: 'generic' } : undefined;
 }
 
 function extractText(value: unknown): string | null {
@@ -1137,13 +1165,27 @@ export class CodexProvider extends BaseProvider {
       });
 
       let latestTokenUsage: ProviderTokenUsage | undefined;
+      let latestTurnLastTokenUsage: ProviderTokenUsage | undefined;
 
       for await (const rawEvent of stream) {
         const event = rawEvent as Record<string, unknown>;
         const eventType = getEventType(event);
-        const eventUsage = extractCodexTokenUsage(event);
+        if (eventType === CODEX_EVENT_TYPES.turnStarted) {
+          latestTurnLastTokenUsage = undefined;
+        }
+
+        const eventUsageMatch = extractCodexTokenUsage(event);
+        const eventUsage = eventUsageMatch?.usage;
+        const eventUsageSource = eventUsageMatch?.source;
         if (eventUsage) {
-          latestTokenUsage = eventUsage;
+          if (eventUsageSource === 'last') {
+            latestTurnLastTokenUsage = eventUsage;
+            latestTokenUsage = eventUsage;
+          } else if (!(eventType === CODEX_EVENT_TYPES.turnCompleted && latestTurnLastTokenUsage)) {
+            // codex exec can expose cumulative usage on turn.completed; keep
+            // the last turn-scoped usage when available for context tracking.
+            latestTokenUsage = eventUsage;
+          }
         }
 
         // Track thread/session ID from events
@@ -1200,8 +1242,12 @@ export class CodexProvider extends BaseProvider {
           const resultText = resultTextRaw
             ? sanitizeCodexOutput(resultTextRaw) || undefined
             : undefined;
-          const usage = eventUsage ?? latestTokenUsage;
+          const usage =
+            eventUsageSource === 'last'
+              ? eventUsage
+              : (latestTurnLastTokenUsage ?? eventUsage ?? latestTokenUsage);
           yield { type: 'result', subtype: 'success', result: resultText, usage };
+          latestTurnLastTokenUsage = undefined;
           continue;
         }
 

@@ -199,7 +199,7 @@ function SessionListItemRowImpl({
           !wasStopped &&
           !isDirty &&
           isCurrentSession &&
-          'border-primary bg-primary/10 shadow-[0_8px_20px_-16px_hsl(var(--primary))]',
+          'border-orange-400 bg-orange-400/12 shadow-[0_4px_24px_-4px_theme(colors.orange.400/0.45)] ring-1 ring-orange-400/25',
         session.isArchived && 'opacity-60',
         // Signal-based card styling: violet border for QUESTION signal
         !isRunning &&
@@ -218,7 +218,7 @@ function SessionListItemRowImpl({
           'border-violet-500 bg-violet-500/10 shadow-[0_8px_20px_-16px_theme(colors.violet.500)]',
         isMultiselectMode &&
           isSelected &&
-          'border-primary bg-primary/20 shadow-[0_8px_18px_-16px_hsl(var(--primary))]',
+          'border-orange-400 bg-orange-400/15 shadow-[0_4px_20px_-4px_theme(colors.orange.400/0.4)] ring-1 ring-orange-400/25',
         isPhaseItem && 'bg-muted/20',
         isSubagent &&
           'border-sky-500/50 bg-sky-500/5 shadow-[0_8px_20px_-16px_theme(colors.sky.500)]'
