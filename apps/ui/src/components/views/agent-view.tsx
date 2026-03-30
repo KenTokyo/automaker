@@ -490,7 +490,11 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
   // Track elapsed seconds for display
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const autoSessionSwitchTriggeredSessionsRef = useRef(new Set<string>());
+  const timeLimitStopRequestedSessionsRef = useRef(new Set<string>());
   const pendingCopiedContentSourceSessionIdRef = useRef<string | null>(null);
+  const followUpAutoSendRef = useRef(false);
+  const followUpAutoStartInFlightRef = useRef(false);
+  const followUpSessionRequestForRef = useRef<string | null>(null);
 
   // Reset timer when session changes
   useEffect(() => {
@@ -539,32 +543,6 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     return () => clearInterval(interval);
   }, [currentSessionId, timeLimiterEnabled, isProcessing, getElapsedSeconds]);
 
-  // Handle pending content from previous session (paste into new session)
-  useEffect(() => {
-    if (pendingCopiedContent && currentSessionId && isConnected && !isProcessing) {
-      const sourceSessionId = pendingCopiedContentSourceSessionIdRef.current;
-      if (sourceSessionId && sourceSessionId === currentSessionId) {
-        return;
-      }
-      // Never inject into an already-used chat. Wait for the fresh follow-up session.
-      if (hasConversationMessages) {
-        return;
-      }
-
-      // Set the pending content as input
-      setInput(pendingCopiedContent);
-      clearPendingContent();
-      pendingCopiedContentSourceSessionIdRef.current = null;
-    }
-  }, [
-    pendingCopiedContent,
-    currentSessionId,
-    isConnected,
-    isProcessing,
-    clearPendingContent,
-    hasConversationMessages,
-  ]);
-
   // Handle pending task message from task-chat bridge
   const pendingTaskMessage = useTaskChatBridgeStore((s) => s.pendingTaskMessage);
   const shouldNavigateToAgent = useTaskChatBridgeStore((s) => s.shouldNavigateToAgent);
@@ -592,6 +570,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
       const contextSummary = `${autoHintText}${generateContextSummary(messages)}`;
       pendingCopiedContentSourceSessionIdRef.current = currentSessionId;
+      followUpAutoSendRef.current = true;
       setPendingCopiedContent(contextSummary);
       const created = await quickCreate({
         attachOrchestratorRunId: false,
@@ -602,6 +581,8 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
       if (!created) {
         pendingCopiedContentSourceSessionIdRef.current = null;
+        followUpAutoSendRef.current = false;
+        followUpSessionRequestForRef.current = null;
         clearPendingContent();
         toast.error('Automatischer Wechsel fehlgeschlagen. Bitte kurz erneut versuchen.');
         return false;
@@ -622,7 +603,18 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
   useEffect(() => {
     if (!timeLimiterEnabled || !currentSessionId || !isConnected) return;
     if (!isTimeExceeded()) return;
-    if (isProcessing) return; // Don't switch while processing
+
+    if (isProcessing) {
+      if (timeLimitStopRequestedSessionsRef.current.has(currentSessionId)) return;
+      timeLimitStopRequestedSessionsRef.current.add(currentSessionId);
+
+      void stopExecution().catch((error) => {
+        logger.error('[TimeLimiter] Failed to stop active run at time limit', error);
+        timeLimitStopRequestedSessionsRef.current.delete(currentSessionId);
+      });
+      return;
+    }
+
     if (autoSessionSwitchTriggeredSessionsRef.current.has(currentSessionId)) return;
 
     const sourceSessionId = currentSessionId;
@@ -630,12 +622,14 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
     void createFollowUpSessionWithSummary('time-limit')
       .then((didCreate) => {
+        timeLimitStopRequestedSessionsRef.current.delete(sourceSessionId);
         if (!didCreate) {
           autoSessionSwitchTriggeredSessionsRef.current.delete(sourceSessionId);
         }
       })
       .catch((error) => {
         logger.error('[TimeLimiter] Automatic session switch failed', error);
+        timeLimitStopRequestedSessionsRef.current.delete(sourceSessionId);
         autoSessionSwitchTriggeredSessionsRef.current.delete(sourceSessionId);
       });
   }, [
@@ -644,6 +638,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     isConnected,
     isProcessing,
     isTimeExceeded,
+    stopExecution,
     createFollowUpSessionWithSummary,
   ]);
 
@@ -1189,6 +1184,86 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       getOrchestratorMessageWrapper,
     ]
   );
+
+  // Handle pending content from time-limit/context follow-up in the newly created session.
+  // This flow auto-sends the summary once the target session is connected and idle.
+  useEffect(() => {
+    if (!pendingCopiedContent) return;
+    if (followUpAutoStartInFlightRef.current) return;
+
+    const sourceSessionId = pendingCopiedContentSourceSessionIdRef.current;
+    const requestToken = `${sourceSessionId ?? 'unknown'}:${pendingCopiedContent.length}`;
+
+    const autoStartFollowUp = async () => {
+      followUpAutoStartInFlightRef.current = true;
+
+      try {
+        const quickCreate = quickCreateSessionRef.current;
+        if (!quickCreate || !currentSessionId) {
+          return;
+        }
+
+        // Wait until SessionManager switched away from the source session.
+        if (sourceSessionId && sourceSessionId === currentSessionId) {
+          return;
+        }
+
+        // Never inject into an already-used chat: force a fresh follow-up target instead.
+        if (hasConversationMessages) {
+          if (followUpSessionRequestForRef.current === requestToken) {
+            return;
+          }
+
+          followUpSessionRequestForRef.current = requestToken;
+          const created = await quickCreate({
+            attachOrchestratorRunId: false,
+            forceCreate: true,
+            sourceType: 'manual',
+            parentSessionId: sourceSessionId ?? currentSessionId,
+          });
+
+          if (!created) {
+            followUpSessionRequestForRef.current = null;
+            toast.error('Neuer Folge-Chat konnte nicht erstellt werden.');
+          }
+          return;
+        }
+
+        if (!isConnected || isProcessing) {
+          return;
+        }
+
+        followUpSessionRequestForRef.current = null;
+
+        if (followUpAutoSendRef.current) {
+          const didSend = await handleSend(pendingCopiedContent);
+          if (!didSend) {
+            setInput(pendingCopiedContent);
+          }
+        } else {
+          setInput(pendingCopiedContent);
+        }
+
+        clearPendingContent();
+        pendingCopiedContentSourceSessionIdRef.current = null;
+        followUpAutoSendRef.current = false;
+      } catch (error) {
+        logger.error('[SessionFollowUp] Failed to initialize follow-up content', error);
+      } finally {
+        followUpAutoStartInFlightRef.current = false;
+      }
+    };
+
+    void autoStartFollowUp();
+  }, [
+    pendingCopiedContent,
+    currentSessionId,
+    isConnected,
+    isProcessing,
+    hasConversationMessages,
+    handleSend,
+    clearPendingContent,
+  ]);
 
   const syncTaskInProgressAfterSend = useCallback(
     async (
