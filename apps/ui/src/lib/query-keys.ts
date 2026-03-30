@@ -122,7 +122,8 @@ export const queryKeys = {
   // ============================================
   sessions: {
     /** All sessions */
-    all: (includeArchived?: boolean) => ['sessions', { includeArchived }] as const,
+    all: (includeArchived?: boolean, projectPath?: string) =>
+      ['sessions', { includeArchived, projectPath }] as const,
     /** Session history */
     history: (sessionId: string) => ['sessions', sessionId, 'history'] as const,
     /** Session queue */

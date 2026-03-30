@@ -184,7 +184,7 @@ interface UseElectronAgentResult {
     images?: ImageAttachment[],
     textFiles?: TextFileAttachment[]
   ) => Promise<void>;
-  stopExecution: () => Promise<void>;
+  stopExecution: (reason?: 'manual' | 'time_limit') => Promise<void>;
   clearHistory: () => Promise<void>;
   error: string | null;
   lastTerminalEvent: AgentTerminalEvent | null;
@@ -913,27 +913,30 @@ export function useElectronAgent({
   );
 
   // Stop current execution
-  const stopExecution = useCallback(async () => {
-    const api = getElectronAPI();
-    if (!api?.agent) {
-      setError('API not available');
-      return;
-    }
-
-    try {
-      logger.info('Stopping execution');
-      const result = await api.agent!.stop(sessionId);
-
-      if (!result.success) {
-        setError(result.error || 'Failed to stop execution');
-      } else {
-        setIsProcessing(false);
+  const stopExecution = useCallback(
+    async (reason: 'manual' | 'time_limit' = 'manual') => {
+      const api = getElectronAPI();
+      if (!api?.agent) {
+        setError('API not available');
+        return;
       }
-    } catch (err) {
-      logger.error('Failed to stop:', err);
-      setError(err instanceof Error ? err.message : 'Failed to stop execution');
-    }
-  }, [sessionId]);
+
+      try {
+        logger.info('Stopping execution', { reason });
+        const result = await api.agent!.stop(sessionId, reason);
+
+        if (!result.success) {
+          setError(result.error || 'Failed to stop execution');
+        } else {
+          setIsProcessing(false);
+        }
+      } catch (err) {
+        logger.error('Failed to stop:', err);
+        setError(err instanceof Error ? err.message : 'Failed to stop execution');
+      }
+    },
+    [sessionId]
+  );
 
   // Clear conversation history
   const clearHistory = useCallback(async () => {

@@ -75,11 +75,13 @@ interface QueuedPrompt {
 }
 
 type SessionSourceType = 'manual' | 'orchestrator' | 'subagent';
+type StopExecutionReason = 'manual' | 'time_limit';
 
 interface Session {
   messages: Message[];
   isRunning: boolean;
-  wasStopped: boolean; // Tracks if the session was manually stopped by the user
+  wasStopped: boolean; // Tracks if the session was interrupted before normal completion
+  stopReason?: StopExecutionReason;
   abortController: AbortController | null;
   workingDirectory: string;
   model?: string;
@@ -114,6 +116,7 @@ interface SessionMetadata {
   preview?: string; // Cached preview for fast session list rendering
   lastError?: string; // Cached last error preview for fast session list rendering
   lastSignal?: SessionSignal; // Cached signal from last AI message (ALL_PHASES_COMPLETE, QUESTION)
+  stopReason?: StopExecutionReason;
 }
 
 interface ActiveSubagentSessionState {
@@ -469,6 +472,7 @@ export class AgentService {
         messages,
         isRunning: false,
         wasStopped: false,
+        stopReason: sessionMetadata?.stopReason,
         abortController: null,
         workingDirectory: resolvedWorkingDirectory,
         model: sessionMetadata?.model,
@@ -548,10 +552,14 @@ export class AgentService {
     // while we are still loading images or building prompt context.
     session.isRunning = true;
     session.wasStopped = false;
+    session.stopReason = undefined;
     session.abortController = new AbortController();
 
     // Track elapsed time: record when this run started
-    await this.updateSession(sessionId, { lastStartedAt: new Date().toISOString() });
+    await this.updateSession(sessionId, {
+      lastStartedAt: new Date().toISOString(),
+      stopReason: undefined,
+    });
 
     // Read images and convert to base64
     const images: Message['images'] = [];
@@ -1410,6 +1418,14 @@ export class AgentService {
     );
   }
 
+  getStoppedSessionReasons(): Map<string, StopExecutionReason> {
+    return new Map(
+      Array.from(this.sessions.entries())
+        .filter(([, session]) => session.wasStopped)
+        .map(([sessionId, session]) => [sessionId, session.stopReason ?? 'manual'])
+    );
+  }
+
   async sessionExists(sessionId: string): Promise<boolean> {
     const metadata = await this.loadMetadata();
     return Boolean(metadata[sessionId]);
@@ -1418,7 +1434,7 @@ export class AgentService {
   /**
    * Stop current agent execution
    */
-  async stopExecution(sessionId: string) {
+  async stopExecution(sessionId: string, reason: StopExecutionReason = 'manual') {
     const session = this.sessions.get(sessionId);
     if (!session) {
       return { success: false, error: 'Session not found' };
@@ -1428,7 +1444,9 @@ export class AgentService {
       session.abortController.abort();
       session.isRunning = false;
       session.wasStopped = true;
+      session.stopReason = reason;
       session.abortController = null;
+      await this.updateSession(sessionId, { stopReason: reason });
       await this.accumulateElapsedTime(sessionId);
       await this.finalizeForegroundSubagents(sessionId);
       await this.finalizeBackgroundSubagentsAfterParentStop(sessionId);
@@ -1577,12 +1595,24 @@ export class AgentService {
     return true;
   }
 
-  async listSessions(includeArchived = false): Promise<SessionMetadata[]> {
+  async listSessions(includeArchived = false, projectPath?: string): Promise<SessionMetadata[]> {
     const metadata = await this.loadMetadata();
     let sessions = Object.values(metadata);
 
     if (!includeArchived) {
       sessions = sessions.filter((s) => !s.archived);
+    }
+
+    if (projectPath) {
+      const normalizePath = (value: string | undefined): string =>
+        (value || '')
+          .replace(/[\\/]+$/, '')
+          .replace(/\\/g, '/')
+          .toLowerCase();
+      const normalizedTargetProjectPath = normalizePath(projectPath);
+      sessions = sessions.filter(
+        (s) => normalizePath(s.projectPath || s.workingDirectory) === normalizedTargetProjectPath
+      );
     }
 
     return sessions.sort(

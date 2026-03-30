@@ -108,6 +108,7 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'favoriteModels', // User's favorite models in the model selector
   'selectedAgentModel', // Last selected model in agent chat view
   'maxSessionsPerProject', // Max active sessions per project (0 = unlimited)
+  'singleProjectHistoryView', // Show only current project's sessions in history
 ] as const;
 
 // Fields from setup store to sync
@@ -770,6 +771,8 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       // Model Selection Persistence
       favoriteModels: resolvedFavoriteModels,
       selectedAgentModel: resolvedSelectedAgentModel,
+      maxSessionsPerProject: serverSettings.maxSessionsPerProject ?? 15,
+      singleProjectHistoryView: serverSettings.singleProjectHistoryView ?? true,
       // Event hooks
       eventHooks: serverSettings.eventHooks ?? [],
       // Terminal settings (nested in terminalState)

@@ -715,6 +715,9 @@ const initialState: AppState = {
   editorTheme: JSON.parse(getItem('automaker:editorTheme') || 'null') || DEFAULT_EDITOR_THEME,
   // Session History Limit
   maxSessionsPerProject: parseInt(getItem('automaker:maxSessionsPerProject') || '15', 10),
+  // Session List Scope
+  singleProjectHistoryView:
+    (getItem('automaker:singleProjectHistoryView') ?? 'true').toLowerCase() === 'true',
   // Skip clear chat confirmation dialog
   skipClearChatConfirm: getItem('automaker:skipClearChatConfirm') === 'true',
   // Session Panel Font Size
@@ -3258,6 +3261,12 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     const clamped = Math.max(0, Math.min(100, max));
     set({ maxSessionsPerProject: clamped });
     setItem('automaker:maxSessionsPerProject', String(clamped));
+  },
+
+  // Session list scope actions
+  setSingleProjectHistoryView: (enabled) => {
+    set({ singleProjectHistoryView: enabled });
+    setItem('automaker:singleProjectHistoryView', String(enabled));
   },
 
   // Clear chat confirmation actions

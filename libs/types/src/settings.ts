@@ -1150,6 +1150,10 @@ export interface GlobalSettings {
   // Session Tracking
   /** Maps project path -> last selected session ID in that project */
   lastSelectedSessionByProject: Record<string, string>;
+  /** Maximum number of sessions kept per project in the left history panel (0 = unlimited) */
+  maxSessionsPerProject?: number;
+  /** When true, only the currently active project's sessions are shown in history */
+  singleProjectHistoryView?: boolean;
 
   // Window State (Electron only)
   /** Persisted window bounds for restoring position/size across sessions */
@@ -1592,6 +1596,8 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   recentFolders: [],
   worktreePanelCollapsed: false,
   lastSelectedSessionByProject: {},
+  maxSessionsPerProject: 15,
+  singleProjectHistoryView: true,
   autoLoadClaudeMd: true,
   skipSandboxWarning: false,
   codexAutoLoadAgents: DEFAULT_CODEX_AUTO_LOAD_AGENTS,

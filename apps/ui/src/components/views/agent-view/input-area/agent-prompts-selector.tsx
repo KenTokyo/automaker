@@ -6,7 +6,7 @@
  * Supports two scopes: Global (available in all projects) and Project (local).
  */
 
-import { memo, useState, useEffect, useMemo } from 'react';
+import { memo, useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Bot,
   Plus,
@@ -47,7 +47,7 @@ import {
   type AgentPromptScope,
 } from '@/store/agent-prompts-store';
 import { Badge } from '@/components/ui/badge';
-import { GlobalSystemPromptEditor } from './global-system-prompt-editor';
+import { GlobalSystemPromptInline, GlobalSystemPromptDialog } from './global-system-prompt-editor';
 
 interface AgentPromptsSelectorProps {
   projectPath: string | null;
@@ -76,6 +76,7 @@ export const AgentPromptsSelector = memo(function AgentPromptsSelector({
   } = useAgentPromptsStore();
 
   const [isOpen, setIsOpen] = useState(false);
+  const [isGlobalPromptDialogOpen, setIsGlobalPromptDialogOpen] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState<AgentPrompt | null>(null);
   const [editorName, setEditorName] = useState('');
@@ -140,6 +141,12 @@ export const AgentPromptsSelector = memo(function AgentPromptsSelector({
     }
     return `${selectedCount} Agents`;
   };
+
+  const handleOpenGlobalPromptEditor = useCallback(() => {
+    // Close dropdown first, then open dialog after a short delay
+    setIsOpen(false);
+    setTimeout(() => setIsGlobalPromptDialogOpen(true), 120);
+  }, []);
 
   const handleAddNew = (scope: AgentPromptScope = 'local') => {
     setEditingPrompt(null);
@@ -339,8 +346,8 @@ export const AgentPromptsSelector = memo(function AgentPromptsSelector({
             </div>
           </div>
 
-          {/* Global System Prompt (always active, not selectable) */}
-          <GlobalSystemPromptEditor onCloseDropdown={() => setIsOpen(false)} />
+          {/* Global System Prompt (always active, not selectable) — only inline preview here */}
+          <GlobalSystemPromptInline onRequestEdit={handleOpenGlobalPromptEditor} />
 
           {/* Clear All Option */}
           {!searchQuery && (
@@ -427,7 +434,13 @@ export const AgentPromptsSelector = memo(function AgentPromptsSelector({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Editor Dialog */}
+      {/* Global System Prompt Dialog (rendered OUTSIDE dropdown to survive unmount) */}
+      <GlobalSystemPromptDialog
+        open={isGlobalPromptDialogOpen}
+        onOpenChange={setIsGlobalPromptDialogOpen}
+      />
+
+      {/* Agent Prompt Editor Dialog */}
       <Dialog open={isEditorOpen} onOpenChange={setIsEditorOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>

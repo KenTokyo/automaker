@@ -5,7 +5,6 @@ import { useAppStore } from '@/store/app-store';
 import { useShallow } from 'zustand/react/shallow';
 import { getElectronAPI } from '@/lib/electron';
 import { generateRandomSessionName } from '@/components/session-manager/session-name-generator';
-import { queryKeys } from '@/lib/query-keys';
 
 const logger = createLogger('AgentSession');
 
@@ -97,7 +96,7 @@ export function useAgentSession({
 
         if (result.success && result.session?.id) {
           // Invalidate session queries so SessionManager picks up the new session
-          await queryClient.invalidateQueries({ queryKey: queryKeys.sessions.all(true) });
+          await queryClient.invalidateQueries({ queryKey: ['sessions'] });
 
           // Set the new session as current and persist
           setCurrentSessionId(result.session.id);

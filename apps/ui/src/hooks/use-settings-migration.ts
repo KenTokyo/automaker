@@ -196,6 +196,8 @@ export function parseLocalStorageSettings(): Partial<GlobalSettings> | null {
       projectHistoryIndex: state.projectHistoryIndex as number,
       lastSelectedSessionByProject:
         state.lastSelectedSessionByProject as GlobalSettings['lastSelectedSessionByProject'],
+      maxSessionsPerProject: state.maxSessionsPerProject as number,
+      singleProjectHistoryView: state.singleProjectHistoryView as boolean,
       // UI State from standalone localStorage keys or Zustand state
       worktreePanelCollapsed:
         worktreePanelCollapsed === 'true' || (state.worktreePanelCollapsed as boolean),
@@ -746,6 +748,8 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     projectHistory: settings.projectHistory ?? [],
     projectHistoryIndex: settings.projectHistoryIndex ?? -1,
     lastSelectedSessionByProject: settings.lastSelectedSessionByProject ?? {},
+    maxSessionsPerProject: settings.maxSessionsPerProject ?? 15,
+    singleProjectHistoryView: settings.singleProjectHistoryView ?? true,
     // UI State
     worktreePanelCollapsed: settings.worktreePanelCollapsed ?? false,
     lastProjectDir: settings.lastProjectDir ?? '',
@@ -829,6 +833,8 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     projectHistory: state.projectHistory,
     projectHistoryIndex: state.projectHistoryIndex,
     lastSelectedSessionByProject: state.lastSelectedSessionByProject,
+    maxSessionsPerProject: state.maxSessionsPerProject,
+    singleProjectHistoryView: state.singleProjectHistoryView,
     worktreePanelCollapsed: state.worktreePanelCollapsed,
     lastProjectDir: state.lastProjectDir,
     recentFolders: state.recentFolders,

@@ -114,8 +114,10 @@ function SessionListItemRowImpl({
   // Defensive guard: sub-agent rows should not stay "running" when parent is already finished.
   const isRunning = isSubagentSource ? rawIsRunning && parentSessionIsRunning : rawIsRunning;
   const hasFailed = session.status === 'failed' && !isRunning;
+  const wasTimeLimited = session.status === 'time_limited' && !isRunning;
   const wasStopped = session.status === 'stopped' && !isRunning;
-  const isDirty = session.isDirty && !isRunning && !hasFailed && !wasStopped;
+  const wasStoppedLike = wasTimeLimited || wasStopped;
+  const isDirty = session.isDirty && !isRunning && !hasFailed && !wasStoppedLike;
 
   const elapsedTime = useElapsedTime(
     session.totalElapsedMs,
@@ -183,6 +185,12 @@ function SessionListItemRowImpl({
         isRunning &&
           isCurrentSession &&
           'border-amber-500 bg-amber-500/10 shadow-[0_8px_20px_-16px_theme(colors.amber.500)]',
+        wasTimeLimited &&
+          !isCurrentSession &&
+          'border-orange-500/70 bg-orange-500/5 shadow-[0_8px_20px_-16px_theme(colors.orange.500)]',
+        wasTimeLimited &&
+          isCurrentSession &&
+          'border-orange-500 bg-orange-500/10 shadow-[0_8px_20px_-16px_theme(colors.orange.500)]',
         wasStopped &&
           !isCurrentSession &&
           'border-red-500/70 bg-red-500/5 shadow-[0_8px_20px_-16px_theme(colors.red.500)]',
@@ -196,21 +204,21 @@ function SessionListItemRowImpl({
           isCurrentSession &&
           'border-emerald-500 bg-emerald-500/10 shadow-[0_8px_20px_-16px_theme(colors.emerald.500)]',
         !isRunning &&
-          !wasStopped &&
+          !wasStoppedLike &&
           !isDirty &&
           isCurrentSession &&
           'border-orange-400 bg-orange-400/12 shadow-[0_4px_24px_-4px_theme(colors.orange.400/0.45)] ring-1 ring-orange-400/25',
         session.isArchived && 'opacity-60',
         // Signal-based card styling: violet border for QUESTION signal
         !isRunning &&
-          !wasStopped &&
+          !wasStoppedLike &&
           !isDirty &&
           !hasFailed &&
           session.lastSignal === 'question' &&
           !isCurrentSession &&
           'border-violet-500/60 bg-violet-500/5 shadow-[0_8px_20px_-16px_theme(colors.violet.500)]',
         !isRunning &&
-          !wasStopped &&
+          !wasStoppedLike &&
           !isDirty &&
           !hasFailed &&
           session.lastSignal === 'question' &&
@@ -325,6 +333,14 @@ function SessionListItemRowImpl({
 
                 {isRunning ? (
                   <Spinner size="sm" className="shrink-0 text-amber-500" />
+                ) : wasTimeLimited ? (
+                  <Timer
+                    style={{
+                      width: `${sessionFontSize}px`,
+                      height: `${sessionFontSize}px`,
+                    }}
+                    className="shrink-0 text-orange-500"
+                  />
                 ) : wasStopped ? (
                   <StopCircle
                     style={{
@@ -395,6 +411,12 @@ function SessionListItemRowImpl({
                 {isRunning && (
                   <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-amber-500">
                     läuft
+                  </span>
+                )}
+
+                {wasTimeLimited && (
+                  <span className="rounded-full bg-orange-500/10 px-1.5 py-0.5 text-orange-500">
+                    Zeitlimit
                   </span>
                 )}
 
@@ -587,7 +609,10 @@ function SessionListItemRowImpl({
                     Updated {formatTime(session.updatedAt)}
                   </span>
 
-                  {session.projectPath && (
+                  {/* ProjectBadge is intentionally hidden in the list view because sessions
+                      are already grouped by project. It remains visible only when a session
+                      is the actively selected one (detail view). */}
+                  {isCurrentSession && session.projectPath && (
                     <>
                       <span className="text-muted-foreground">|</span>
                       <ProjectBadge

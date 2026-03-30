@@ -148,7 +148,13 @@ function repairSessionItem(raw: unknown): SessionListItem | null {
  * Prüft ob ein Status-Wert gültig ist.
  */
 function isValidStatus(value: unknown): value is SessionListItem['status'] {
-  return value === 'idle' || value === 'running' || value === 'failed' || value === 'stopped';
+  return (
+    value === 'idle' ||
+    value === 'running' ||
+    value === 'failed' ||
+    value === 'stopped' ||
+    value === 'time_limited'
+  );
 }
 
 function isValidSourceType(value: unknown): value is SessionListItem['sourceType'] {

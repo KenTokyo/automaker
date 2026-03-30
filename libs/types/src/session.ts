@@ -17,7 +17,8 @@ export interface AgentSession {
   isArchived: boolean;
   isDirty?: boolean; // Indicates session has completed work that needs review
   tags?: string[];
-  status?: 'idle' | 'running' | 'failed' | 'stopped';
+  status?: 'idle' | 'running' | 'failed' | 'stopped' | 'time_limited';
+  stopReason?: 'manual' | 'time_limit';
   lastError?: string;
   totalElapsedMs?: number; // Accumulated running time in milliseconds
   lastStartedAt?: string; // ISO timestamp of when the session last started running

@@ -3,6 +3,8 @@ import {
   AArrowUp,
   Archive,
   CheckSquare,
+  ChevronsDownUp,
+  ChevronsUpDown,
   MessageSquare,
   Plus,
   Square,
@@ -40,6 +42,10 @@ interface SessionManagerHeaderProps {
   sessionFontSize: number;
   onSessionFontSizeChange: (size: number) => void;
   onDeleteOldSessions: () => void;
+  /** Whether all project groups are currently expanded */
+  allProjectsExpanded: boolean;
+  /** Toggle all project groups collapsed/expanded */
+  onToggleAllProjects: () => void;
 }
 
 export function SessionManagerHeader({
@@ -65,6 +71,8 @@ export function SessionManagerHeader({
   sessionFontSize,
   onSessionFontSizeChange,
   onDeleteOldSessions,
+  allProjectsExpanded,
+  onToggleAllProjects,
 }: SessionManagerHeaderProps) {
   return (
     <CardHeader className="gap-1 px-2 pb-1.5 pt-1">
@@ -152,6 +160,19 @@ export function SessionManagerHeader({
         <span className="w-5 text-right text-[10px] tabular-nums text-muted-foreground">
           {sessionFontSize}
         </span>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onToggleAllProjects}
+          title={allProjectsExpanded ? 'Alle Projekte einklappen' : 'Alle Projekte ausklappen'}
+          className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          {allProjectsExpanded ? (
+            <ChevronsDownUp className="h-2.5 w-2.5" />
+          ) : (
+            <ChevronsUpDown className="h-2.5 w-2.5" />
+          )}
+        </Button>
         <Button
           variant="ghost"
           size="icon-sm"

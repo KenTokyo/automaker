@@ -143,6 +143,8 @@ export function EditProjectDialog({
     setProjectUserBubbleColor,
     maxSessionsPerProject,
     setMaxSessionsPerProject,
+    singleProjectHistoryView,
+    setSingleProjectHistoryView,
     skipClearChatConfirm,
     setSkipClearChatConfirm,
   } = useAppStore();
@@ -612,6 +614,28 @@ export function EditProjectDialog({
                       ? 'Unlimited'
                       : `${maxSessionsPerProject} sessions`}
                   </span>
+                </div>
+              </div>
+
+              {/* Single Project History View */}
+              <div className="space-y-2">
+                <Label htmlFor="single-project-history-view">Single-Project-Verlauf</Label>
+                <p className="text-xs text-muted-foreground">
+                  Zeigt in der Session-Liste nur das aktuell geöffnete Projekt, damit weniger Daten
+                  gerendert werden.
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Checkbox
+                    id="single-project-history-view"
+                    checked={singleProjectHistoryView}
+                    onCheckedChange={(checked) => setSingleProjectHistoryView(checked === true)}
+                  />
+                  <Label
+                    htmlFor="single-project-history-view"
+                    className="text-sm text-muted-foreground cursor-pointer select-none"
+                  >
+                    Nur aktuelles Projekt in der Historie anzeigen
+                  </Label>
                 </div>
               </div>
 

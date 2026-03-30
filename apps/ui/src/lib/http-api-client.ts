@@ -2451,8 +2451,11 @@ export class HttpApiClient implements ElectronAPI {
       error?: string;
     }> => this.post('/api/agent/history', { sessionId }),
 
-    stop: (sessionId: string): Promise<{ success: boolean; error?: string }> =>
-      this.post('/api/agent/stop', { sessionId }),
+    stop: (
+      sessionId: string,
+      reason?: 'manual' | 'time_limit'
+    ): Promise<{ success: boolean; error?: string }> =>
+      this.post('/api/agent/stop', { sessionId, reason }),
 
     clear: (sessionId: string): Promise<{ success: boolean; error?: string }> =>
       this.post('/api/agent/clear', { sessionId }),
@@ -2703,12 +2706,20 @@ export class HttpApiClient implements ElectronAPI {
   // Sessions API
   sessions = {
     list: (
-      includeArchived?: boolean
+      includeArchived?: boolean,
+      projectPath?: string
     ): Promise<{
       success: boolean;
       sessions?: SessionListItem[];
       error?: string;
-    }> => this.get(`/api/sessions?includeArchived=${includeArchived || false}`),
+    }> => {
+      const params = new URLSearchParams();
+      params.set('includeArchived', String(Boolean(includeArchived)));
+      if (projectPath && projectPath.trim().length > 0) {
+        params.set('projectPath', projectPath);
+      }
+      return this.get(`/api/sessions?${params.toString()}`);
+    },
 
     create: (
       name: string,

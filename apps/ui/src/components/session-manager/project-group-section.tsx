@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ChevronRight, ChevronUp, FolderOpen, Folder, Plus } from 'lucide-react';
+import { ChevronRight, ChevronUp, FolderOpen, Folder, Plus, Scissors } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { buildProjectDisplayEntries, type ProjectGroup } from '@/hooks/use-project-grouping';
 import type { SessionDisplayEntry } from '@/hooks/use-session-grouping';
@@ -20,6 +20,8 @@ interface ProjectGroupSectionProps {
   renderDisplayEntry: (entry: SessionDisplayEntry) => React.ReactNode;
   /** Creates a new chat in this project */
   onNewSession?: (projectPath: string) => void;
+  /** Opens the cleanup dialog for this project */
+  onCleanupProject?: (projectPath: string) => void;
   /** Whether this is the currently active project (the one selected in the agent header) */
   isActiveProject?: boolean;
 }
@@ -37,6 +39,7 @@ export function ProjectGroupSection({
   onShowLess,
   renderDisplayEntry,
   onNewSession,
+  onCleanupProject,
   isActiveProject = false,
 }: ProjectGroupSectionProps) {
   const visibleSessions = useMemo(() => {
@@ -148,6 +151,25 @@ export function ProjectGroupSection({
         <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
           {group.totalCount}
         </span>
+        {onCleanupProject && (
+          <span
+            role="button"
+            tabIndex={-1}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCleanupProject(group.projectPath);
+            }}
+            className={cn(
+              'shrink-0 rounded-md p-1',
+              'text-muted-foreground hover:text-orange-400 hover:bg-orange-500/15',
+              'opacity-0 group-hover/project-header:opacity-100',
+              'transition-all duration-150 cursor-pointer'
+            )}
+            title={`Sessions aufräumen für ${group.projectName}`}
+          >
+            <Scissors className="h-3.5 w-3.5" />
+          </span>
+        )}
         {onNewSession && (
           <span
             role="button"

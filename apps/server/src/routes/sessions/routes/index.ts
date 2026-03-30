@@ -17,10 +17,15 @@ export function createIndexHandler(agentService: AgentService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const includeArchived = req.query.includeArchived === 'true';
-      const sessionsRaw = await agentService.listSessions(includeArchived);
+      const projectPath =
+        typeof req.query.projectPath === 'string' && req.query.projectPath.trim().length > 0
+          ? req.query.projectPath
+          : undefined;
+      const sessionsRaw = await agentService.listSessions(includeArchived, projectPath);
       const runningSessionIds = agentService.getRunningSessionIds();
       const runningSubagentSessionIds = agentService.getRunningSubagentSessionIds();
       const stoppedSessionIds = agentService.getStoppedSessionIds();
+      const stoppedSessionReasons = agentService.getStoppedSessionReasons();
       const activeSessionIds = new Set([...runningSessionIds, ...runningSubagentSessionIds]);
 
       // Transform to match frontend SessionListItem interface
@@ -51,7 +56,12 @@ export function createIndexHandler(agentService: AgentService) {
           const isRunning = isSubagentSession
             ? isParentActive && activeSessionIds.has(s.id)
             : activeSessionIds.has(s.id);
-          const isStopped = stoppedSessionIds.has(s.id);
+          const inMemoryStopReason = stoppedSessionReasons.get(s.id);
+          const stopReason =
+            s.stopReason === 'manual' || s.stopReason === 'time_limit'
+              ? s.stopReason
+              : inMemoryStopReason;
+          const isStopped = stoppedSessionIds.has(s.id) || Boolean(stopReason);
 
           return {
             id: s.id,
@@ -70,7 +80,16 @@ export function createIndexHandler(agentService: AgentService) {
             parentToolUseId: s.parentToolUseId,
             messageCount: messageCount ?? 0,
             preview,
-            status: isRunning ? 'running' : isStopped ? 'stopped' : lastError ? 'failed' : 'idle',
+            status: isRunning
+              ? 'running'
+              : stopReason === 'time_limit'
+                ? 'time_limited'
+                : isStopped
+                  ? 'stopped'
+                  : lastError
+                    ? 'failed'
+                    : 'idle',
+            stopReason,
             lastError,
             lastSignal,
             totalElapsedMs: s.totalElapsedMs || 0,

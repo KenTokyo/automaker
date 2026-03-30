@@ -218,7 +218,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
   // Session metadata for Save-to-Docs feature and activity indicators
   const { data: currentSession = null } = useSessionById(currentSessionId, true);
-  const { data: sessionsForOrchestratorScope = [] } = useSessions(true);
+  const { data: sessionsForOrchestratorScope = [] } = useSessions(true, currentProject?.path);
   const { data: availableModels = [], isFetched: availableModelsFetched } = useAvailableModels();
   const currentSessionName = currentSession?.name ?? null;
   const [copySuccess, setCopySuccess] = useState(false);
@@ -250,7 +250,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
   const chatActivityState: 'idle' | 'running' | 'stopped' =
     isProcessing || currentSession?.status === 'running'
       ? 'running'
-      : currentSession?.status === 'stopped'
+      : currentSession?.status === 'stopped' || currentSession?.status === 'time_limited'
         ? 'stopped'
         : 'idle';
 
@@ -608,7 +608,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       if (timeLimitStopRequestedSessionsRef.current.has(currentSessionId)) return;
       timeLimitStopRequestedSessionsRef.current.add(currentSessionId);
 
-      void stopExecution().catch((error) => {
+      void stopExecution('time_limit').catch((error) => {
         logger.error('[TimeLimiter] Failed to stop active run at time limit', error);
         timeLimitStopRequestedSessionsRef.current.delete(currentSessionId);
       });
@@ -636,6 +636,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     timeLimiterEnabled,
     currentSessionId,
     isConnected,
+    elapsedSeconds,
     isProcessing,
     isTimeExceeded,
     stopExecution,

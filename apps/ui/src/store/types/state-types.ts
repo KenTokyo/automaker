@@ -382,6 +382,9 @@ export interface AppState {
   // Session History Limit
   maxSessionsPerProject: number;
 
+  // Session List Scope
+  singleProjectHistoryView: boolean;
+
   // Skip clear chat confirmation dialog
   skipClearChatConfirm: boolean;
 
@@ -902,6 +905,9 @@ export interface AppActions {
 
   // Session Limit actions
   setMaxSessionsPerProject: (max: number) => void;
+
+  // Session list scope actions
+  setSingleProjectHistoryView: (enabled: boolean) => void;
 
   // Clear chat confirmation actions
   setSkipClearChatConfirm: (skip: boolean) => void;

@@ -20,6 +20,7 @@ import { queryKeys } from '@/lib/query-keys';
 import { DeleteSessionDialog } from '@/components/dialogs/delete-session-dialog';
 import { DeleteAllArchivedSessionsDialog } from '@/components/dialogs/delete-all-archived-sessions-dialog';
 import { DeleteOldSessionsDialog } from '@/components/dialogs/delete-old-sessions-dialog';
+import { CleanupProjectSessionsDialog } from '@/components/dialogs/cleanup-project-sessions-dialog';
 import { LeftOverviewPanel } from '@/components/session-manager/left-overview-panel';
 import { CompletedTasksPanel } from '@/components/session-manager/completed-tasks-panel';
 import { TasksPanel } from '@/components/session-manager/tasks-panel';
@@ -47,6 +48,14 @@ import { SessionListError } from '@/components/session-manager/session-list-erro
 
 const logger = createLogger('SessionManager');
 const RUNNING_SESSION_REFRESH_MS = 5000;
+
+function normalizeProjectPath(path: string | undefined | null): string {
+  if (!path) return '';
+  return path
+    .replace(/[\\/]+$/, '')
+    .replace(/\\/g, '/')
+    .toLowerCase();
+}
 
 interface SessionManagerProps {
   currentSessionId: string | null;
@@ -90,6 +99,7 @@ function SessionManagerImpl({
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   const [timeFilterHours, setTimeFilterHours] = useState<number | null>(null);
   const [isDeleteOldSessionsDialogOpen, setIsDeleteOldSessionsDialogOpen] = useState(false);
+  const [cleanupProjectPath, setCleanupProjectPath] = useState<string | null>(null);
 
   // Collapsible children: tracks which parent sessions have their children hidden
   const [collapsedSessions, setCollapsedSessions] = useState<Set<string>>(new Set());
@@ -108,6 +118,8 @@ function SessionManagerImpl({
   // Project tree: which projects are expanded + how many sessions are visible per project
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
   const [projectVisibleCounts, setProjectVisibleCounts] = useState<Record<string, number>>({});
+  const singleProjectHistoryView = useAppStore((state) => state.singleProjectHistoryView);
+  const sessionsQueryProjectPath = singleProjectHistoryView ? projectPath : undefined;
 
   const {
     data: rawSessions = [],
@@ -115,10 +127,20 @@ function SessionManagerImpl({
     isLoading: isSessionsLoading,
     isError: isSessionsError,
     error: sessionsError,
-  } = useSessions(true);
+  } = useSessions(true, sessionsQueryProjectPath);
 
   // Validiere Session-Daten zur Laufzeit – repariert fehlende Felder, filtert kaputte Einträge
-  const sessions = useMemo(() => validateSessionData(rawSessions), [rawSessions]);
+  const sessions = useMemo(() => {
+    const validated = validateSessionData(rawSessions);
+    if (!singleProjectHistoryView) {
+      return validated;
+    }
+
+    const normalizedActiveProjectPath = normalizeProjectPath(projectPath);
+    return validated.filter(
+      (session) => normalizeProjectPath(session.projectPath) === normalizedActiveProjectPath
+    );
+  }, [rawSessions, singleProjectHistoryView, projectPath]);
   const { searchTerm, debouncedSearchTerm, setSearchTerm, clearSearch } = useSessionSearch();
 
   const {
@@ -141,14 +163,16 @@ function SessionManagerImpl({
   useEffect(() => {
     resetFilter();
     setTimeFilterHours(null);
-  }, [projectPath, resetFilter]);
+  }, [projectPath, resetFilter, singleProjectHistoryView]);
 
   const cleanupInProgressRef = useRef(false);
 
   const invalidateSessions = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: queryKeys.sessions.all(true) });
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.sessions.all(true, sessionsQueryProjectPath),
+    });
     await refetchSessions();
-  }, [queryClient, refetchSessions]);
+  }, [queryClient, refetchSessions, sessionsQueryProjectPath]);
 
   const resolveOrchestratorRunIdForSessionCreation = (): string | undefined => {
     const orchestratorState = useOrchestratorStore.getState();
@@ -582,6 +606,23 @@ function SessionManagerImpl({
     setExpandedProjects((prev) => ({ ...prev, [projectPath]: !prev[projectPath] }));
   }, []);
 
+  // Derived state: are ALL project groups currently expanded?
+  const allProjectsExpanded = useMemo(() => {
+    if (projectGroups.length === 0) return false;
+    return projectGroups.every((g) => !!expandedProjects[g.projectPath]);
+  }, [projectGroups, expandedProjects]);
+
+  const toggleAllProjectsExpanded = useCallback(() => {
+    setExpandedProjects((prev) => {
+      const shouldExpand = !projectGroups.every((g) => !!prev[g.projectPath]);
+      const next: Record<string, boolean> = {};
+      for (const group of projectGroups) {
+        next[group.projectPath] = shouldExpand;
+      }
+      return next;
+    });
+  }, [projectGroups]);
+
   const showMoreForProject = useCallback((projectPath: string) => {
     setProjectVisibleCounts((prev) => ({
       ...prev,
@@ -982,6 +1023,8 @@ function SessionManagerImpl({
             sessionFontSize={sessionFontSize}
             onSessionFontSizeChange={setSessionFontSize}
             onDeleteOldSessions={() => setIsDeleteOldSessionsDialogOpen(true)}
+            allProjectsExpanded={allProjectsExpanded}
+            onToggleAllProjects={toggleAllProjectsExpanded}
           />
 
           <CardContent
@@ -1027,6 +1070,7 @@ function SessionManagerImpl({
                 onShowMore={() => showMoreForProject(group.projectPath)}
                 onShowLess={() => showLessForProject(group.projectPath)}
                 onNewSession={(path) => void handleNewSessionForProject(path)}
+                onCleanupProject={(path) => setCleanupProjectPath(path)}
                 renderDisplayEntry={(displayEntry) => {
                   if (displayEntry.type === 'single') {
                     const session = displayEntry.session;
@@ -1143,6 +1187,27 @@ function SessionManagerImpl({
             getProjectName={getProjectName}
             onDeleteSessions={handleDeleteSessionsByIds}
           />
+
+          {cleanupProjectPath && (
+            <CleanupProjectSessionsDialog
+              open={!!cleanupProjectPath}
+              onOpenChange={(open) => {
+                if (!open) setCleanupProjectPath(null);
+              }}
+              projectName={
+                getProjectName(cleanupProjectPath) ||
+                cleanupProjectPath
+                  .replace(/[\\/]+$/, '')
+                  .split(/[\\/]/)
+                  .pop() ||
+                cleanupProjectPath
+              }
+              projectPath={cleanupProjectPath}
+              sessions={sessions}
+              currentSessionId={currentSessionId}
+              onDeleteSessions={handleDeleteSessionsByIds}
+            />
+          )}
         </>
       )}
     </Card>

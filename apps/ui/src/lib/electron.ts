@@ -796,7 +796,10 @@ export interface ElectronAPI {
       }>;
       error?: string;
     }>;
-    stop: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
+    stop: (
+      sessionId: string,
+      reason?: 'manual' | 'time_limit'
+    ) => Promise<{ success: boolean; error?: string }>;
     clear: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     queueList: (sessionId: string) => Promise<{
       success: boolean;
@@ -827,7 +830,10 @@ export interface ElectronAPI {
     onStream: (callback: (data: unknown) => void) => () => void;
   };
   sessions?: {
-    list: (includeArchived?: boolean) => Promise<{
+    list: (
+      includeArchived?: boolean,
+      projectPath?: string
+    ) => Promise<{
       success: boolean;
       sessions?: SessionListItem[];
       error?: string;

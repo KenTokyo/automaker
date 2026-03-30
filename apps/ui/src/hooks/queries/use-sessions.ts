@@ -10,12 +10,15 @@ import { queryKeys } from '@/lib/query-keys';
 import { STALE_TIMES } from '@/lib/query-client';
 import type { SessionListItem } from '@/types/electron';
 
-async function fetchSessions(includeArchived: boolean): Promise<SessionListItem[]> {
+async function fetchSessions(
+  includeArchived: boolean,
+  projectPath?: string
+): Promise<SessionListItem[]> {
   const api = getElectronAPI();
   if (!api.sessions) {
     throw new Error('Sessions API not available');
   }
-  const result = await api.sessions.list(includeArchived);
+  const result = await api.sessions.list(includeArchived, projectPath);
   if (!result.success) {
     throw new Error(result.error || 'Failed to fetch sessions');
   }
@@ -33,10 +36,10 @@ async function fetchSessions(includeArchived: boolean): Promise<SessionListItem[
  * const { data: sessions, isLoading } = useSessions(false);
  * ```
  */
-export function useSessions(includeArchived = false) {
+export function useSessions(includeArchived = false, projectPath?: string) {
   return useQuery({
-    queryKey: queryKeys.sessions.all(includeArchived),
-    queryFn: () => fetchSessions(includeArchived),
+    queryKey: queryKeys.sessions.all(includeArchived, projectPath),
+    queryFn: () => fetchSessions(includeArchived, projectPath),
     staleTime: STALE_TIMES.SESSIONS,
   });
 }

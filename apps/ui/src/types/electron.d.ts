@@ -144,7 +144,8 @@ export interface SessionListItem {
   parentSessionId?: string;
   parentToolUseId?: string;
   preview: string;
-  status?: 'idle' | 'running' | 'failed' | 'stopped';
+  status?: 'idle' | 'running' | 'failed' | 'stopped' | 'time_limited';
+  stopReason?: 'manual' | 'time_limit';
   lastError?: string;
   totalElapsedMs?: number; // Accumulated running time in milliseconds
   lastStartedAt?: string; // ISO timestamp of when the session last started running
@@ -195,7 +196,10 @@ export interface AgentAPI {
     error?: string;
   }>;
 
-  stop: (sessionId: string) => Promise<{
+  stop: (
+    sessionId: string,
+    reason?: 'manual' | 'time_limit'
+  ) => Promise<{
     success: boolean;
     error?: string;
   }>;
@@ -209,7 +213,10 @@ export interface AgentAPI {
 }
 
 export interface SessionsAPI {
-  list: (includeArchived?: boolean) => Promise<{
+  list: (
+    includeArchived?: boolean,
+    projectPath?: string
+  ) => Promise<{
     success: boolean;
     sessions?: SessionListItem[];
     error?: string;
