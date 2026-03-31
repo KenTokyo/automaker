@@ -118,6 +118,43 @@ describe('atomic-writer.ts', () => {
       expect(secureFs.unlink).toHaveBeenCalledTimes(1);
     });
 
+    it('should retry transient rename errors and eventually succeed', async () => {
+      const filePath = path.join(tempDir, 'test.json');
+      const data = { key: 'value' };
+
+      const transientRenameError = new Error('File is locked') as NodeJS.ErrnoException;
+      transientRenameError.code = 'EPERM';
+
+      (secureFs.writeFile as unknown as MockInstance).mockResolvedValue(undefined);
+      (secureFs.rename as unknown as MockInstance)
+        .mockRejectedValueOnce(transientRenameError)
+        .mockRejectedValueOnce(transientRenameError)
+        .mockResolvedValueOnce(undefined);
+
+      await atomicWriteJson(filePath, data);
+
+      expect(secureFs.rename).toHaveBeenCalledTimes(3);
+      expect(secureFs.unlink).not.toHaveBeenCalled();
+    });
+
+    it('should stop retrying transient rename errors after max attempts', async () => {
+      const filePath = path.join(tempDir, 'test.json');
+      const data = { key: 'value' };
+
+      const transientRenameError = new Error('File is locked') as NodeJS.ErrnoException;
+      transientRenameError.code = 'EPERM';
+
+      (secureFs.writeFile as unknown as MockInstance).mockResolvedValue(undefined);
+      (secureFs.rename as unknown as MockInstance).mockRejectedValue(transientRenameError);
+      (secureFs.unlink as unknown as MockInstance).mockResolvedValue(undefined);
+
+      await expect(atomicWriteJson(filePath, data)).rejects.toThrow('File is locked');
+
+      // 1 initial try + 5 retries
+      expect(secureFs.rename).toHaveBeenCalledTimes(6);
+      expect(secureFs.unlink).toHaveBeenCalledTimes(1);
+    });
+
     it('should ignore cleanup errors', async () => {
       const filePath = path.join(tempDir, 'test.json');
       const data = { key: 'value' };

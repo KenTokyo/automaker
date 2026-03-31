@@ -25,6 +25,7 @@ import { createLogger } from '@automaker/utils/logger';
 import { CLAUDE_CANONICAL_MAP } from '@automaker/types';
 import { toast } from 'sonner';
 import { useSupabaseAuthStore } from '@/store/supabase-auth-store';
+import { resolveUniqueFilePath } from '@/lib/utils';
 
 // Extracted hooks
 import {
@@ -55,6 +56,7 @@ const CONTEXT_TEXT_CHARS_PER_TOKEN = 4;
 const CONTEXT_TOOL_CHARS_PER_TOKEN = 3;
 const CONTEXT_IMAGE_TOKEN_ESTIMATE = 850;
 const CONTEXT_BASELINE_TOKENS = 12000;
+const FOLLOW_UP_INLINE_CONTEXT_CHAR_LIMIT = 12000;
 const logger = createLogger('AgentView');
 
 function buildTaskCompletionNotes(
@@ -74,6 +76,17 @@ function buildTaskCompletionNotes(
   }
 
   return `${text.slice(0, 1497)}...`;
+}
+
+function buildSafeHistoryStem(sessionName: string | null): string {
+  const safeName = (sessionName || 'Chat')
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 100);
+
+  return safeName.length > 0 ? safeName : 'chat';
 }
 
 interface AgentViewProps {
@@ -558,6 +571,36 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     useTaskChatBridgeStore.getState().clearNavigationFlag();
   }, [shouldNavigateToAgent]);
 
+  const saveHistorySnapshot = useCallback(
+    async (content: string): Promise<{ fileName: string; filePath: string } | null> => {
+      if (!currentProject?.path) {
+        return null;
+      }
+
+      const api = getHttpApiClient();
+      const historyDir = `${currentProject.path}/History`;
+      const preferredFileName = `${buildSafeHistoryStem(currentSessionName)}-history.md`;
+
+      const mkdirResult = await api.mkdir(historyDir);
+      if (!mkdirResult.success) {
+        throw new Error(mkdirResult.error || 'History-Ordner konnte nicht erstellt werden.');
+      }
+      const uniquePath = await resolveUniqueFilePath(
+        historyDir,
+        preferredFileName,
+        async (candidatePath: string) => api.exists(candidatePath)
+      );
+
+      const writeResult = await api.writeFile(uniquePath.filePath, content);
+      if (!writeResult.success) {
+        throw new Error(writeResult.error || 'Verlauf konnte nicht gespeichert werden.');
+      }
+
+      return uniquePath;
+    },
+    [currentProject?.path, currentSessionName]
+  );
+
   const createFollowUpSessionWithSummary = useCallback(
     async (reason: 'time-limit' | 'context-threshold'): Promise<boolean> => {
       const quickCreate = quickCreateSessionRef.current;
@@ -567,11 +610,34 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
         reason === 'context-threshold'
           ? 'Hinweis: Dieser Chat wurde automatisch zusammengefasst, weil der Kontext fast voll war.\n\n'
           : 'Hinweis: Dieser Chat wurde automatisch zusammengefasst, weil das Zeitlimit erreicht war.\n\n';
+      const contextSummary = generateContextSummary(messages);
+      let followUpContent = `${autoHintText}${contextSummary.text}`;
 
-      const contextSummary = `${autoHintText}${generateContextSummary(messages)}`;
+      const shouldUseHistoryFileForFollowUp =
+        contextSummary.wasTruncated || followUpContent.length > FOLLOW_UP_INLINE_CONTEXT_CHAR_LIMIT;
+
+      if (shouldUseHistoryFileForFollowUp) {
+        try {
+          const fullSummary = generateChatSummary(messages, { maxMessageChars: null });
+          const historyFile = await saveHistorySnapshot(fullSummary.formattedChat);
+          if (historyFile) {
+            followUpContent = [
+              autoHintText.trimEnd(),
+              '',
+              'Der komplette Verlauf wurde in eine Datei gespeichert:',
+              `Verlaufsdatei: ${historyFile.filePath}`,
+              '',
+              'Bitte lies diese Verlaufsdatei vollstaendig und setze die Aufgabe danach fort.',
+            ].join('\n');
+          }
+        } catch (error) {
+          logger.error('[TimeLimiter] Konnte Verlaufsdatei fuer Follow-up nicht speichern', error);
+        }
+      }
+
       pendingCopiedContentSourceSessionIdRef.current = currentSessionId;
       followUpAutoSendRef.current = true;
-      setPendingCopiedContent(contextSummary);
+      setPendingCopiedContent(followUpContent);
       const created = await quickCreate({
         attachOrchestratorRunId: false,
         forceCreate: true,
@@ -596,7 +662,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
       return true;
     },
-    [messages, currentSessionId, setPendingCopiedContent, clearPendingContent]
+    [messages, currentSessionId, setPendingCopiedContent, clearPendingContent, saveHistorySnapshot]
   );
 
   // Auto-session-switch when time limit is exceeded
@@ -1667,31 +1733,18 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     if (!currentProject?.path || messages.length === 0 || isSavingToDoc) return;
     setIsSavingToDoc(true);
     try {
-      const api = getHttpApiClient();
-      const summary = generateChatSummary(messages);
-      const safeName = (currentSessionName || 'Chat')
-        .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-        .slice(0, 100);
-      const docName = `${safeName}-history.md`;
-
-      // Save to {projectRoot}/History/ folder instead of .automaker/docs/
-      const historyDir = `${currentProject.path}/History`;
-      const historyFilePath = `${historyDir}/${docName}`;
-
-      // Ensure History/ directory exists
-      await api.mkdir(historyDir);
-
-      // Write the history file
-      await api.writeFile(historyFilePath, summary.formattedChat);
+      const summary = generateChatSummary(messages, { maxMessageChars: null });
+      const historyFile = await saveHistorySnapshot(summary.formattedChat);
+      if (!historyFile) {
+        toast.error('Kein Projekt ausgewaehlt.');
+        return;
+      }
 
       // Set the file path with prefix into the chat input field
       setInput((prev) => {
         const trimmed = prev.replace(/\s+$/, '');
         const prefix = trimmed.length > 0 ? '\n\n' : '';
-        return `${trimmed}${prefix}Verlaufsdatei: ${historyFilePath}\n`;
+        return `${trimmed}${prefix}Verlaufsdatei: ${historyFile.filePath}\n`;
       });
 
       // Focus the input field
@@ -1699,22 +1752,29 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
         inputRef.current?.focus();
       }, 100);
 
-      toast.success(`Verlauf gespeichert: History/${docName}`);
-      setCurrentDocPath(historyFilePath);
+      toast.success(`Verlauf gespeichert: History/${historyFile.fileName}`);
+      setCurrentDocPath(historyFile.filePath);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Fehler beim Speichern';
       toast.error(msg);
     } finally {
       setIsSavingToDoc(false);
     }
-  }, [currentProject, messages, isSavingToDoc, currentSessionName, setCurrentDocPath, setInput]);
+  }, [
+    currentProject?.path,
+    messages,
+    isSavingToDoc,
+    setCurrentDocPath,
+    setInput,
+    saveHistorySnapshot,
+  ]);
 
   const handleAppendChatToCurrent = useCallback(async () => {
     if (!currentProject?.path || !currentDocPath || messages.length === 0 || isSavingToDoc) return;
     setIsSavingToDoc(true);
     try {
       const api = getHttpApiClient();
-      const summary = generateChatSummary(messages);
+      const summary = generateChatSummary(messages, { maxMessageChars: null });
 
       // Read existing content from the current history file
       const existingResult = await api.readFile(currentDocPath);

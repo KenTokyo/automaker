@@ -6,7 +6,8 @@
  */
 
 import { useState, useCallback } from 'react';
-import { apiPost } from '@/lib/api-fetch';
+import { getHttpApiClient } from '@/lib/http-api-client';
+import { resolveUniqueFilePath } from '@/lib/utils';
 
 interface SaveAsMarkdownOptions {
   /** Absoluter Projektpfad */
@@ -76,7 +77,8 @@ export function useSaveAsMarkdown({ projectPath, input, onInputChange }: SaveAsM
     setIsSaving(true);
 
     try {
-      const fileName = generateFileName(trimmedInput);
+      const api = getHttpApiClient();
+      const preferredFileName = generateFileName(trimmedInput);
       const title = extractTitle(trimmedInput);
       const now = new Date();
 
@@ -92,16 +94,26 @@ export function useSaveAsMarkdown({ projectPath, input, onInputChange }: SaveAsM
         '',
       ].join('\n');
 
-      // Pfad zusammenbauen: {projectPath}/Notes/{fileName}
-      const separator = projectPath.includes('/') ? '/' : '\\';
-      const filePath = `${projectPath}${separator}Notes${separator}${fileName}`;
-      const relativePath = `Notes/${fileName}`;
+      // Zielordner vorbereiten
+      const notesDir = `${projectPath}/Notes`;
+      const mkdirResult = await api.mkdir(notesDir);
+      if (!mkdirResult.success) {
+        return {
+          success: false,
+          error: mkdirResult.error || 'Notes-Ordner konnte nicht erstellt werden.',
+        };
+      }
+
+      // Eindeutigen Dateinamen finden: foo.md, foo-2.md, foo-3.md, ...
+      const uniqueTarget = await resolveUniqueFilePath(
+        notesDir,
+        preferredFileName,
+        async (candidatePath: string) => api.exists(candidatePath)
+      );
+      const relativePath = `Notes/${uniqueTarget.fileName}`;
 
       // Via API speichern
-      const result = await apiPost<{ success: boolean; error?: string }>('/api/fs/write', {
-        filePath,
-        content: markdownContent,
-      });
+      const result = await api.writeFile(uniqueTarget.filePath, markdownContent);
 
       if (!result.success) {
         return { success: false, error: result.error || 'Speichern fehlgeschlagen.' };

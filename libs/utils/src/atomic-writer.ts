@@ -15,6 +15,55 @@ const logger = createLogger('AtomicWriter');
 
 /** Default maximum number of backup files to keep for crash recovery */
 export const DEFAULT_BACKUP_COUNT = 3;
+const TRANSIENT_RENAME_ERROR_CODES = new Set(['EPERM', 'EACCES', 'EBUSY']);
+const MAX_RENAME_RETRIES = 5;
+const BASE_RENAME_RETRY_DELAY_MS = 25;
+const MAX_RENAME_RETRY_DELAY_MS = 300;
+
+function isTransientRenameError(error: unknown): boolean {
+  if (!error || typeof error !== 'object' || !('code' in error)) {
+    return false;
+  }
+
+  const code = (error as { code?: unknown }).code;
+  return typeof code === 'string' && TRANSIENT_RENAME_ERROR_CODES.has(code);
+}
+
+function getRenameRetryDelay(attempt: number): number {
+  const exponential = BASE_RENAME_RETRY_DELAY_MS * Math.pow(2, attempt);
+  const jitter = Math.floor(Math.random() * BASE_RENAME_RETRY_DELAY_MS);
+  return Math.min(exponential + jitter, MAX_RENAME_RETRY_DELAY_MS);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function renameWithRetry(oldPath: string, newPath: string): Promise<void> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= MAX_RENAME_RETRIES; attempt++) {
+    try {
+      await secureFs.rename(oldPath, newPath);
+      return;
+    } catch (error) {
+      lastError = error;
+      const isRetryable = isTransientRenameError(error);
+      if (!isRetryable || attempt === MAX_RENAME_RETRIES) {
+        throw error;
+      }
+
+      const delayMs = getRenameRetryDelay(attempt);
+      logger.warn(
+        `[AtomicWriter] Transient rename error (${attempt + 1}/${MAX_RENAME_RETRIES + 1}) for ${newPath}. Retrying in ${delayMs}ms.`,
+        error
+      );
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Rename failed');
+}
 
 /**
  * Options for atomic write operations
@@ -119,7 +168,7 @@ export async function atomicWriteJson<T>(
     }
 
     await secureFs.writeFile(tempPath, content, 'utf-8');
-    await secureFs.rename(tempPath, resolvedPath);
+    await renameWithRetry(tempPath, resolvedPath);
   } catch (error) {
     // Clean up temp file if it exists
     try {
@@ -315,7 +364,7 @@ export async function readJsonWithRecovery<T>(
           // Optionally restore main file from temp
           if (autoRestore) {
             try {
-              await secureFs.rename(tempPath, resolvedPath);
+              await renameWithRetry(tempPath, resolvedPath);
               logger.info(`Restored main file from temp: ${tempPath}`);
             } catch (restoreError) {
               logger.warn(`Failed to restore main file from temp: ${restoreError}`);

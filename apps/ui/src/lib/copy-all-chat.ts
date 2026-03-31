@@ -26,6 +26,25 @@ interface ChatSummary {
   filesWritten: string[];
   filesEdited: string[];
   filesDeleted: string[];
+  truncatedMessages: number;
+}
+
+interface GenerateChatSummaryOptions {
+  /**
+   * Maximum characters per message.
+   * Set to null for no truncation.
+   */
+  maxMessageChars?: number | null;
+}
+
+export interface ContextSummaryResult {
+  text: string;
+  wasTruncated: boolean;
+}
+
+interface GenerateContextSummaryOptions {
+  recentMessageLimit?: number;
+  recentMessageCharLimit?: number | null;
 }
 
 /**
@@ -100,7 +119,10 @@ function deduplicatePaths(paths: string[]): string[] {
 /**
  * Format a single message for copying
  */
-function formatMessage(message: Message): string {
+function formatMessage(
+  message: Message,
+  maxMessageChars: number | null
+): { text: string; wasTruncated: boolean } {
   const role = message.role === 'user' ? 'User' : 'KI';
   const timestamp = message.timestamp
     ? new Date(message.timestamp).toLocaleTimeString('de-DE', {
@@ -113,21 +135,35 @@ function formatMessage(message: Message): string {
 
   // Truncate very long messages for summary
   let content = getCopyableMessageContent(message.content);
-  if (content.length > 5000) {
-    content = content.substring(0, 5000) + '\n... (truncated)';
+  let wasTruncated = false;
+  if (
+    typeof maxMessageChars === 'number' &&
+    maxMessageChars > 0 &&
+    content.length > maxMessageChars
+  ) {
+    content = `${content.substring(0, maxMessageChars)}\n...`;
+    wasTruncated = true;
   }
 
-  return `${timePrefix}${role}:\n${content}`;
+  return {
+    text: `${timePrefix}${role}:\n${content}`,
+    wasTruncated,
+  };
 }
 
 /**
  * Generate the complete chat summary for copying
  */
-export function generateChatSummary(messages: Message[]): ChatSummary {
+export function generateChatSummary(
+  messages: Message[],
+  options: GenerateChatSummaryOptions = {}
+): ChatSummary {
+  const maxMessageChars = options.maxMessageChars ?? 5000;
   const filesRead: string[] = [];
   const filesWritten: string[] = [];
   const filesEdited: string[] = [];
   const filesDeleted: string[] = [];
+  let truncatedMessages = 0;
 
   // Process each message
   const formattedMessages: string[] = [];
@@ -137,7 +173,11 @@ export function generateChatSummary(messages: Message[]): ChatSummary {
     if (message.id === 'welcome') continue;
 
     // Format the message
-    formattedMessages.push(formatMessage(message));
+    const formatted = formatMessage(message, maxMessageChars);
+    formattedMessages.push(formatted.text);
+    if (formatted.wasTruncated) {
+      truncatedMessages += 1;
+    }
 
     // Extract file operations from assistant messages
     if (message.role === 'assistant') {
@@ -222,16 +262,23 @@ export function generateChatSummary(messages: Message[]): ChatSummary {
     filesWritten: dedupedWritten,
     filesEdited: dedupedEdited,
     filesDeleted: dedupedDeleted,
+    truncatedMessages,
   };
 }
 
 /**
  * Generate a compact context summary for continuing in a new session
  */
-export function generateContextSummary(messages: Message[]): string {
+export function generateContextSummary(
+  messages: Message[],
+  options: GenerateContextSummaryOptions = {}
+): ContextSummaryResult {
   const summary = generateChatSummary(messages);
+  const recentMessageLimit = options.recentMessageLimit ?? 6;
+  const recentMessageCharLimit = options.recentMessageCharLimit ?? 1000;
 
   const sections: string[] = [];
+  let wasTruncated = false;
 
   sections.push('CONTEXT FROM PREVIOUS SESSION:');
   sections.push('');
@@ -255,17 +302,22 @@ export function generateContextSummary(messages: Message[]): string {
   }
 
   // Last few messages (most relevant context)
-  const relevantMessages = messages.filter((m) => m.id !== 'welcome').slice(-6); // Last 3 exchanges
+  const relevantMessages = messages.filter((m) => m.id !== 'welcome').slice(-recentMessageLimit);
 
   if (relevantMessages.length > 0) {
     sections.push('Recent conversation:');
     sections.push('');
     for (const msg of relevantMessages) {
       const role = msg.role === 'user' ? 'User' : 'KI';
-      // Truncate long messages
+      // Keep recent context compact for inline continuation messages
       let content = getCopyableMessageContent(msg.content);
-      if (content.length > 1000) {
-        content = content.substring(0, 1000) + '... (truncated)';
+      if (
+        typeof recentMessageCharLimit === 'number' &&
+        recentMessageCharLimit > 0 &&
+        content.length > recentMessageCharLimit
+      ) {
+        content = `${content.substring(0, recentMessageCharLimit)}...`;
+        wasTruncated = true;
       }
       sections.push(`${role}: ${content}`);
       sections.push('');
@@ -273,9 +325,12 @@ export function generateContextSummary(messages: Message[]): string {
   }
 
   sections.push('---');
-  sections.push('Please continue with the task from above.');
+  sections.push('Bitte setze die Aufgabe aus diesem Kontext direkt fort.');
 
-  return sections.join('\n');
+  return {
+    text: sections.join('\n'),
+    wasTruncated: wasTruncated || summary.truncatedMessages > 0,
+  };
 }
 
 /**

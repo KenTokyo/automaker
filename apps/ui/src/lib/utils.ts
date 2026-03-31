@@ -112,6 +112,49 @@ export function normalizePath(p: string): string {
   return p.replace(/\\/g, '/');
 }
 
+function splitFileName(fileName: string): { stem: string; ext: string } {
+  const lastDot = fileName.lastIndexOf('.');
+  if (lastDot <= 0) {
+    return { stem: fileName, ext: '' };
+  }
+  return {
+    stem: fileName.slice(0, lastDot),
+    ext: fileName.slice(lastDot),
+  };
+}
+
+export interface UniqueFilePathResult {
+  fileName: string;
+  filePath: string;
+}
+
+/**
+ * Resolve a unique filename inside a directory.
+ * If `<name>.md` exists, returns `<name>-2.md`, then `<name>-3.md`, etc.
+ */
+export async function resolveUniqueFilePath(
+  directoryPath: string,
+  desiredFileName: string,
+  exists: (filePath: string) => Promise<boolean>
+): Promise<UniqueFilePathResult> {
+  const normalizedDir = normalizePath(directoryPath).replace(/\/+$/, '');
+  const sanitizedDesired =
+    desiredFileName.replace(/[\\/]/g, '-').trim() || `datei-${Date.now().toString(36)}.md`;
+  const { stem, ext } = splitFileName(sanitizedDesired);
+
+  let counter = 1;
+  while (counter < 10000) {
+    const fileName = counter === 1 ? sanitizedDesired : `${stem}-${counter}${ext}`;
+    const filePath = `${normalizedDir}/${fileName}`;
+    if (!(await exists(filePath))) {
+      return { fileName, filePath };
+    }
+    counter += 1;
+  }
+
+  throw new Error('Konnte keinen freien Dateinamen finden.');
+}
+
 /**
  * Compare two paths for equality, handling cross-platform differences.
  * Normalizes both paths to forward slashes before comparison.
