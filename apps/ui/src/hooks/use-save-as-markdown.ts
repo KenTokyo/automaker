@@ -2,7 +2,7 @@
  * Hook: Text als Markdown-Datei speichern
  *
  * Speichert den aktuellen Textarea-Inhalt als .md-Datei
- * unter .automaker/docs/ und gibt den relativen Pfad zurück.
+ * unter Notes/ (direkt im Projektstamm) und gibt den relativen Pfad zurück.
  */
 
 import { useState, useCallback } from 'react';
@@ -92,10 +92,10 @@ export function useSaveAsMarkdown({ projectPath, input, onInputChange }: SaveAsM
         '',
       ].join('\n');
 
-      // Pfad zusammenbauen: {projectPath}/.automaker/docs/{fileName}
+      // Pfad zusammenbauen: {projectPath}/Notes/{fileName}
       const separator = projectPath.includes('/') ? '/' : '\\';
-      const filePath = `${projectPath}${separator}.automaker${separator}docs${separator}${fileName}`;
-      const relativePath = `.automaker/docs/${fileName}`;
+      const filePath = `${projectPath}${separator}Notes${separator}${fileName}`;
+      const relativePath = `Notes/${fileName}`;
 
       // Via API speichern
       const result = await apiPost<{ success: boolean; error?: string }>('/api/fs/write', {
@@ -107,8 +107,8 @@ export function useSaveAsMarkdown({ projectPath, input, onInputChange }: SaveAsM
         return { success: false, error: result.error || 'Speichern fehlgeschlagen.' };
       }
 
-      // Input durch Pfad-Referenz ersetzen
-      const reference = `Meine Notizen: ${relativePath}`;
+      // Input durch Pfad-Referenz + Aufgaben-Anweisung ersetzen
+      const reference = `Meine Notizen: ${relativePath}\n\nSollten in der Notiz Aufgaben stehen, bitte löse diese bzw. orientiere dich an den enthaltenen Aufgaben.`;
       onInputChange(reference);
 
       return { success: true, filePath: relativePath };

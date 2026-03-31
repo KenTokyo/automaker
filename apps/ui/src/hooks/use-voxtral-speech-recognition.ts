@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+/**
+ * @deprecated Voxtral local realtime ASR is kept for reference only.
+ * Prefer `useWhisperSpeechRecognition` with smaller models to reduce GPU pressure.
+ */
 const MODEL_ID = 'onnx-community/Voxtral-Mini-4B-Realtime-2602-ONNX';
 const SAMPLE_RATE = 16_000;
 const MODEL_FILE_COUNT = 3;

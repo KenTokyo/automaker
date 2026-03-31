@@ -4,13 +4,9 @@ import {
   Paperclip,
   Square,
   ListOrdered,
-  Mic,
-  MicOff,
   FileText,
   Plus,
   Loader2,
-  Cpu,
-  RotateCcw,
   FileDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,10 +20,12 @@ import { TimeLimiterSettings } from './time-limiter-settings';
 import { OrchestratorSettings } from './orchestrator-settings';
 import { CompletedTasksToggle } from './completed-tasks-toggle';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
-import { useVoxtralSpeechRecognition } from '@/hooks/use-voxtral-speech-recognition';
+import { useWhisperSpeechRecognition } from '@/hooks/use-whisper-speech-recognition';
+import { useCanarySpeechRecognition } from '@/hooks/use-canary-speech-recognition';
 import { useAppStore } from '@/store/app-store';
 import { useSaveAsMarkdown } from '@/hooks/use-save-as-markdown';
 import type { PhaseModelEntry } from '@automaker/types';
+import { VoiceInputSelector, type VoiceInputProvider } from './voice-input-selector';
 
 interface InputControlsProps {
   input: string;
@@ -76,15 +74,10 @@ interface InputControlsProps {
   activeSessionOrchestratorRunId?: string | null;
 }
 
-/**
- * Voxtral local speech recognition is disabled for now – the WebGPU model
- * requires too many resources.  Set to `true` to re-enable.
- */
-const VOXTRAL_ENABLED = false;
-
 const TEXTAREA_MIN_HEIGHT = 44;
 const TEXTAREA_MAX_HEIGHT = 320;
 const INPUT_SYNC_DEBOUNCE_MS = 180;
+const DEFAULT_VOICE_PROVIDER: VoiceInputProvider = 'webspeech';
 
 export function InputControls({
   input,
@@ -125,6 +118,23 @@ export function InputControls({
   const [draftInput, setDraftInput] = useState(input);
   const draftInputRef = useRef(input);
   const [interimTranscript, setInterimTranscript] = useState('');
+  const [voiceProvider, setVoiceProvider] = useState<VoiceInputProvider>(() => {
+    if (typeof window === 'undefined') {
+      return DEFAULT_VOICE_PROVIDER;
+    }
+
+    const persistedProvider = window.localStorage.getItem('automaker:voiceInputProvider');
+    if (
+      persistedProvider === 'webspeech' ||
+      persistedProvider === 'whisper-small' ||
+      persistedProvider === 'whisper-base' ||
+      persistedProvider === 'canary-1b-v2'
+    ) {
+      return persistedProvider;
+    }
+
+    return DEFAULT_VOICE_PROVIDER;
+  });
   onSendRef.current = onSend;
 
   const resizeTextarea = useCallback(
@@ -220,11 +230,37 @@ export function InputControls({
     scheduleTextareaResize(inputRef.current);
   }, [input, inputRef, scheduleTextareaResize]);
 
-  // Speech recognition
+  const appendTranscriptToInput = useCallback(
+    (transcript: string) => {
+      const normalizedTranscript = transcript.trim();
+      if (normalizedTranscript.length === 0) {
+        return;
+      }
+
+      setDraftInput((previous) => {
+        const nextValue = `${previous}${previous ? ' ' : ''}${normalizedTranscript}`;
+        syncInputToParent(nextValue);
+        return nextValue;
+      });
+      setInterimTranscript('');
+      scheduleTextareaResize(inputRef.current);
+      scrollTextareaToBottom(inputRef.current);
+    },
+    [inputRef, scheduleTextareaResize, scrollTextareaToBottom, syncInputToParent]
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.localStorage.setItem('automaker:voiceInputProvider', voiceProvider);
+  }, [voiceProvider]);
+
   const {
-    isListening,
-    isSupported: isSpeechSupported,
-    toggleListening,
+    isListening: isWebSpeechListening,
+    isSupported: isWebSpeechSupported,
+    toggleListening: toggleWebSpeechListening,
+    stopListening: stopWebSpeechListening,
   } = useSpeechRecognition({
     lang: 'de-DE',
     continuous: true,
@@ -232,102 +268,149 @@ export function InputControls({
     onTranscript: useCallback(
       (transcript: string, isFinal: boolean) => {
         if (isFinal) {
-          // Append final transcript to local draft first to keep typing responsive.
-          setDraftInput((previous) => {
-            const nextValue = previous + (previous ? ' ' : '') + transcript;
-            syncInputToParent(nextValue);
-            return nextValue;
-          });
-          setInterimTranscript('');
-          scheduleTextareaResize(inputRef.current);
-          // Auto-scroll to bottom so user sees the latest text
-          scrollTextareaToBottom(inputRef.current);
-        } else {
-          // Show interim results
-          setInterimTranscript(transcript);
-          // Auto-scroll to bottom during speech input
-          scrollTextareaToBottom(inputRef.current);
+          appendTranscriptToInput(transcript);
+          return;
         }
+        setInterimTranscript(transcript);
+        scrollTextareaToBottom(inputRef.current);
       },
-      [inputRef, scheduleTextareaResize, scrollTextareaToBottom, syncInputToParent]
+      [appendTranscriptToInput, inputRef, scrollTextareaToBottom]
     ),
-    onError: useCallback((error: string) => {
-      console.error('Speech recognition error:', error);
+    onError: useCallback((errorMessage: string) => {
+      console.error('Speech recognition error:', errorMessage);
       setInterimTranscript('');
     }, []),
   });
 
-  // Voxtral local speech recognition (disabled – see VOXTRAL_ENABLED)
-  const voxtralHook = useVoxtralSpeechRecognition(
-    VOXTRAL_ENABLED
-      ? {
-          onTranscript: (chunk: string) => {
-            setDraftInput((previous) => {
-              const normalizedChunk = previous.length === 0 ? chunk.trimStart() : chunk;
-              if (!normalizedChunk) return previous;
-              const nextValue = previous + normalizedChunk;
-              syncInputToParent(nextValue);
-              return nextValue;
-            });
-            scheduleTextareaResize(inputRef.current);
-            scrollTextareaToBottom(inputRef.current);
-          },
-          onError: (errorMessage: string) => {
-            console.error('Voxtral speech recognition error:', errorMessage);
-          },
-        }
-      : {}
-  );
+  const whisperModel = voiceProvider === 'whisper-base' ? 'base' : 'small';
+  const {
+    isSupported: isWhisperSupported,
+    isListening: isWhisperListening,
+    isLoading: isWhisperLoading,
+    hasLoadedModel: hasLoadedWhisperModel,
+    loadingMessage: whisperLoadingMessage,
+    loadingProgress: whisperLoadingProgress,
+    error: whisperError,
+    toggleListening: toggleWhisperListening,
+    stopListening: stopWhisperListening,
+  } = useWhisperSpeechRecognition({
+    model: whisperModel,
+    onTranscript: (chunk: string) => {
+      appendTranscriptToInput(chunk);
+    },
+    onError: (errorMessage: string) => {
+      console.error('Whisper speech recognition error:', errorMessage);
+    },
+  });
 
   const {
-    isSupported: isVoxtralSupported,
-    isListening: isVoxtralListening,
-    isLoading: isVoxtralLoading,
-    hasLoadedModel: hasLoadedVoxtralModel,
-    status: voxtralStatus,
-    loadingMessage: voxtralLoadingMessage,
-    loadingProgress: voxtralLoadingProgress,
-    error: voxtralError,
-    toggleListening: toggleVoxtralListening,
-    resetSession: resetVoxtralSession,
-  } = voxtralHook;
+    isSupported: isCanarySupported,
+    isListening: isCanaryListening,
+    isLoading: isCanaryLoading,
+    loadingMessage: canaryLoadingMessage,
+    loadingProgress: canaryLoadingProgress,
+    error: canaryError,
+    toggleListening: toggleCanaryListening,
+    stopListening: stopCanaryListening,
+  } = useCanarySpeechRecognition({
+    onError: (errorMessage: string) => {
+      console.error('Canary speech recognition error:', errorMessage);
+    },
+  });
 
-  const voxtralButtonTitle = !isVoxtralSupported
-    ? 'Voxtral braucht WebGPU und Mikrofonrechte'
-    : isVoxtralLoading
-      ? `Voxtral lädt (${Math.round(voxtralLoadingProgress)}%)`
-      : isVoxtralListening
-        ? 'Voxtral stoppen'
-        : voxtralError
-          ? `Voxtral Fehler: ${voxtralError}`
-          : 'Voxtral lokal starten';
+  useEffect(() => {
+    if (voiceProvider === 'webspeech') {
+      stopWhisperListening();
+      stopCanaryListening();
+      return;
+    }
 
-  const showVoxtralResetButton =
-    isConnected &&
-    voxtralStatus !== 'loading' &&
-    (hasLoadedVoxtralModel || isVoxtralListening || Boolean(voxtralError));
+    if (voiceProvider === 'canary-1b-v2') {
+      stopWebSpeechListening();
+      stopWhisperListening();
+      setInterimTranscript('');
+      return;
+    }
 
-  const voxtralHelpText = !isConnected
+    stopWebSpeechListening();
+    stopCanaryListening();
+    setInterimTranscript('');
+  }, [stopCanaryListening, stopWebSpeechListening, stopWhisperListening, voiceProvider]);
+
+  const isVoiceListening =
+    voiceProvider === 'webspeech'
+      ? isWebSpeechListening
+      : voiceProvider === 'canary-1b-v2'
+        ? isCanaryListening
+        : isWhisperListening;
+  const isVoiceSupported =
+    voiceProvider === 'webspeech'
+      ? isWebSpeechSupported
+      : voiceProvider === 'canary-1b-v2'
+        ? isCanarySupported
+        : isWhisperSupported;
+  const isVoiceLoading =
+    voiceProvider === 'webspeech'
+      ? false
+      : voiceProvider === 'canary-1b-v2'
+        ? isCanaryLoading
+        : isWhisperLoading;
+  const activeVoiceError =
+    voiceProvider === 'webspeech'
+      ? null
+      : voiceProvider === 'canary-1b-v2'
+        ? canaryError
+        : whisperError;
+
+  const handleToggleVoiceInput = useCallback(async () => {
+    if (voiceProvider === 'webspeech') {
+      toggleWebSpeechListening();
+      return;
+    }
+
+    if (voiceProvider === 'canary-1b-v2') {
+      await toggleCanaryListening();
+      return;
+    }
+
+    await toggleWhisperListening();
+  }, [toggleCanaryListening, toggleWebSpeechListening, toggleWhisperListening, voiceProvider]);
+
+  const handleVoiceProviderChange = useCallback((nextProvider: VoiceInputProvider) => {
+    setVoiceProvider(nextProvider);
+  }, []);
+
+  const whisperProviderLabel = voiceProvider === 'whisper-base' ? 'Whisper Base' : 'Whisper Small';
+  const canaryProviderLabel = 'Canary 1B v2';
+  const voiceHelpText = !isConnected
     ? null
-    : !isVoxtralSupported
-      ? 'Voxtral braucht WebGPU. Das heißt: Dein Gerät muss KI direkt im Browser rechnen können.'
-      : isVoxtralLoading && !hasLoadedVoxtralModel
-        ? `Erster Start: ${voxtralLoadingMessage} (${Math.round(voxtralLoadingProgress)}%). Das kann kurz dauern.`
-        : isVoxtralLoading
-          ? `${voxtralLoadingMessage} (${Math.round(voxtralLoadingProgress)}%).`
-          : voxtralError
-            ? `Voxtral hat ein Problem: ${voxtralError}. Mit „Zurücksetzen” kannst du neu starten.`
-            : isVoxtralListening
-              ? 'Voxtral hört zu. Sprich normal, der Text kommt direkt ins Feld.'
-              : hasLoadedVoxtralModel
-                ? 'Voxtral ist bereit. Klick auf den grünen Knopf zum Start.'
-                : 'Tipp: Beim ersten Start lädt Voxtral mehr Daten. Danach geht es schneller.';
+    : voiceProvider === 'webspeech'
+      ? null
+      : voiceProvider === 'canary-1b-v2'
+        ? canaryError
+          ? `Canary-Fehler: ${canaryError}`
+          : !isCanarySupported
+            ? `${canaryProviderLabel} läuft derzeit nur mit Server-Backend (NeMo/Riva + GPU).`
+            : isCanaryLoading
+              ? `${canaryLoadingMessage} (${Math.round(canaryLoadingProgress)}%).`
+              : `${canaryProviderLabel} ist bereit.`
+        : !isWhisperSupported
+          ? 'Whisper braucht WebGPU und Mikrofonrechte.'
+          : isWhisperLoading
+            ? `${whisperLoadingMessage} (${Math.round(whisperLoadingProgress)}%).`
+            : whisperError
+              ? `Whisper-Fehler: ${whisperError}`
+              : isWhisperListening
+                ? `${whisperProviderLabel} hört zu. Sprich normal, der Text landet direkt im Feld.`
+                : hasLoadedWhisperModel
+                  ? `${whisperProviderLabel} ist bereit.`
+                  : 'Beim ersten Start lädt Whisper lokal im Browser.';
 
-  const voxtralHelpToneClass = voxtralError
+  const voiceHelpToneClass = activeVoiceError
     ? 'border-red-500/30 bg-red-500/5 text-red-700'
-    : isVoxtralLoading
+    : isVoiceLoading
       ? 'border-amber-500/30 bg-amber-500/5 text-amber-700'
-      : isVoxtralListening
+      : isVoiceListening
         ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700'
         : 'border-border/70 bg-muted/40 text-muted-foreground';
 
@@ -455,10 +538,10 @@ export function InputControls({
             'min-h-[44px]',
             hasFiles && !accentColor && 'border-primary/30',
             isDragOver && 'border-primary bg-primary/5',
-            isListening && 'border-red-500/50 ring-2 ring-red-500/20'
+            isVoiceListening && 'border-red-500/50 ring-2 ring-red-500/20'
           )}
           style={
-            accentColor && !isDragOver && !isListening
+            accentColor && !isDragOver && !isVoiceListening
               ? {
                   borderColor: accentColor + '40',
                   boxShadow: `0 0 0 1px ${accentColor}20`,
@@ -466,13 +549,13 @@ export function InputControls({
               : undefined
           }
           onFocus={(e) => {
-            if (accentColor && !isDragOver && !isListening) {
+            if (accentColor && !isDragOver && !isVoiceListening) {
               e.currentTarget.style.borderColor = accentColor + '70';
               e.currentTarget.style.boxShadow = `0 0 0 2px ${accentColor}30`;
             }
           }}
           onBlurCapture={(e) => {
-            if (accentColor && !isDragOver && !isListening) {
+            if (accentColor && !isDragOver && !isVoiceListening) {
               e.currentTarget.style.borderColor = accentColor + '40';
               e.currentTarget.style.boxShadow = `0 0 0 1px ${accentColor}20`;
             }
@@ -529,11 +612,11 @@ export function InputControls({
             className={cn(
               'h-7 w-7 rounded-md shrink-0 transition-all duration-200',
               canSaveMarkdown && isConnected
-                ? 'bg-emerald-600/10 text-emerald-600 border-emerald-500/40 hover:bg-emerald-600/20 hover:border-emerald-500/60'
-                : 'border-border',
+                ? 'bg-blue-600 text-white border-blue-500 hover:bg-blue-500 shadow-sm shadow-blue-600/50 hover:shadow-blue-500/60 hover:shadow-md'
+                : 'border-border text-muted-foreground',
               isSaving && 'animate-pulse'
             )}
-            title="Text als Markdown speichern"
+            title="Notiz in Notes/ speichern"
           >
             {isSaving ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -542,58 +625,16 @@ export function InputControls({
             )}
           </Button>
 
-          {/* Microphone Button */}
-          {isSpeechSupported && (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={toggleListening}
-              disabled={!isConnected}
-              className={cn(
-                'h-7 w-7 rounded-md border-border shrink-0',
-                isListening && 'bg-red-500/10 text-red-600 border-red-500/30 animate-pulse'
-              )}
-              title={isListening ? 'Stop recording' : 'Start voice input'}
-            >
-              {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-            </Button>
-          )}
-
-          {/* Voxtral Test-Mikrofon (WebGPU) – disabled via VOXTRAL_ENABLED */}
-          {VOXTRAL_ENABLED && (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => {
-                void toggleVoxtralListening();
-              }}
-              disabled={!isConnected || (!isVoxtralSupported && !isVoxtralLoading)}
-              className={cn(
-                'h-7 w-7 rounded-md border-border shrink-0 transition-[background-color,color,border-color,box-shadow]',
-                isVoxtralListening &&
-                  'bg-emerald-500/10 text-emerald-700 border-emerald-500/40 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.35)]',
-                isVoxtralLoading &&
-                  'text-amber-600 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.35)]',
-                !isVoxtralListening &&
-                  !isVoxtralLoading &&
-                  isVoxtralSupported &&
-                  'text-emerald-700 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.25)] hover:shadow-[0_0_14px_rgba(16,185,129,0.35)]',
-                voxtralError &&
-                  !isVoxtralListening &&
-                  !isVoxtralLoading &&
-                  'text-red-600 border-red-500/40 shadow-none'
-              )}
-              title={voxtralButtonTitle}
-            >
-              {isVoxtralLoading ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : isVoxtralListening ? (
-                <MicOff className="w-3.5 h-3.5" />
-              ) : (
-                <Cpu className="w-3.5 h-3.5" />
-              )}
-            </Button>
-          )}
+          <VoiceInputSelector
+            provider={voiceProvider}
+            disabled={!isConnected}
+            isListening={isVoiceListening}
+            isLoading={isVoiceLoading}
+            isSupported={isVoiceSupported}
+            errorMessage={activeVoiceError}
+            onToggleListening={handleToggleVoiceInput}
+            onProviderChange={handleVoiceProviderChange}
+          />
 
           {/* Docs Quick Access */}
           <Popover open={docsPopoverOpen} onOpenChange={setDocsPopoverOpen}>
@@ -694,27 +735,14 @@ export function InputControls({
         </div>
       </div>
 
-      {VOXTRAL_ENABLED && voxtralHelpText && (
+      {voiceHelpText && (
         <div
           className={cn(
             'flex flex-col gap-1 rounded-md border px-2 py-1 text-[11px] leading-tight sm:flex-row sm:items-center sm:justify-between',
-            voxtralHelpToneClass
+            voiceHelpToneClass
           )}
         >
-          <p>{voxtralHelpText}</p>
-          {showVoxtralResetButton && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={resetVoxtralSession}
-              className="h-6 px-2 text-[11px] self-start sm:self-auto"
-              title="Voxtral neu starten"
-            >
-              <RotateCcw className="w-3 h-3 mr-1" />
-              Zurücksetzen
-            </Button>
-          )}
+          <p>{voiceHelpText}</p>
         </div>
       )}
     </div>
