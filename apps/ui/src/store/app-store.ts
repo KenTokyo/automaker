@@ -710,7 +710,17 @@ const initialState: AppState = {
   leftPanelTab: 'sessions' as const,
   currentDocPath: null,
   docsViewMode: (getItem('automaker:docsViewMode') as 'rendered' | 'raw') || 'rendered',
-  recentDocs: JSON.parse(getItem('automaker:recentDocs') || '[]'),
+  recentDocs: (
+    JSON.parse(getItem('automaker:recentDocs') || '[]') as Array<Record<string, unknown>>
+  ).map((d) => ({
+    path: (d.path as string) ?? '',
+    name: (d.name as string) ?? '',
+    absolutePath: (d.absolutePath as string) ?? '',
+    lastAccessedAt: (d.lastAccessedAt as string) ?? new Date().toISOString(),
+    accessCount: typeof d.accessCount === 'number' ? d.accessCount : 1,
+    isFavorite: typeof d.isFavorite === 'boolean' ? d.isFavorite : false,
+    source: (d.source as 'docs' | 'clipboard') ?? 'docs',
+  })),
   // Docs Editor Theme
   editorTheme: JSON.parse(getItem('automaker:editorTheme') || 'null') || DEFAULT_EDITOR_THEME,
   // Session History Limit
@@ -3217,10 +3227,41 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   },
   addRecentDoc: (doc) => {
     const { recentDocs } = get();
+    const existing = recentDocs.find((d) => d.path === doc.path);
+    const now = new Date().toISOString();
+
+    const updatedDoc = {
+      path: doc.path,
+      name: doc.name,
+      absolutePath: doc.absolutePath,
+      lastAccessedAt: now,
+      accessCount: existing ? existing.accessCount + 1 : 1,
+      isFavorite: existing?.isFavorite ?? false,
+      source: doc.source ?? 'docs',
+    } satisfies import('./types/ui-types').RecentDoc;
+
     const filtered = recentDocs.filter((d) => d.path !== doc.path);
-    const updated = [doc, ...filtered].slice(0, 10);
+    const updated = [updatedDoc, ...filtered].slice(0, 30);
     set({ recentDocs: updated });
     setItem('automaker:recentDocs', JSON.stringify(updated));
+  },
+  toggleRecentDocFavorite: (path) => {
+    const { recentDocs } = get();
+    const updated = recentDocs.map((d) =>
+      d.path === path ? { ...d, isFavorite: !d.isFavorite } : d
+    );
+    set({ recentDocs: updated });
+    setItem('automaker:recentDocs', JSON.stringify(updated));
+  },
+  removeRecentDoc: (path) => {
+    const { recentDocs } = get();
+    const updated = recentDocs.filter((d) => d.path !== path);
+    set({ recentDocs: updated });
+    setItem('automaker:recentDocs', JSON.stringify(updated));
+  },
+  clearRecentDocs: () => {
+    set({ recentDocs: [] });
+    setItem('automaker:recentDocs', '[]');
   },
 
   // Docs Editor Theme actions

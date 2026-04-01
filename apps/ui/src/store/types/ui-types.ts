@@ -6,11 +6,19 @@ export interface BrowserTab {
   port: number | null; // Configured port (e.g. 3000)
 }
 
-// Recently opened document
+// Recently opened document (with usage tracking & favorites)
 export interface RecentDoc {
   path: string;
   name: string;
   absolutePath: string;
+  /** ISO timestamp of when this doc was last accessed */
+  lastAccessedAt: string;
+  /** How often this doc was referenced / copied */
+  accessCount: number;
+  /** Whether the user has pinned this doc as a favorite */
+  isFavorite: boolean;
+  /** Source of the entry: 'docs' = opened in docs viewer, 'clipboard' = copied path from tree */
+  source: 'docs' | 'clipboard';
 }
 
 export type ViewMode =

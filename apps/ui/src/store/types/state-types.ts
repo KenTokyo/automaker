@@ -893,7 +893,12 @@ export interface AppActions {
   setLeftPanelTab: (tab: LeftPanelTab) => void;
   setCurrentDocPath: (path: string | null) => void;
   setDocsViewMode: (mode: 'rendered' | 'raw') => void;
-  addRecentDoc: (doc: RecentDoc) => void;
+  addRecentDoc: (
+    doc: Pick<RecentDoc, 'path' | 'name' | 'absolutePath'> & { source?: RecentDoc['source'] }
+  ) => void;
+  toggleRecentDocFavorite: (path: string) => void;
+  removeRecentDoc: (path: string) => void;
+  clearRecentDocs: () => void;
   setDocsAutoSave: (enabled: boolean) => void;
   setDocsAutoSaveDelay: (ms: number) => void;
 

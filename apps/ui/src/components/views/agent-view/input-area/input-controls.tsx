@@ -26,6 +26,7 @@ import { useAppStore } from '@/store/app-store';
 import { useSaveAsMarkdown } from '@/hooks/use-save-as-markdown';
 import type { PhaseModelEntry } from '@automaker/types';
 import { VoiceInputSelector, type VoiceInputProvider } from './voice-input-selector';
+import { RecentDocsPopover } from './recent-docs-popover';
 
 interface InputControlsProps {
   input: string;
