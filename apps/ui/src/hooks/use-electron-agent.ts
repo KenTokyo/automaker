@@ -922,8 +922,9 @@ export function useElectronAgent({
       }
 
       try {
-        logger.info('Stopping execution', { reason });
-        const result = await api.agent!.stop(sessionId, reason);
+        const stopReason = reason === 'time_limit' ? 'time_limit' : 'manual';
+        logger.info('Stopping execution', { reason: stopReason });
+        const result = await api.agent!.stop(sessionId, stopReason);
 
         if (!result.success) {
           setError(result.error || 'Failed to stop execution');

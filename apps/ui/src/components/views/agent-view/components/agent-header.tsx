@@ -21,6 +21,7 @@ import {
   Eye,
   GitCommit,
   Upload,
+  Bot,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -52,6 +53,7 @@ import type {
 } from '@/components/views/board-view/worktree-panel/types';
 import type { ChatDisplaySettings } from '@/store/types/ui-types';
 import { ChatSettingsPopover } from './chat-settings-popover';
+import { AiProvidersDialog } from './ai-providers-dialog';
 
 interface WorktreeActionsProps {
   mainWorktree: WorktreeInfo;
@@ -163,6 +165,7 @@ export function AgentHeader({
   const [pathCopied, setPathCopied] = useState(false);
   const [isSaveDocMenuOpen, setIsSaveDocMenuOpen] = useState(false);
   const [showManageDialog, setShowManageDialog] = useState(false);
+  const [showProvidersDialog, setShowProvidersDialog] = useState(false);
   const [isRenamingProject, setIsRenamingProject] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -737,6 +740,17 @@ export function AgentHeader({
             variant="ghost"
             size="sm"
             className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+            aria-label="AI Providers"
+            title="AI Provider Einstellungen"
+            onClick={() => setShowProvidersDialog(true)}
+          >
+            <Bot className="w-4 h-4" />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
             aria-label="Project settings"
             title="Project settings"
             onClick={() => {
@@ -909,6 +923,8 @@ export function AgentHeader({
       />
 
       <ManageProjectsDialog open={showManageDialog} onOpenChange={setShowManageDialog} />
+
+      <AiProvidersDialog open={showProvidersDialog} onOpenChange={setShowProvidersDialog} />
     </>
   );
 }

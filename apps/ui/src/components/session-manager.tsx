@@ -63,7 +63,7 @@ interface SessionManagerProps {
   projectPath: string;
   isCurrentSessionThinking?: boolean;
   onQuickCreateRef?: MutableRefObject<
-    ((options?: QuickCreateSessionArgs) => Promise<boolean>) | null
+    ((options?: QuickCreateSessionArgs) => Promise<QuickCreateSessionResult>) | null
   >;
 }
 
@@ -76,6 +76,11 @@ export interface QuickCreateSessionOptions {
 }
 
 export type QuickCreateSessionArgs = boolean | QuickCreateSessionOptions;
+
+export interface QuickCreateSessionResult {
+  success: boolean;
+  sessionId: string | null;
+}
 
 function SessionManagerImpl({
   currentSessionId,
@@ -253,7 +258,7 @@ function SessionManagerImpl({
   };
 
   const handleQuickCreateSession = useCallback(
-    async (options?: QuickCreateSessionArgs): Promise<boolean> => {
+    async (options?: QuickCreateSessionArgs): Promise<QuickCreateSessionResult> => {
       const normalizedOptions: QuickCreateSessionOptions =
         typeof options === 'boolean' ? { attachOrchestratorRunId: options } : options || {};
       const {
@@ -269,12 +274,12 @@ function SessionManagerImpl({
         const existingEmpty = findReusableEmptySession();
         if (existingEmpty) {
           onSelectSession(existingEmpty.id);
-          return true;
+          return { success: true, sessionId: existingEmpty.id };
         }
       }
 
       const api = getElectronAPI();
-      if (!api?.sessions) return false;
+      if (!api?.sessions) return { success: false, sessionId: null };
 
       // Only attach orchestrator run ID when explicitly requested (orchestrator auto-phase)
       const runIdForSession = attachOrchestratorRunId
@@ -294,10 +299,10 @@ function SessionManagerImpl({
       if (result.success && result.session?.id) {
         await invalidateSessions();
         onSelectSession(result.session.id);
-        return true;
+        return { success: true, sessionId: result.session.id };
       }
 
-      return false;
+      return { success: false, sessionId: null };
     },
     [findReusableEmptySession, projectPath, invalidateSessions, onSelectSession]
   );

@@ -31,13 +31,15 @@ interface InputControlsProps {
   input: string;
   onInputChange: (value: string) => void;
   onSend: (messageOverride?: string) => void;
-  onStop: () => void;
+  onStop: () => void | Promise<void>;
   onPaste: (e: React.ClipboardEvent) => Promise<void>;
   /** Current model selection (model + optional thinking level) */
   modelSelection: PhaseModelEntry;
   /** Callback when model is selected */
   onModelSelect: (entry: PhaseModelEntry) => void;
   isProcessing: boolean;
+  /** Show stop action even if local isProcessing is temporarily out of sync */
+  canStop?: boolean;
   isConnected: boolean;
   hasFiles: boolean;
   isDragOver: boolean;
@@ -88,6 +90,7 @@ export function InputControls({
   modelSelection,
   onModelSelect,
   isProcessing,
+  canStop = false,
   isConnected,
   hasFiles,
   isDragOver,
@@ -211,6 +214,7 @@ export function InputControls({
   );
 
   const canSend = (draftInput.trim().length > 0 || hasFiles) && isConnected;
+  const shouldShowStop = isProcessing || canStop;
 
   useEffect(() => {
     draftInputRef.current = draftInput;
@@ -702,10 +706,12 @@ export function InputControls({
           <FavoriteAgentButtons disabled={!isConnected} />
 
           {/* Stop Button (only when processing) */}
-          {isProcessing && (
+          {shouldShowStop && (
             <Button
-              onClick={onStop}
-              disabled={!isConnected}
+              onClick={() => {
+                void onStop();
+              }}
+              disabled={!isConnected && !canStop}
               className="h-7 w-7 rounded-md shrink-0"
               variant="destructive"
               size="icon"

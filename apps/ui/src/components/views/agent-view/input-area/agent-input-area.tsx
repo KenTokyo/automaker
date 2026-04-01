@@ -17,12 +17,14 @@ interface AgentInputAreaProps {
   input: string;
   onInputChange: (value: string) => void;
   onSend: (messageOverride?: string) => void;
-  onStop: () => void;
+  onStop: () => void | Promise<void>;
   /** Current model selection (model + optional thinking level) */
   modelSelection: PhaseModelEntry;
   /** Callback when model is selected */
   onModelSelect: (entry: PhaseModelEntry) => void;
   isProcessing: boolean;
+  /** Show stop action even if local isProcessing is temporarily out of sync */
+  canStop?: boolean;
   isConnected: boolean;
   /** Current project path for agent prompts */
   projectPath: string | null;
@@ -81,6 +83,7 @@ export function AgentInputArea({
   modelSelection,
   onModelSelect,
   isProcessing,
+  canStop = false,
   isConnected,
   projectPath,
   elapsedSeconds = 0,
@@ -167,6 +170,7 @@ export function AgentInputArea({
         modelSelection={modelSelection}
         onModelSelect={onModelSelect}
         isProcessing={isProcessing}
+        canStop={canStop}
         isConnected={isConnected}
         hasFiles={hasFiles}
         isDragOver={isDragOver}

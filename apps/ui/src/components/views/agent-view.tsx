@@ -7,7 +7,11 @@ import { useOrchestratorStore } from '@/store/orchestrator-store';
 import { useTaskChatBridgeStore } from '@/store/task-chat-bridge-store';
 import { useShallow } from 'zustand/react/shallow';
 import { useElectronAgent } from '@/hooks/use-electron-agent';
-import { SessionManager, type QuickCreateSessionArgs } from '@/components/session-manager';
+import {
+  SessionManager,
+  type QuickCreateSessionArgs,
+  type QuickCreateSessionResult,
+} from '@/components/session-manager';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { copyToClipboard, generateChatSummary, generateContextSummary } from '@/lib/copy-all-chat';
 import { embedSystemPrompts } from '@/lib/system-prompt-payload';
@@ -218,7 +222,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
   // Ref for quick create session function from SessionManager
   const quickCreateSessionRef = useRef<
-    ((options?: QuickCreateSessionArgs) => Promise<boolean>) | null
+    ((options?: QuickCreateSessionArgs) => Promise<QuickCreateSessionResult>) | null
   >(null);
 
   // Session management hook
@@ -266,6 +270,10 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       : currentSession?.status === 'stopped' || currentSession?.status === 'time_limited'
         ? 'stopped'
         : 'idle';
+  const canStopExecution = chatActivityState === 'running';
+  const handleStopExecution = useCallback(() => {
+    void stopExecution('manual');
+  }, [stopExecution]);
 
   const chatActivityHandleClass =
     chatActivityState === 'running'
@@ -638,14 +646,14 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       pendingCopiedContentSourceSessionIdRef.current = currentSessionId;
       followUpAutoSendRef.current = true;
       setPendingCopiedContent(followUpContent);
-      const created = await quickCreate({
+      const quickCreateResult = await quickCreate({
         attachOrchestratorRunId: false,
         forceCreate: true,
         sourceType: 'manual',
         parentSessionId: currentSessionId,
       });
 
-      if (!created) {
+      if (!quickCreateResult.success) {
         pendingCopiedContentSourceSessionIdRef.current = null;
         followUpAutoSendRef.current = false;
         followUpSessionRequestForRef.current = null;
@@ -758,6 +766,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     setAutoSendStatus: orchestratorSetAutoSendStatus,
     setLastTriggerCheck: orchestratorSetLastTriggerCheck,
     startNewRun: orchestratorStartNewRun,
+    orchestratorRunId: activeOrchestratorRunId,
   } = useOrchestratorStore(
     useShallow((s) => ({
       isEnabled: s.isEnabled,
@@ -772,6 +781,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       setAutoSendStatus: s.setAutoSendStatus,
       setLastTriggerCheck: s.setLastTriggerCheck,
       startNewRun: s.startNewRun,
+      orchestratorRunId: s.orchestratorRunId,
     }))
   );
 
@@ -782,6 +792,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
   );
   const sessionIdAtProcessingStartRef = useRef<string | null>(null);
   const orchestratorSourceSessionIdRef = useRef<string | null>(null);
+  const orchestratorTargetSessionIdRef = useRef<string | null>(null);
   const orchestratorHandledMessageKeysRef = useRef(new Set<string>());
   const sessionsWithInjectedSystemPromptsRef = useRef(new Set<string>());
 
@@ -852,6 +863,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
 
       orchestratorHandledMessageKeysRef.current.add(messageKey);
       orchestratorSourceSessionIdRef.current = sourceSessionId;
+      orchestratorTargetSessionIdRef.current = null;
       setOrchestratorPendingContent(assistantMessage.content);
       if (orchestratorAutoSend) {
         orchestratorSetAutoSendStatus('waiting');
@@ -873,21 +885,37 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
         forceCreate: true,
         sourceType: 'orchestrator',
       })
-        .then((created) => {
-          if (!created) {
+        .then((quickCreateResult) => {
+          if (!quickCreateResult.success) {
             logger.error('[Orchestrator] Session creation failed');
             orchestratorHandledMessageKeysRef.current.delete(messageKey);
             clearOrchestratorPendingContent();
             orchestratorSourceSessionIdRef.current = null;
+            orchestratorTargetSessionIdRef.current = null;
             orchestratorSetAutoSendStatus('idle');
             toast.error('Orchestrator konnte keinen neuen Chat starten.');
+            return;
           }
+
+          if (!quickCreateResult.sessionId) {
+            logger.error('[Orchestrator] Session creation returned no target session ID');
+            orchestratorHandledMessageKeysRef.current.delete(messageKey);
+            clearOrchestratorPendingContent();
+            orchestratorSourceSessionIdRef.current = null;
+            orchestratorTargetSessionIdRef.current = null;
+            orchestratorSetAutoSendStatus('idle');
+            toast.error('Orchestrator konnte keinen neuen Chat starten.');
+            return;
+          }
+
+          orchestratorTargetSessionIdRef.current = quickCreateResult.sessionId;
         })
         .catch((error) => {
           logger.error('[Orchestrator] Session creation crashed', error);
           orchestratorHandledMessageKeysRef.current.delete(messageKey);
           clearOrchestratorPendingContent();
           orchestratorSourceSessionIdRef.current = null;
+          orchestratorTargetSessionIdRef.current = null;
           orchestratorSetAutoSendStatus('idle');
           toast.error('Orchestrator konnte keinen neuen Chat starten.');
         });
@@ -904,16 +932,17 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     ]
   );
 
-  const sessionIdsForCurrentProject = useMemo(() => {
+  const sessionsByIdForCurrentProject = useMemo(() => {
     if (!currentProject?.path) {
-      return new Set<string>();
+      return new Map<string, (typeof sessionsForOrchestratorScope)[number]>();
     }
 
-    return new Set(
-      sessionsForOrchestratorScope
-        .filter((session) => session.projectPath === currentProject.path)
-        .map((session) => session.id)
-    );
+    const map = new Map<string, (typeof sessionsForOrchestratorScope)[number]>();
+    for (const session of sessionsForOrchestratorScope) {
+      if (session.projectPath !== currentProject.path) continue;
+      map.set(session.id, session);
+    }
+    return map;
   }, [sessionsForOrchestratorScope, currentProject?.path]);
 
   // Listen globally for completion events so orchestrator chaining also works in the background.
@@ -927,9 +956,14 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       const event = rawEvent as StreamEvent;
       if (event.type !== 'complete') return;
 
-      const belongsToCurrentProject =
-        sessionIdsForCurrentProject.has(event.sessionId) || event.sessionId === currentSessionId;
-      if (!belongsToCurrentProject) {
+      const eventSession = sessionsByIdForCurrentProject.get(event.sessionId);
+      const isActiveSession = event.sessionId === currentSessionId;
+      const belongsToActiveOrchestratorRun =
+        !!activeOrchestratorRunId &&
+        eventSession?.sourceType === 'orchestrator' &&
+        eventSession.orchestratorRunId === activeOrchestratorRunId;
+
+      if (!isActiveSession && !belongsToActiveOrchestratorRun) {
         return;
       }
 
@@ -954,7 +988,8 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     orchestratorEnabled,
     currentProject?.path,
     currentSessionId,
-    sessionIdsForCurrentProject,
+    activeOrchestratorRunId,
+    sessionsByIdForCurrentProject,
     triggerOrchestratorPhaseContinuation,
   ]);
 
@@ -1075,10 +1110,18 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     if (!pendingOrchestratorContent || !currentSessionId) return;
     const content = pendingOrchestratorContent;
     const sourceSessionId = orchestratorSourceSessionIdRef.current;
+    const targetSessionId = orchestratorTargetSessionIdRef.current;
 
-    // Never inject pending content back into the source/origin session.
-    // Wait until SessionManager actually switched to the newly created session.
-    if (sourceSessionId && sourceSessionId === currentSessionId) {
+    // Prefer strict target-session matching. This prevents routing into unrelated chats.
+    if (targetSessionId && currentSessionId !== targetSessionId) {
+      if (orchestratorAutoSend) {
+        orchestratorSetAutoSendStatus('waiting');
+      }
+      return;
+    }
+
+    // Fallback guard for legacy/edge paths where no target session ID is available yet.
+    if (!targetSessionId && sourceSessionId && sourceSessionId === currentSessionId) {
       if (orchestratorAutoSend) {
         orchestratorSetAutoSendStatus('waiting');
       }
@@ -1091,6 +1134,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
       clearOrchestratorPendingContent();
       orchestratorSetAutoSendStatus('idle');
       orchestratorSourceSessionIdRef.current = null;
+      orchestratorTargetSessionIdRef.current = null;
       return;
     }
 
@@ -1132,6 +1176,7 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
         orchestratorAutoSendInProgressRef.current = false;
         orchestratorSetAutoSendStatus('idle');
         orchestratorSourceSessionIdRef.current = null;
+        orchestratorTargetSessionIdRef.current = null;
       });
   }, [
     pendingOrchestratorContent,
@@ -1184,7 +1229,8 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
           orchestratorEnabled &&
           !currentSession?.orchestratorRunId &&
           !pendingOrchestratorContent &&
-          !orchestratorSourceSessionIdRef.current;
+          !orchestratorSourceSessionIdRef.current &&
+          !orchestratorTargetSessionIdRef.current;
 
         if (shouldStartFreshRun) {
           orchestratorStartNewRun();
@@ -1282,14 +1328,14 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
           }
 
           followUpSessionRequestForRef.current = requestToken;
-          const created = await quickCreate({
+          const quickCreateResult = await quickCreate({
             attachOrchestratorRunId: false,
             forceCreate: true,
             sourceType: 'manual',
             parentSessionId: sourceSessionId ?? currentSessionId,
           });
 
-          if (!created) {
+          if (!quickCreateResult.success) {
             followUpSessionRequestForRef.current = null;
             toast.error('Neuer Folge-Chat konnte nicht erstellt werden.');
           }
@@ -1519,13 +1565,13 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
           }
 
           taskAutoStartSessionRequestForRef.current = taskToken;
-          const created = await quickCreate({
+          const quickCreateResult = await quickCreate({
             attachOrchestratorRunId: false,
             forceCreate: false,
             sourceType: 'manual',
           });
 
-          if (!created) {
+          if (!quickCreateResult.success) {
             failBeforeSend('Neue Session konnte nicht erstellt werden.');
           }
           return;
@@ -1537,14 +1583,14 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
           }
 
           taskAutoStartSessionRequestForRef.current = taskToken;
-          const created = await quickCreate({
+          const quickCreateResult = await quickCreate({
             attachOrchestratorRunId: false,
             forceCreate: true,
             sourceType: 'manual',
             parentSessionId: currentSessionId,
           });
 
-          if (!created) {
+          if (!quickCreateResult.success) {
             failBeforeSend('Neue leere Session konnte nicht erstellt werden.');
           }
           return;
@@ -1740,20 +1786,47 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
         return;
       }
 
-      // Set the file path with prefix into the chat input field
-      setInput((prev) => {
-        const trimmed = prev.replace(/\s+$/, '');
-        const prefix = trimmed.length > 0 ? '\n\n' : '';
-        return `${trimmed}${prefix}Verlaufsdatei: ${historyFile.filePath}\n`;
-      });
-
-      // Focus the input field
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 100);
-
-      toast.success(`Verlauf gespeichert: History/${historyFile.fileName}`);
       setCurrentDocPath(historyFile.filePath);
+
+      // Open a new chat with the history file reference pre-filled (but NOT auto-sent)
+      const quickCreate = quickCreateSessionRef.current;
+      if (quickCreate && currentSessionId) {
+        const prefillContent = `Verlaufsdatei: ${historyFile.filePath}\n`;
+        pendingCopiedContentSourceSessionIdRef.current = currentSessionId;
+        followUpAutoSendRef.current = false; // Do NOT auto-send, user decides
+        setPendingCopiedContent(prefillContent);
+        const quickCreateResult = await quickCreate({
+          attachOrchestratorRunId: false,
+          forceCreate: true,
+          sourceType: 'manual',
+        });
+
+        if (quickCreateResult.success) {
+          toast.success(
+            `Verlauf gespeichert: History/${historyFile.fileName} — Neuer Chat geoeffnet.`
+          );
+        } else {
+          // Fallback: could not create new session, fill into current input
+          pendingCopiedContentSourceSessionIdRef.current = null;
+          clearPendingContent();
+          setInput((prev) => {
+            const trimmed = prev.replace(/\s+$/, '');
+            const prefix = trimmed.length > 0 ? '\n\n' : '';
+            return `${trimmed}${prefix}Verlaufsdatei: ${historyFile.filePath}\n`;
+          });
+          setTimeout(() => inputRef.current?.focus(), 100);
+          toast.success(`Verlauf gespeichert: History/${historyFile.fileName}`);
+        }
+      } else {
+        // No quickCreate available — fallback to current chat input
+        setInput((prev) => {
+          const trimmed = prev.replace(/\s+$/, '');
+          const prefix = trimmed.length > 0 ? '\n\n' : '';
+          return `${trimmed}${prefix}Verlaufsdatei: ${historyFile.filePath}\n`;
+        });
+        setTimeout(() => inputRef.current?.focus(), 100);
+        toast.success(`Verlauf gespeichert: History/${historyFile.fileName}`);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Fehler beim Speichern';
       toast.error(msg);
@@ -1764,8 +1837,11 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
     currentProject?.path,
     messages,
     isSavingToDoc,
+    currentSessionId,
     setCurrentDocPath,
     setInput,
+    setPendingCopiedContent,
+    clearPendingContent,
     saveHistorySnapshot,
   ]);
 
@@ -2045,10 +2121,11 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
                   input={input}
                   onInputChange={setInput}
                   onSend={handleSend}
-                  onStop={stopExecution}
+                  onStop={handleStopExecution}
                   modelSelection={modelSelection}
                   onModelSelect={setModelSelection}
                   isProcessing={isProcessing}
+                  canStop={canStopExecution}
                   isConnected={isConnected}
                   projectPath={currentProject?.path || null}
                   elapsedSeconds={elapsedSeconds}
@@ -2158,10 +2235,11 @@ export function AgentView({ hideHeader }: AgentViewProps = {}) {
               input={input}
               onInputChange={setInput}
               onSend={handleSend}
-              onStop={stopExecution}
+              onStop={handleStopExecution}
               modelSelection={modelSelection}
               onModelSelect={setModelSelection}
               isProcessing={isProcessing}
+              canStop={canStopExecution}
               isConnected={isConnected}
               projectPath={currentProject?.path || null}
               elapsedSeconds={elapsedSeconds}
